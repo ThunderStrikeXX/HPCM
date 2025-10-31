@@ -488,15 +488,15 @@ namespace vapor_sodium {
 
 int main() {
 
-    // ===========================================================================
+    // =======================================================================
     //
     //               [CONSTANTS AND VARIABLES DEFINITIONS]
     //
-    // ===========================================================================
+    // =======================================================================
 
-#pragma region constants_and_variables
+    #pragma region constants_and_variables
 
-// Mathematical constants
+    // Mathematical constants
     const double M_PI = 3.14159265358979323846;
 
     // Physical properties
@@ -610,17 +610,22 @@ int main() {
 
     // Liquid initial conditions
     std::vector<double> u_x(N, -0.01), p_x(N, vapor_sodium::P_sat(T_x_v[N - 1])), p_prime_x(N, 0.0);
+    std::vector<double> T_old_x(N, T_init - 200), p_old_x(N, vapor_sodium::P_sat(T_x_v[N - 1]));        // Backup values
+    std::vector<double> p_storage_x(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));                          // Storage for ghost nodes at the boundaries
+    double* p_padded_x = &p_storage_x[1];                                                               // Poìnter to work on the storage with the same indes
+    
 
     // Vapor inital conditions
     std::vector<double> u_v(N, 0.1), p_v(N, vapor_sodium::P_sat(T_x_v[N - 1])), rho_v(N, 8e-3), p_prime_v(N, 0.0);
     std::vector<double> p_old_v(N, vapor_sodium::P_sat(T_x_v[N - 1])), T_old_v(N, T_init), rho_old_v(N, 8e-3), u_old_v(N, 0.1);
-    std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));          // Storage for ghost nodes aVT the boundaries
-    double* p_padded_v = &p_storage_v[1];                                               // Poìnter to work on the storage with the same indes
+    std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));                          // Storage for ghost nodes aVT the boundaries
+    double* p_padded_v = &p_storage_v[1];                                                               // Poìnter to work on the storage with the same indes
 
 
     // Liquid boundary conditions (Dirichlet u at inlet, p at outlet, T at both ends)
-    const double u_inlet_x = 0.01;          // Inlet velocity [m/s]
-    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);     // Outlet pressure [Pa]
+    const double u_inlet_x = 0.01;                              // Inlet velocity [m/s]
+    const double u_outlet_x = 0.0;                              // Outlet velocity [m/s]
+    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);      // Outlet pressure [Pa]
 
     // Boundary conditions for the vapor phase
     const double u_inlet_v = 0.0;      // Inlet velocity [m/s]
@@ -681,6 +686,9 @@ int main() {
 
     // The coefficient bVU is needed in momentum predictor loop and pressure correction to estimate the velocities aVT the faces using the Rhie and Chow correction
     std::vector<double> aVU(N, 0.0), bVU(N, 2 * (4.0 / 3.0 * vapor_sodium::mu(T_init) / dz) + dz / dt * rho_v[0]), cVU(N, 0.0), dVU(N, 0.0);
+
+    // The coefficient bU is needed in momentum predictor loop and pressure correction to estimate the velocities at the faces using the Rhie and Chow correction
+    std::vector<double> aXU(N, 0.0), bXU(N, liquid_sodium::rho(T_init) * dz / dt + 2 * liquid_sodium::mu(T_init) / dz), cXU(N, 0.0), dXU(N, 0.0);
 
     #pragma endregion
 
