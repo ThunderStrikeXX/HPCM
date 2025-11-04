@@ -681,74 +681,74 @@ int main() {
     const double M_PI = 3.14159265358979323846;
 
     // Physical properties
-    const double emissivity = 0.9;          // Wall emissivity [-]
-    const double sigma = 5.67e-8;           // Stefan-Boltzmann constant [W/m^2/K^4]
-    const double Rv = 361.8;                // Gas constant for the sodium vapor [J/(kg K)]
-    const double Pr_t = 0.01;               // Prandtl turbulent number for sodium vapor [-]
-    const double gamma = 1.66;              // Ratio between constant pressure specific heat and constant volume specific heat [-] 
+    const double emissivity = 0.9;          ///< Wall emissivity [-]
+    const double sigma = 5.67e-8;           ///< Stefan-Boltzmann constant [W/m^2/K^4]
+    const double Rv = 361.8;                ///< Gas constant for the sodium vapor [J/(kg K)]
+    const double Pr_t = 0.01;               ///< Prandtl turbulent number for sodium vapor [-]
+    const double gamma = 1.66;              ///< TODO: MAKE THIS PROPERTY TEMPERATURE DEPENDENT Ratio between constant pressure specific heat and constant volume specific heat [-] 
 
     // Environmental boundary conditions
-    const double h_conv = 10;             // Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 1e3;               // Power at the evaporator side [W]
-    const double T_env = 280.0;             // External environmental temperature [K]
+    const double h_conv = 10;               ///< Convective heat transfer coefficient for external heat removal [W/m^2/K]
+    const double power = 1e3;               ///< Power at the evaporator side [W]
+    const double T_env = 280.0;             ///< External environmental temperature [K]
 
     // Geometric parameters
-    const int N = 100;                                                          // Number of axial nodes [-]
-    const double L = 0.982; 			                                        // Length of the heat pipe [m]
-    const double dz = L / N;                                                    // Axial discretization step [m]
-    const double evaporator_length = 0.502;                                     // Evaporator length [m]
-    const double adiabatic_length = 0.188;                                      // Adiabatic length [m]
-    const double condenser_length = 0.292;                                      // Condenser length [m]
-    const double evaporator_nodes = std::floor(evaporator_length / dz);         // Number of evaporator nodes
-    const double condenser_nodes = std::ceil(condenser_length / dz);            // Number of condenser nodes
-    const double adiabatic_nodes = N - (evaporator_nodes + condenser_nodes);    // Number of adiabatic nodes
-    const double r_outer = 0.01335;                                             // Outer wall radius [m]
-    const double r_interface = 0.0112;                                          // Wall-wick interface radius [m]
-    const double r_inner = 0.01075;                                             //  Vapor-wick interface radius [m]
+    const int N = 100;                                                          ///< Number of axial nodes [-]
+    const double L = 0.982; 			                                        ///< Length of the heat pipe [m]
+    const double dz = L / N;                                                    ///< Axial discretization step [m]
+    const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
+    const double adiabatic_length = 0.188;                                      ///< Adiabatic length [m]
+    const double condenser_length = 0.292;                                      ///< Condenser length [m]
+    const double evaporator_nodes = std::floor(evaporator_length / dz);         ///< Number of evaporator nodes
+    const double condenser_nodes = std::ceil(condenser_length / dz);            ///< Number of condenser nodes
+    const double adiabatic_nodes = N - (evaporator_nodes + condenser_nodes);    ///< Number of adiabatic nodes
+    const double r_outer = 0.01335;                                             ///< Outer wall radius [m]
+    const double r_interface = 0.0112;                                          ///< Wall-wick interface radius [m]
+    const double r_inner = 0.01075;                                             ///< Vapor-wick interface radius [m]
 
     // Surfaces 
-    const double A_w_outer = 2 * M_PI * r_outer * dz;                                       // Wall radial area (at r_outer) [m^2]
-    const double A_w_cross = M_PI * (r_outer * r_outer - r_interface * r_interface);        // Wall cross-sectional area [m^2]
-    const double A_x_interface = 2 * M_PI * r_interface * dz;                               // Wick radial area (at r_interface) [m^2]
-    const double A_x_cross = M_PI * (r_interface * r_interface - r_inner * r_inner);        // Wick cross-sectional area [m^2]
-    const double A_v_inner = 2 * M_PI * r_inner * dz;                                       // Vapor radial area (at r_inner) [m^2]
-    const double A_v_cross = M_PI * r_inner * r_inner;                                      // Vapor cross-sectional area [m^2]
+    const double A_w_outer = 2 * M_PI * r_outer * dz;                                       ///< Wall radial area (at r_outer) [m^2]
+    const double A_w_cross = M_PI * (r_outer * r_outer - r_interface * r_interface);        ///< Wall cross-sectional area [m^2]
+    const double A_x_interface = 2 * M_PI * r_interface * dz;                               ///< Wick radial area (at r_interface) [m^2]
+    const double A_x_cross = M_PI * (r_interface * r_interface - r_inner * r_inner);        ///< Wick cross-sectional area [m^2]
+    const double A_v_inner = 2 * M_PI * r_inner * dz;                                       ///< Vapor radial area (at r_inner) [m^2]
+    const double A_v_cross = M_PI * r_inner * r_inner;                                      ///< Vapor cross-sectional area [m^2]
 
     // Time-stepping parameters
-    double dt = 1e-7;                         // Initial time step [s] (then it is updated according to the limits)
-    const int nSteps = 50;                          // Number of timesteps
-    const double time_total = nSteps * dt;          // Total simulation time [s]
+    double dt = 1e-7;                               ///< Initial time step [s] (then it is updated according to the limits)
+    const int nSteps = 50;                          ///< Number of timesteps
+    const double time_total = nSteps * dt;          ///< Total simulation time [s]
 
     // Wick permeability parameters
-    const double K = 1e-4;                          // Permeability [m^2]
-    const double CF = 0.0;                          // Forchheimer coefficient [1/m]
+    const double K = 1e-4;                          ///< Permeability [m^2]
+    const double CF = 0.0;                          ///< Forchheimer coefficient [1/m]
 
     // PISO Wick parameters
-    const int tot_outer_iter_x = 10000;                 // Outer iterations per time-step [-]
-    const int tot_inner_iter_x = 500;                    // Inner iterations per outer iteration [-]
-    const double outer_tol_x = 1e-6;                    // Tolerance for the inner iterations [-]
-    const double inner_tol_x = 1e-4;                    // Tolerance for the inner iterations [-]
+    const int tot_outer_iter_x = 10000;             ///< Outer iterations per time-step [-]
+    const int tot_inner_iter_x = 500;               ///< Inner iterations per outer iteration [-]
+    const double outer_tol_x = 1e-6;                ///< Tolerance for the inner iterations [-]
+    const double inner_tol_x = 1e-4;                ///< Tolerance for the inner iterations [-]
 
     // PISO Vapor parameters
-    const int tot_outer_iter_v = 10000;                  // Outer iterations per time-step [-]
-    const int tot_inner_iter_v = 500;                    // Inner iterations per outer iteration [-]
-    const double outer_tol_v = 1e-6;                     // Tolerance for the inner iterations [-]
-    const double inner_tol_v = 1e-4;                     // Tolerance for the inner iterations [-]
+    const int tot_outer_iter_v = 10000;             ///< Outer iterations per time-step [-]
+    const int tot_inner_iter_v = 500;               ///< Inner iterations per outer iteration [-]
+    const double outer_tol_v = 1e-6;                ///< Tolerance for the inner iterations [-]
+    const double inner_tol_v = 1e-4;                ///< Tolerance for the inner iterations [-]
 
-    // --- Initial temperature fields ---
     // Node partition
-    const int N_e = static_cast<int>(std::floor(evaporator_length / dz));
-    const int N_c = static_cast<int>(std::ceil(condenser_length / dz));
-    const int N_a = N - (N_e + N_c);
+    const int N_e = static_cast<int>(std::floor(evaporator_length / dz));   ///< Number of nodes of the evaporator region [-]
+    const int N_c = static_cast<int>(std::ceil(condenser_length / dz));     ///< Number of nodes of the condenser region [-]
+    const int N_a = N - (N_e + N_c);                                        ///< Number of nodes of the adiabadic region [-]
 
-    // Temperature min and max
-    double T_o_w_min = 875.0, T_o_w_max = 1100.0;
-    double T_w_min = 880.0, T_w_max = 1095.0;
-    double T_w_x_min = 885.0, T_w_x_max = 1090.0;
-    double T_x_min = 890.0, T_x_max = 1085.0;
-    double T_x_v_min = 895.0, T_x_v_max = 1080.0;
-    double T_v_min = 900.0, T_v_max = 1075.0;
+    // Initial values for the temperatures distributions
+    double T_o_w_min = 875.0, T_o_w_max = 1100.0;               ///< Extremes for the outer wall initial temperature [K]
+    double T_w_min = 880.0, T_w_max = 1095.0;                   ///< Extremes for the wall bulk initial temperature [K]
+    double T_w_x_min = 885.0, T_w_x_max = 1090.0;               ///< Extremes for the wall wick interface initial temperature [K]
+    double T_x_min = 890.0, T_x_max = 1085.0;                   ///< Extremes for the wick bulk initial temperature [K]
+    double T_x_v_min = 895.0, T_x_v_max = 1080.0;               ///< Extremes for the wick vapor initial temperature [K]
+    double T_v_min = 900.0, T_v_max = 1075.0;                   ///< Extremes for the vapor bulk initial temperature [K]
 
+    // Initialization of the initial temperatures using the extremes in a linear distribution
     std::vector<double> T_o_w = linspace(T_o_w_max, T_o_w_min, N);
     std::vector<double> T_w_bulk = linspace(T_w_max, T_w_min, N);
     std::vector<double> T_w_x = linspace(T_w_x_max, T_w_x_min, N);
@@ -756,45 +756,52 @@ int main() {
     std::vector<double> T_x_v = linspace(T_x_v_max, T_x_v_min, N);
     std::vector<double> T_v_bulk = linspace(T_v_max, T_v_min, N);
 
+    // Old temperature variables
     std::vector<double> T_x_v_old = T_x_v;
     std::vector<double> T_old_x = T_x_bulk;
     std::vector<double> T_old_v = T_v_bulk;
 
-    // Liquid initial conditions
-    std::vector<double> u_x(N, -0.01), p_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1])), p_prime_x(N, 0.0);
-    std::vector<double> p_old_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));        // Backup values
-    std::vector<double> p_storage_x(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));                          // Storage for ghost nodes at the boundaries
-    double* p_padded_x = &p_storage_x[1];                                                               // Poìnter to work on the storage with the same indes
+    // Wick fields
+    std::vector<double> u_x(N, -0.01);                                              ///< Wick velocity field [m/s]
+    std::vector<double> p_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));               ///< Wick pressure field [Pa]
+    std::vector<double> p_prime_x(N, 0.0);                                          ///< Wick correction pressure field [Pa]
+    std::vector<double> p_old_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));           ///< Wick old pressure field [Pa]
+    std::vector<double> p_storage_x(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));      ///< Wick padded pressure vector for R&C correction [Pa]
+    double* p_padded_x = &p_storage_x[1];                                           ///< Poìnter to work on the wick pressure padded storage with the same indes
 
-    // Vapor inital conditions
+    // Vapor fields
+    std::vector<double> u_v(N, 0.1);                                                ///< Vapor velocity field [m/s]
+    std::vector<double> p_v(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));               ///< Vapor pressure field [Pa]
+    std::vector<double> rho_v(N, 8e-3);                                             ///< Vapor density field [Pa]
+    std::vector<double> p_prime_v(N, 0.0);                                          ///< Vapor correction pressure field [Pa]
+    std::vector<double> p_old_v(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));           ///< Vapor old pressure field [Pa]
+    std::vector<double> rho_old_v(N, 8e-3);                                         ///< Vapor old density field [Pa]
+    std::vector<double> u_old_v(N, 0.1);                                            ///< Vapor old velocity field [Pa]
+    std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_v_bulk[N - 1]));   ///< Vapor padded pressure vector for R&C correction [Pa]
+    double* p_padded_v = &p_storage_v[1];                                           ///< Poìnter to work on the storage with the same indes
 
-    std::vector<double> u_v(N, 0.1), p_v(N, vapor_sodium::P_sat(T_v_bulk[N - 1])), rho_v(N, 8e-3), p_prime_v(N, 0.0);
-    std::vector<double> p_old_v(N, vapor_sodium::P_sat(T_v_bulk[N - 1])), rho_old_v(N, 8e-3), u_old_v(N, 0.1);
-    std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_v_bulk[N - 1]));                          // Storage for ghost nodes aVT the boundaries
-    double* p_padded_v = &p_storage_v[1];   // Poìnter to work on the storage with the same indes
+    // Wick BCs
+    const double u_inlet_x = 0.0;                                   ///< Wick inlet velocity [m/s]
+    const double u_outlet_x = 0.0;                                  ///< Wick outlet velocity [m/s]
+    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);          ///< Wick outlet pressure [Pa]
 
-    // Liquid boundary conditions (Dirichlet u at inlet, p at outlet, T at both ends)
-    const double u_inlet_x = 0.0;                              // Inlet velocity [m/s]
-    const double u_outlet_x = 0.0;                              // Outlet velocity [m/s]
-    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);      // Outlet pressure [Pa]
-
-    // Boundary conditions for the vapor phase
-    const double u_inlet_v = 0.0;      // Inlet velocity [m/s]
-    const double u_outlet_v = 0.0;      // Inlet velocity [m/s]
-    double p_outlet_v = vapor_sodium::P_sat(T_v_bulk[N - 1]);  // Outlet pressure [Pa]
+    // Vapor BCs
+    const double u_inlet_v = 0.0;                                   ///< Vapor inlet velocity [m/s]
+    const double u_outlet_v = 0.0;                                  ///< Vapor outlet velocity [m/s]
+    double p_outlet_v = vapor_sodium::P_sat(T_v_bulk[N - 1]);       ///< Vapor outlet pressure [Pa]
 
     // Turbulence constants for sodium vapor (SST model)
-    const double I = 0.05;                          // Turbulence intensity (5%)
-    const double L_t = 0.07 * L;                    // Turbulence length scale
-    const double k0 = 1.5 * pow(I * u_inlet_v, 2);        // Initial turbulent kinetic energy
-    const double omega0 = sqrt(k0) / (0.09 * L_t);        // Initial specific dissipation
-    const double sigma_k = 0.85;
-    const double sigma_omega = 0.5;
-    const double beta_star = 0.09;
-    const double beta = 0.075;
-    const double alpha = 5.0 / 9.0;
+    const double I = 0.05;                                          ///< Turbulence intensity [-]
+    const double L_t = 0.07 * L;                                    ///< Turbulence length scale [m]
+    const double k0 = 1.5 * pow(I * u_inlet_v, 2);                  ///< Initial turbulent kinetic energy [m^2/s^2]
+    const double omega0 = sqrt(k0) / (0.09 * L_t);                  ///< Initial specific dissipation rate [1/s]
+    const double sigma_k = 0.85;                                    ///< k-equation turbulent Prandtl number [-]
+    const double sigma_omega = 0.5;                                 ///< ω-equation turbulent Prandtl number [-]
+    const double beta_star = 0.09;                                  ///< β* constant for SST model [-]
+    const double beta = 0.075;                                      ///< β constant for turbulence model [-]
+    const double alpha = 5.0 / 9.0;                                 ///< α blending coefficient for SST model [-]
 
-    // Turbulence fields for sodium vapor initialization
+    // Turbulence fields for sodium vapor
     std::vector<double> k_turb(N, k0);
     std::vector<double> omega_turb(N, omega0);
     std::vector<double> mu_t(N, 0.0);
