@@ -63,16 +63,14 @@ namespace steel {
     }
 
     /**
-    * @brief Density as a function of temperature [kg/m3]
-    * @param T Temperature at which the density is needed.
+    * @brief Density [kg/m3] as a function of temperature T 
     */
-    double rho(double T) { return (7.9841 - 2.6560e-4 * T - 1.158e-7 * T * T) * 1e3; }
+    inline double rho(double T) { return (7.9841 - 2.6560e-4 * T - 1.158e-7 * T * T) * 1e3; }
 
     /**
-    * @brief Thermal conductivity as a function of temperature [W/(m*K)]
-    * @param T Temperature for which the thermal conductivity is needed.
+    * @brief Thermal conductivity [W/(m*K)] as a function of temperature T 
     */
-    double k(double T) { return (3.116e-2 + 1.618e-4 * T) * 100.0; }
+    inline double k(double T) { return (3.116e-2 + 1.618e-4 * T) * 100.0; }
 }
 
 #pragma endregion
@@ -83,43 +81,52 @@ namespace steel {
  * @brief Provides thermophysical properties for Liquid Sodium (Na).
  *
  * This namespace contains constant data and functions to calculate key
- * temperature-dependent properties of liquid sodium, which is commonly used
- * as a coolant in fast breeder reactors.
- * * All functions accept temperature T in **Kelvin [K]** and return values
- * in standard SI units.
+ * temperature-dependent properties of liquid sodium.
+ * All functions accept temperature T in Kelvin [K] and return values
+ * in standard SI units unless otherwise specified.
+ * The function give warnings if the input temperature is below the 
+ * (constant) solidification temperature.
  */
 namespace liquid_sodium {
 
-    // Critical temperature [K]
+    /// Critical temperature [K]
     constexpr double Tcrit = 2509.46;
 
-    // Solidification temperature, gives warning if below
+    /// Solidification temperature [K]
     constexpr double Tsolid = 370.87;
 
-    // Density [kg/m^3]
-    double rho(double T) {
+    /**
+    * @brief Density [kg/m3] as a function of temperature T
+    */
+    inline double rho(double T) {
 
-        if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
+        if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature (" << Tsolid << ")!";
         return 219.0 + 275.32 * (1.0 - T / Tcrit) + 511.58 * pow(1.0 - T / Tcrit, 0.5);
     }
 
-    // Thermal conductivity [W/(m·K)]
-    double k(double T) {
+    /**
+    * @brief Thermal conductivity [W/(m*K)] as a function of temperature T
+    */
+    inline double k(double T) {
 
         if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         return 124.67 - 0.11381 * T + 5.5226e-5 * T * T - 1.1842e-8 * T * T * T;
     }
 
-    // Specific heat [J/(kg·K)]
-    double cp(double T) {
+    /**
+    * @brief Specific heat at constant pressure [J/(kg·K)] as a function of temperature 
+    */
+    inline double cp(double T) {
 
         if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         double dXT = T - 273.15;
         return 1436.72 - 0.58 * dXT + 4.627e-4 * dXT * dXT;
     }
 
-    // Dynamic viscosity [Pa·s] using Shpilrain et al. correlation, valid for 371 K < T < 2500 K
-    double mu(double T) {
+    /**
+    * @brief Dynamic viscosity [Pa·s] using Shpilrain et al. correlation, valid for 371 K < T < 2500 K
+    */
+    inline double mu(double T) {
 
         if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
@@ -131,27 +138,27 @@ namespace liquid_sodium {
 #pragma region vapor_sodium_properties
 
 /**
- * @brief Provides thermophysical and transport properties for Saturated Sodium Vapor.
+ * @brief Provides thermophysical and transport properties for Sodium Vapor.
  *
  * This namespace contains constant data and functions to calculate key properties
- * of sodium vapor, particularly focusing on its behavior near the saturation curve
- * and critical region. It includes functions for thermodynamic properties and
- * flow/heat transfer correlations.
- *
- * All functions primarily accept temperature T in **Kelvin [K]** and return values
+ * of sodium vapor.
+ * All functions primarily accept temperature T in Kelvin [K] and return values
  * in standard SI units unless otherwise noted.
  */
-
 namespace vapor_sodium {
 
-    constexpr double Tcrit_Na = 2509.46;           // Critical temperature [K]
-    constexpr double Ad_Na = 3.46;                 // Adiabatic factor [-]
-    constexpr double m_g_Na = 23e-3;               // Molar mass [kg/mol]
+    constexpr double Tcrit_Na = 2509.46;           ///< Critical temperature [K]
+    constexpr double Ad_Na = 3.46;                 ///< Adiabatic factor [-]
+    constexpr double m_g_Na = 23e-3;               ///< Molar mass [kg/mol]
 
-    // Functions that clamps a value x to the range [a, b]
+    /**
+    * @brief Functions that clamps a value x to the range [a, b]
+    */
     inline double clamp(double x, double a, double b) { return std::max(a, std::min(x, b)); }
 
-    // 1D table interpolation in T over monotone grid
+    /**
+    * @brief 1D table interpolation in T over monotone grid
+    */
     template<size_t N>
     double interp_T(const std::array<double, N>& Tgrid, const std::array<double, N>& Ygrid, double T) {
 
@@ -165,21 +172,27 @@ namespace vapor_sodium {
         return Ygrid[i] + (T - Tgrid[i]) / (Tgrid[i + 1] - Tgrid[i]) * (Ygrid[i + 1] - Ygrid[i]);
     }
 
-    // Enthalpy of vaporization [J/kg]
+    /**
+    * @brief Enthalpy of vaporization [J/kg] as a function of temperature T
+    */
     inline double h_vap(double T) {
 
         const double r = 1.0 - T / Tcrit_Na;
         return (393.37 * r + 4398.6 * std::pow(r, 0.29302)) * 1e3;
     }
 
-    // Saturation pressure [Pa]
+    /**
+    * @brief Saturation pressure [Pa] as a function of temperature T
+    */
     inline double P_sat(double T) {
 
         const double val_MPa = std::exp(11.9463 - 12633.7 / T - 0.4672 * std::log(T));
         return val_MPa * 1e6;
     }
 
-    // Derivative of saturation pressure with respect to temperature [Pa/K]
+    /**
+    * @brief Derivative of saturation pressure with respect to temperature [Pa/K] as a function of temperature T
+    */
     inline double dP_sat_dVT(double T) {
 
         const double val_MPa_per_K =
@@ -187,17 +200,21 @@ namespace vapor_sodium {
         return val_MPa_per_K * 1e6;
     }
 
-    // Density of saturated vapor [kg/m^3]
+    /**
+    * @brief Density of saturated vapor [kg/m^3] as a function of temperature T
+    */
     inline double rho(double T) {
 
-        const double hv = h_vap(T);                         // [J/kg]
+        const double hv = h_vap(T);                           // [J/kg]
         const double dPdVT = dP_sat_dVT(T);                   // [Pa/K]
-        const double rhol = liquid_sodium::rho(T);          // [kg/m^3]
+        const double rhol = liquid_sodium::rho(T);            // [kg/m^3]
         const double denom = hv / (T * dPdVT) + 1.0 / rhol;
-        return 1.0 / denom;                                 // [kg/m^3]
+        return 1.0 / denom;                                   // [kg/m^3]
     }
 
-    // Specific heats from table interpolation [J/kg/K]
+    /**
+    * @brief Specific heat at constant pressure from table interpolation [J/(kg*K)] as a function of temperature T
+    */
     inline double cp(double T) {
 
         static const std::array<double, 21> Tgrid = { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100,2200,2300,2400 };
@@ -209,10 +226,12 @@ namespace vapor_sodium {
         return interp_T(Tgrid, Cpgrid, T);
     }
 
+    /**
+    * @brief Specific heat at constant volume from table interpolation [J/(kg*K)] as a function of temperature T
+    */
     inline double cv(double T) {
 
         static const std::array<double, 21> Tgrid = { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100,2200,2300,2400 };
-
         static const std::array<double, 21> Cvgrid = { 490, 840,1310,1710,1930,1980,1920,1810,1680,1580,1510,1440,1390,1380,1360,1330,1300,1300,1340,1440,1760 };
 
         // Table also lists 2500 K = 17030; extreme near critical. If needed, extend:
@@ -221,22 +240,20 @@ namespace vapor_sodium {
         return interp_T(Tgrid, Cvgrid, T);
     }
 
-    // Dynamic viscosity of sodium vapor [Pa·s]
-    inline double mu(double T) {
-        return 6.083e-9 * T + 1.2606e-5;
-
-    }
+    /**
+    * @brief Dynamic viscosity of sodium vapor [Pa·s] as a function of temperature T
+    */
+    inline double mu(double T) { return 6.083e-9 * T + 1.2606e-5; }
 
     /**
-     * @brief Calculates the Thermal Conductivity (k) of sodium vapor over an extended range.
+     * @brief Thermal conductivity [W/(m*K)] of sodium vapor over an extended range.
      *
      * Performs bilinear interpolation inside the experimental grid.
-     * Outside 900–1500 K or 981–98066 Pa, it extrapolates using kinetic-gas scaling (k ∝ sqrt(T))
-     * referenced to the nearest boundary. Prints warnings when extrapolating.
+     * Outside 900–1500 K or 981–98066 Pa, it extrapolates using kinetic-gas scaling (k ~ sqrt(T))
+     * referenced to the nearest boundary. Prints warnings when extrapolating outside of the boundaries.
      *
      * @param T Temperature [K]
      * @param P Pressure [Pa]
-     * @return double Thermal conductivity [W/(m·K)]
      */
     inline double k(double T, double P) {
 
@@ -254,7 +271,7 @@ namespace vapor_sodium {
             {0.048930, 0.049162,0.049511,0.051603,0.054043}  // 1500 K
         };
 
-        // local clamp
+        // Clamping function
         auto clamp_val = [](double x, double minv, double maxv) {
             return (x < minv) ? minv : ((x > maxv) ? maxv : x);
             };
@@ -289,7 +306,7 @@ namespace vapor_sodium {
 
         double k_interp = 0.0;
 
-        // bilinear interpolation
+        // Bilinear interpolation
         if ((T1 != T0) && (P1 != P0)) {
             const double t = (Tc - T0) / (T1 - T0);
             const double u = (Pc - P0) / (P1 - P0);
@@ -307,14 +324,14 @@ namespace vapor_sodium {
             k_interp = q11;
         }
 
-        // extrapolation handling
+        // Extrapolation handling
         if (Tlow || Thigh || Plow || Phigh) {
             if (Tlow)
-                std::cerr << "[Warning] Sodium vapor k(): T=" << T << " < " << Tmin << " K. Using sqrt(T) extrapolation.\n";
+                std::cerr << "[Warning] Sodium vapor k: T=" << T << " < " << Tmin << " K. Using sqrt(T) extrapolation.\n";
             if (Thigh)
-                std::cerr << "[Warning] Sodium vapor k(): T=" << T << " > " << Tmax << " K. Using sqrt(T) extrapolation.\n";
+                std::cerr << "[Warning] Sodium vapor k: T=" << T << " > " << Tmax << " K. Using sqrt(T) extrapolation.\n";
             if (Plow || Phigh)
-                std::cerr << "[Warning] Sodium vapor k(): P outside ["
+                std::cerr << "[Warning] Sodium vapor k: P outside ["
                 << Pmin << "," << Pmax << "] Pa. Using constant-P approximation.\n";
 
             double Tref = (Tlow ? Tmin : (Thigh ? Tmax : Tc));
@@ -326,8 +343,10 @@ namespace vapor_sodium {
         return k_interp;
     }
 
-
-    // Friction factor [-] (Gnielinski correlation)
+    /**
+    * @brief Friction factor [-] (Gnielinski correlation) as a function of Reynolds number. 
+    * Retrieves an error if Re < 0.
+    */
     inline double f(double Re) {
 
         if (Re <= 0.0) throw std::invalid_argument("Error: Re < 0");
@@ -336,7 +355,10 @@ namespace vapor_sodium {
         return 1.0 / (t * t);
     }
 
-    // Nusselt number [-] (Gnielinski correlation)
+    /**
+    * @brief Nusselt number [-] (Gnielinski correlation) as a function of Reynolds number
+    * Retrieves an error if Re < 0 or Nu < 0.
+    */
     inline double Nu(double Re, double Pr) {
 
         // If laminar, Nu is constant
@@ -351,9 +373,12 @@ namespace vapor_sodium {
         return num / den;
     }
 
-    // Convective heat transfer coefficient [W/m^2/K] (Gnielinski correlation)
+    /**
+    * @brief Convective heat transfer coefficient [W/m^2/K] (Gnielinski correlation) as a function of Reynolds number
+    * Retrieves an error if Re < 0 or Nu < 0.
+    */ 
     inline double h_conv(double Re, double Pr, double k, double Dh) {
-        if (k <= 0.0 || Dh <= 0.0) throw std::invalid_argument("k, Dh > 0");
+
         const double Nu = vapor_sodium::Nu(Re, Pr);
         return Nu * k / Dh;
     }
@@ -371,20 +396,12 @@ namespace vapor_sodium {
 /**
  * @brief Solves a tridiagonal system of linear equations A*x = d using the Thomas Algorithm (TDMA).
  *
- * This function efficiently solves a system where the coefficient matrix A is tridiagonal,
- * meaning it only has non-zero elements on the main diagonal, the sub-diagonal, and the super-diagonal.
- * The system is defined by:
- * - 'a': The sub-diagonal (below the main diagonal). a[0] is typically unused.
- * - 'b': The main diagonal.
- * - 'c': The super-diagonal (above the main diagonal). c[N-1] is typically unused.
- * - 'd': The right-hand side vector.
- *
  * The method consists of two main phases: forward elimination and back substitution,
  * which is optimized for the sparse tridiagonal structure.
  *
- * @param a The sub-diagonal vector (size N, with a[0] often being zero/unused).
+ * @param a The sub-diagonal vector (size N, with a[0] being zero/unused).
  * @param b The main diagonal vector (size N). Must contain non-zero elements.
- * @param c The super-diagonal vector (size N, with c[N-1] often being zero/unused).
+ * @param c The super-diagonal vector (size N, with c[N-1] being zero/unused).
  * @param d The right-hand side vector (size N).
  * @return std::vector<double> The solution vector 'x' (size N).
  * * @note This implementation assumes the system is diagonally dominant or otherwise
@@ -427,8 +444,7 @@ using Mat6x6 = std::array<std::array<double, 6>, 6>;
  *
  * This function applies Gaussian elimination with partial pivoting to transform the
  * augmented matrix [A|b] into an upper triangular form. It then solves for the
- * unknown vector 'x' using back substitution. The function works only for 6x6
- * systems due to its fixed size implementation.
+ * unknown vector 'x' using back substitution. The function works only for 6x6 systems.
  *
  * @param A The 6x6 coefficient matrix. This matrix is modified in-place
  * (transformed into an upper triangular matrix).
@@ -487,7 +503,13 @@ static Vec6 solve6(Mat6x6 A, Vec6 b) {
     return x;
 }
 
-// Initializes vector with equally spaced values between min and max
+/**
+ * @brief Generate N linearly spaced values from T_min to T_max.
+ * @param T_min start value.
+ * @param T_max end value.
+ * @param N number of points.
+ * @return Vector of uniformly spaced values.
+ */
 std::vector<double> linspace(double T_min, double T_max, int N) {
     std::vector<double> T(N);
     double dT = (T_max - T_min) / (N - 1);
@@ -495,18 +517,23 @@ std::vector<double> linspace(double T_min, double T_max, int N) {
     return T;
 }
 
-// Adaptive SOLID time-step that calculates new time step as the smaller between: 
-//      Fourier limit (CFo number)
-//      Mass source/sink limit (CS limit)
+/**
+ * @brief Compute adaptive time step for the wall region based on Fourier and source limits.
+ * @param dz spatial step size.
+ * @param dt_old previous time step.
+ * @param T wall temperature field.
+ * @param St volumetric source term field.
+ * @return New time step satisfying diffusion and source stability constraints.
+ */
 double new_dt_w(double dz, double dt_old,
     const std::vector<double>& T,
     const std::vector<double>& St) {
 
-    const double CFo = 0.5, CS = 0.5;                           // Limit coefficients
-    const double epsS = 1e-12;                                  // This is to prevent divisions by zero (e.g. if the source is zero)
-    const double theta = 0.9;                                   // Adjusting coefficient for the timestep candidate 
-    const double rdown = 0.2;                                   // Coefficient for damping the timestep correction
-    const double dt_min = 1e-12, dt_max = 1e-3;                  // Timestep boundaries [s]
+    const double CFo = 0.5, CS = 0.5;           ///< Limit coefficients
+    const double epsS = 1e-12;                  ///< This is to prevent divisions by zero (e.g. if the source is zero)
+    const double theta = 0.9;                   ///< Adjusting coefficient for the timestep candidate 
+    const double rdown = 0.2;                   ///< Coefficient for damping the timestep correction
+    const double dt_min = 1e-12, dt_max = 1e-3; ///< Timestep boundaries [s]
 
     int N = St.size();
 
@@ -515,14 +542,14 @@ double new_dt_w(double dz, double dt_old,
 
         const double alpha = steel::k(T[i]) / (steel::cp(T[i]) * steel::rho(T[i]));
 
-        // Minimum time step due to CFL
+        /// Minimum time step due to CFL
         const double dt_c = CFo * dz * dz / alpha;
 
-        // Minimum time step due to CS limit
+        /// Minimum time step due to CS limit
         double dt_s = CS * steel::rho(T[i]) * steel::cp(T[i]) / (std::abs(St[i]) + epsS);
 
         double dti = std::min(dt_c, dt_s);
-        dt_cand = std::min(dt_cand, dti);           // Loop on each node to find the minimum timestep necessary
+        dt_cand = std::min(dt_cand, dti);  // Loop on each node to find the minimum timestep necessary
     }
 
     // Timestep lower boundary overrall and damping the correction
@@ -531,19 +558,25 @@ double new_dt_w(double dz, double dt_old,
 }
 
 
-// Adaptive LIQUID time-step that calculates new time step as the smaller between: 
-//      Convective limit (CFL number)
-//      Mass source/sink limit (CS limit)
+/**
+ * @brief Compute adaptive time step for the wick region based on CFL and source limits.
+ * @param dz spatial step size.
+ * @param dt_old previous time step.
+ * @param u wick velocity field.
+ * @param T wick bulk temperature field.
+ * @param Sm wick mass source term field.
+ * @return New time step satisfying advection and source stability constraints.
+ */
 double new_dt_x(double dz, double dt_old,
     const std::vector<double>& u,
     const std::vector<double>& T,
     const std::vector<double>& Sm) {
 
-    const double CFL = 0.5, CS = 0.5;                           // Limit coefficients
-    const double epsS = 1e-12;                                  // This is to prevent divisions by zero (e.g. if the source is zero)
-    const double theta = 0.9;                                   // Adjusting coefficient for the timestep candidate 
-    const double rdown = 0.2;                                   // Coefficient for damping the timestep correction
-    const double dt_min = 1e-12, dt_max = 1e-3;                  // Timestep boundaries [s]
+    const double CFL = 0.5, CS = 0.5;                  ///< Limit coefficients
+    const double epsS = 1e-12;                         ///< This is to prevent divisions by zero (e.g. if the source is zero)
+    const double theta = 0.9;                          ///< Adjusting coefficient for the timestep candidate 
+    const double rdown = 0.2;                          ///< Coefficient for damping the timestep correction
+    const double dt_min = 1e-12, dt_max = 1e-3;        ///< Timestep boundaries [s]
 
     int N = u.size();
 
@@ -557,7 +590,7 @@ double new_dt_x(double dz, double dt_old,
         double dt_s = CS * liquid_sodium::rho(T[i]) / (std::abs(Sm[i]) + epsS);
 
         double dti = std::min(dt_c, dt_s);
-        dt_cand = std::min(dt_cand, dti);           // Loop on each node to find the minimum timestep necessary
+        dt_cand = std::min(dt_cand, dti);     // Loop on each node to find the minimum timestep necessary
     }
 
     // Timestep lower boundary overrall and damping the correction
@@ -565,10 +598,17 @@ double new_dt_x(double dz, double dt_old,
     return dt_new;
 }
 
-// Adaptive VAPOR time-step that calculates new time step as the smaller between: 
-//      Convective-acoustic limit (CFL number)
-//      Mass source/sink limit (CS limit)
-//      Pressure correction (CP limit)
+/**
+ * @brief Compute adaptive time step for the vapor region from CFL, source, and pressure limits.
+ * @param dz spatial step size.
+ * @param dt_old previous time step.
+ * @param u velocity field.
+ * @param T temperature field.
+ * @param rho density field.
+ * @param Sm mass source term field.
+ * @param bVU compressibility-related coefficient field.
+ * @return New time step satisfying acoustic, source, and pressure stability constraints.
+ */
 double new_dt_v(double dz, double dt_old,
     const std::vector<double>& u,
     const std::vector<double>& T,
@@ -576,13 +616,13 @@ double new_dt_v(double dz, double dt_old,
     const std::vector<double>& Sm,
     const std::vector<double>& bVU) {
 
-    const double gamma = 1.32;                                  // Vapor sodium gas constant [-]
-    const double Rv = 361.8;                                    // Gas constant for the sodium vapor [J/(kg K)]
-    const double CFL = 0.5, CS = 0.5, CP = 0.5;                 // Limit coefficients
-    const double epsS = 1e-12;                                  // This is to prevent divisions by zero (e.g. if the source is zero)
-    const double theta = 0.9;                                   // Adjusting coefficient for the timestep candidate 
-    const double rdown = 0.2;                                   // Coefficient for damping the timestep correction
-    const double dt_min = 1e-12, dt_max = 1e3;                  // Timestep boundaries [s]
+    const double gamma = 1.32;                          ///< Vapor sodium gas constant [-]
+    const double Rv = 361.8;                            ///< Gas constant for the sodium vapor [J/(kg K)]
+    const double CFL = 0.5, CS = 0.5, CP = 0.5;         ///< Limit coefficients
+    const double epsS = 1e-12;                          ///< This is to prevent divisions by zero (e.g. if the source is zero)
+    const double theta = 0.9;                           ///< Adjusting coefficient for the timestep candidate 
+    const double rdown = 0.2;                           ///< Coefficient for damping the timestep correction
+    const double dt_min = 1e-12, dt_max = 1e3;          ///< Timestep boundaries [s]
 
     int N = u.size();
     auto invb = [&](int i) { return 1.0 / std::max(bVU[i], 1e-30); };
@@ -611,7 +651,7 @@ double new_dt_v(double dz, double dt_old,
         }
 
         double dti = std::min(std::min(dt_c, dt_s), std::min(dt_s, dt_p));
-        dt_cand = std::min(dt_cand, dti);           // Loop on each node to find the minimum timestep necessary
+        dt_cand = std::min(dt_cand, dti);   // Loop on each node to find the minimum timestep necessary
     }
 
     // Timestep lower boundary overrall and damping the correction
@@ -621,15 +661,17 @@ double new_dt_v(double dz, double dt_old,
 
 #pragma endregion
 
-//-------------------------------------------------------------
-// Simplified 1D transient coupling between wall, wick, and vapor
-//-------------------------------------------------------------
-
+/**
+ * @brief Simplified 1D transient coupling between wall, wick, and vapor.
+ *
+ * Entry point for the solver performing sequential time-integration
+ * of the solid wall, porous wick, and vapor core.
+ */
 int main() {
 
     // =======================================================================
     //
-    //               [CONSTANTS AND VARIABLES DEFINITIONS]
+    //                       [CONSTANTS AND VARIABLES]
     //
     // =======================================================================
 
