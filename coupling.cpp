@@ -831,6 +831,7 @@ int main() {
     
     std::vector<double> Q_w(N, 0.0);             ///< Wall heat source [W / m^3]
     std::vector<double> Q_x(N, 0.0);             ///< Wick heat source [W / m^3]
+    std::vector<double> Q_v(N, 0.0);             ///< Vapor heat source [W / m^3]
 
     // Models
     const int rhie_chow_on_off_x = 1;                 ///< 0: no wick RC correction, 1: wick with RC correction
@@ -1288,7 +1289,7 @@ int main() {
             bXT[i] = (std::max(C_r, 0.0) + std::max(-C_l, 0.0)) + D_l + D_r + rhoCp_dzdt;       ///< [W/(m^2 K)]
 
             dXT[i] = rhoCp_dzdt * T_old_x[i] +  
-                        Q_x[i] * dz;                                                            ///< [W/(m^2 K)]
+                        Q_x[i] * dz;                                                            ///< [W/m2]
         }
 
         /// Temperature BCs: zero gradient on the first node
@@ -1883,63 +1884,74 @@ int main() {
         #pragma omp parallel
         for (int i = 1; i < N - 1; i++) {
 
-            const double rho_P = rho_v[i];
-            const double rho_L = rho_v[i - 1];
-            const double rho_R = rho_v[i + 1];
+            const double rho_P = rho_v[i];                                          ///< Density [kg/m3] of the central cell
+            const double rho_L = rho_v[i - 1];                                      ///< Density [kg/m3] of the left cell
+            const double rho_R = rho_v[i + 1];                                      ///< Density [kg/m3] of the right cell
 
-            const double k_cond_P = vapor_sodium::k(T_v_bulk[i], p_v[i]);
-            const double k_cond_L = vapor_sodium::k(T_v_bulk[i - 1], p_v[i - 1]);
-            const double k_cond_R = vapor_sodium::k(T_v_bulk[i + 1], p_v[i + 1]);
+            const double k_cond_P = vapor_sodium::k(T_v_bulk[i], p_v[i]);           ///< Thermal conductivity [W/(m*K)] of the central cell       
+            const double k_cond_L = vapor_sodium::k(T_v_bulk[i - 1], p_v[i - 1]);   ///< Thermal conductivity [W/(m*K)] of the left cell
+            const double k_cond_R = vapor_sodium::k(T_v_bulk[i + 1], p_v[i + 1]);   ///< Thermal conductivity [W/(m*K)] of the right cell
 
-            const double cp_P = vapor_sodium::cp(T_v_bulk[i]);
-            const double cp_L = vapor_sodium::cp(T_v_bulk[i - 1]);
-            const double cp_R = vapor_sodium::cp(T_v_bulk[i + 1]);
+            const double cp_P = vapor_sodium::cp(T_v_bulk[i]);                      ///< S. h. at constant pressure [J/(kg K)] of the central cell
+            const double cp_L = vapor_sodium::cp(T_v_bulk[i - 1]);                  ///< S. h. at constant pressure [J/(kg K)] of the left cell
+            const double cp_R = vapor_sodium::cp(T_v_bulk[i + 1]);                  ///< S. h. at constant pressure [J/(kg K)] of the right cell
 
-            const double rhoCp_dzdt = rho_old_v[i] * cp_P * dz / dt;
+            const double rhoCp_dzdt = rho_old_v[i] * cp_P * dz / dt;                ///< Useful constant [W/(m^2 K)]
 
-            const double keff_P = k_cond_P + SST_model_turbulence_on_off * (mu_t[i] * cp_P / Pr_t);
-            const double keff_L = k_cond_L + SST_model_turbulence_on_off * (mu_t[i - 1] * cp_L / Pr_t);
-            const double keff_R = k_cond_R + SST_model_turbulence_on_off * (mu_t[i + 1] * cp_R / Pr_t);
+            const double keff_P = k_cond_P + SST_model_turbulence_on_off * (mu_t[i] * cp_P / Pr_t);     ///< Effective t. c. [J/(kg K)] of the central cell
+            const double keff_L = k_cond_L + SST_model_turbulence_on_off * (mu_t[i - 1] * cp_L / Pr_t); ///< Effective t. c. [J/(kg K)] of the left cell
+            const double keff_R = k_cond_R + SST_model_turbulence_on_off * (mu_t[i + 1] * cp_R / Pr_t); ///< Effective t. c. [J/(kg K)] of the right cell
 
-            // Linear interpolation diffusion coefficient
-            const double D_l = 0.5 * (keff_P + keff_L) / dz;
-            const double D_r = 0.5 * (keff_P + keff_R) / dz;
+            const double D_l = 0.5 * (keff_P + keff_L) / dz;                        ///< Diffusion coefficient [W/(m^2 K)] of the left face (average)
+            const double D_r = 0.5 * (keff_P + keff_R) / dz;                        ///< Diffusion coefficient [W/(m^2 K)] of the right face (average)
 
+            /// RC correction for the left face velocity
             const double rhie_chow_l = -(1.0 / bVU[i - 1] + 1.0 / bVU[i]) / (8 * dz) * (p_padded_v[i - 2] - 3 * p_padded_v[i - 1] + 3 * p_padded_v[i] - p_padded_v[i + 1]);
+            
+            /// RC correction for the right face velocity 
             const double rhie_chow_r = -(1.0 / bVU[i + 1] + 1.0 / bVU[i]) / (8 * dz) * (p_padded_v[i - 1] - 3 * p_padded_v[i] + 3 * p_padded_v[i + 1] - p_padded_v[i + 2]);
 
+            /// Left face velocity [m/s] (average + RC correction)
             const double u_l_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rhie_chow_l;
+
+            /// Right face velocity [m/s] (average + RC correction)
             const double u_r_face = 0.5 * (u_v[i] + u_v[i + 1]) + rhie_chow_on_off_v * rhie_chow_r;
 
-            // Upwind density
-            const double rho_l = (u_l_face >= 0) ? rho_L : rho_P;
-            const double rho_r = (u_r_face >= 0) ? rho_P : rho_R;
+            const double rho_l = (u_l_face >= 0) ? rho_L : rho_P;   ///< Density [kg/m3] of the left face (upwind)
+            const double rho_r = (u_r_face >= 0) ? rho_P : rho_R;   ///< Density [kg/m3] of the right face (upwind)
 
             // Upwind specific heat
-            const double cp_l = (u_l_face >= 0) ? cp_L : cp_P;
-            const double cp_r = (u_r_face >= 0) ? cp_P : cp_R;
+            const double cp_l = (u_l_face >= 0) ? cp_L : cp_P;      ///< S. h. at constant pressure [J/(kg K)] of the left face (upwind)
+            const double cp_r = (u_r_face >= 0) ? cp_P : cp_R;      ///< S. h. at constant pressure [J/(kg K)] of the right face (upwind)
 
-            const double Fl = rho_l * u_l_face;
-            const double Fr = rho_r * u_r_face;
+            const double Fl = rho_l * u_l_face;                     ///< Mass flux [kg/(m2 s)] of the left face (upwind)       
+            const double Fr = rho_r * u_r_face;                     ///< Mass flux [kg/(m2 s)] of the left face (upwind)
 
-            const double C_l = (Fl * cp_l);
-            const double C_r = (Fr * cp_r);
+            const double C_l = (Fl * cp_l);                         ///< Mass flux [W/(m^2 K)] of the left face (upwind)
+            const double C_r = (Fr * cp_r);                         ///< Mass flux [W/(m^2 K)] of the left face (upwind)
 
-            // Volumetric heat source due to heat flux at the wick-vapor interface, positive if heat is flowing into the vapor
-            double volum_heat_source_x_v = 2 * q_x_v_vapor[i] / r_inner;
+            Q_v[i] = 2 * q_x_v_vapor[i] / r_inner;                  ///< Wick volumetric heat source [W/m^3]
 
-            aVT[i] = -D_l - std::max(C_l, 0.0);
-            cVT[i] = -D_r - std::max(-C_r, 0.0);
-            bVT[i] = (std::max(C_r, 0.0) + std::max(-C_l, 0.0)) + D_l + D_r + rhoCp_dzdt;
+            aVT[i] = -D_l - std::max(C_l, 0.0);                     ///< [W/(m^2 K)]
+            cVT[i] = -D_r - std::max(-C_r, 0.0);                    ///< [W/(m^2 K)]
+            bVT[i] = (std::max(C_r, 0.0) + std::max(-C_l, 0.0)) +   
+                        D_l + D_r + rhoCp_dzdt;                     ///< [W/(m^2 K)]
 
             const double pressure_work = (p_v[i] - p_old_v[i]) / dt;
-            dVT[i] = rhoCp_dzdt * T_old_v[i] + pressure_work * dz + volum_heat_source_x_v * dz;
+            dVT[i] = rhoCp_dzdt * T_old_v[i] + pressure_work * dz + 
+                        Q_v[i] * dz;                                ///< [W/m^2]
 
         }
 
-        // Temperature BCs
-        bVT[0] = 1.0; cVT[0] = -1.0; dVT[0] = 0.0;
-        aVT[N - 1] = -1.0; bVT[N - 1] = 1.0; dVT[N - 1] = 0.0;
+        /// Temperature BCs: zero gradient on the first node
+        bVT[0] = 1.0; 
+        cVT[0] = -1.0; 
+        dVT[0] = 0.0;
+
+        /// Temperature BCs: zero gradient on the last node
+        aVT[N - 1] = -1.0; 
+        bVT[N - 1] = 1.0; 
+        dVT[N - 1] = 0.0;
 
         T_v_bulk = solveTridiagonal(aVT, bVT, cVT, dVT);
 
@@ -1958,7 +1970,7 @@ int main() {
         //
         // =======================================================================
 
-        // TODO
+        // TODO Check if the capillary limit is satisfied or not
 
         // =======================================================================
         //
