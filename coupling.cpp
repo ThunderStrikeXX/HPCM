@@ -131,6 +131,37 @@ namespace liquid_sodium {
         if (T < Tsolid) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
     }
+
+    /**
+      * @brief Liquid sodium enthalpy [J/kg]NIST Shomate coefficients for Na(l), 370.98–1170.525 K
+      * Cp° = A + B*t + C*t^2 + D*t^3 + E/t^2  [J/mol/K]
+      * H° - H°298.15 = A*t + B*t^2/2 + C*t^3/3 + D*t^4/4 - E/t + F - H  [kJ/mol]
+      * with t = T/1000
+      */ 
+    inline double h(double T) {
+
+        const double T_min = 370.98, T_max = 1170.525;
+        if (T < T_min) T = T_min;
+        if (T > T_max) T = T_max;
+
+        const double A = 40.25707;
+        const double B = -28.23849;
+        const double C = 20.69402;
+        const double D = -3.641872;
+        const double E = -0.079874;
+        const double F = -8.782300;
+        const double H = 2.406001; // NIST “H” coeff (not temperature)
+
+        const double t = T / 1000.0;
+
+        // kJ/mol relative to 298.15 K
+        const double H_kJ_per_mol =
+            A * t + B * t * t / 2.0 + C * t * t * t / 3.0 + D * t * t * t * t / 4.0 - E / t + F - H;
+
+        // Convert to J/kg
+        const double M_kg_per_mol = 22.98976928e-3; // Molar mass Na
+        return (H_kJ_per_mol * 1000.0) / M_kg_per_mol;
+    }
 }
 
 #pragma endregion
@@ -173,12 +204,39 @@ namespace vapor_sodium {
     }
 
     /**
-    * @brief Enthalpy of vaporization [J/kg] as a function of temperature T
-    */
-    inline double h_vap(double T) {
+      * @brief Enthalpy of sodium vapor [J/kg] from NIST Shomate equation.
+      * Valid for 1170.525 K ≤ T ≤ 6000 K.
+      * Reference state: H(298.15 K) = 0 (per NIST convention).
+      *
+      * @param T Temperature [K]
+      * @return Enthalpy of sodium vapor [J/kg]
+      */
+    inline double h(double T) {
+        const double T_min = 1170.525;
+        const double T_max = 6000.0;
+        if (T < T_min) T = T_min;
+        if (T > T_max) T = T_max;
 
-        const double r = 1.0 - T / Tcrit_Na;
-        return (393.37 * r + 4398.6 * std::pow(r, 0.29302)) * 1e3;
+        const double A = 20.80573;
+        const double B = 0.277206;
+        const double C = -0.392086;
+        const double D = 0.119634;
+        const double E = -0.008879;
+        const double F = 101.0386;
+        const double H = 107.2999;
+
+        double t = T / 1000.0;
+
+        double H_kJ_per_mol = A * t
+            + B * t * t / 2.0
+            + C * t * t * t / 3.0
+            + D * t * t * t * t / 4.0
+            - E / t
+            + F
+            - H;
+
+        const double M_kg_per_mol = 22.98976928e-3;
+        return (H_kJ_per_mol * 1000.0) / M_kg_per_mol; // J/kg
     }
 
     /**
@@ -1318,7 +1376,6 @@ int main() {
 
         #pragma region parabolic_profiles 
 
-
         /**
          * Temperature distribution coefficients (six coefficients per node, two parabolas)
          * First three coefficients are a_w, b_w, c_w
@@ -1374,6 +1431,17 @@ int main() {
             const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));   ///< Derivative of the saturation pressure wrt T [Pa/K]   
 
             const double fac = (2.0 * r_inner * eps_s * beta) / (r_interface * r_interface);    ///< Useful factor in the coefficients calculation [s / m^2]
+
+            double h_xv;
+
+            // TODO implementare h
+
+            if (Gamma_xv[i] >= 0.0) h_xv = vapor_sodium::h(T_x_v[i]);
+            else h_xv = vapor_sodium::h(T_v_bulk[i]);
+                h_gx_x = h_liquid_Jperkg(T_sur)
+                    + (h_gas_Jperkg(T_mean) - h_gas_Jperkg(T_sur));
+            }
+
             const double h_xg_x = vapor_sodium::h_vap(T_x_v[i]);                                // Enthalpy of sodium vaporization [J/kg]
 
             /**

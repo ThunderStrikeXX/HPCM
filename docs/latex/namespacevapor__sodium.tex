@@ -1,0 +1,230 @@
+\doxysection{vapor\+\_\+sodium Namespace Reference}
+\hypertarget{namespacevapor__sodium}{}\label{namespacevapor__sodium}\index{vapor\_sodium@{vapor\_sodium}}
+
+
+Provides thermophysical and transport properties for Sodium Vapor.  
+
+
+\doxysubsubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a27d99137e0d8e08ad695b2a560bda1e8}{clamp}} (double x, double a, double b)
+\begin{DoxyCompactList}\small\item\em Functions that clamps a value x to the range \mbox{[}a, b\mbox{]}. \end{DoxyCompactList}\item 
+{\footnotesize template$<$size\+\_\+t N$>$ }\\double \mbox{\hyperlink{namespacevapor__sodium_ad5235477b202416e683b748ef18c176f}{interp\+\_\+T}} (const std\+::array$<$ double, N $>$ \&Tgrid, const std\+::array$<$ double, N $>$ \&Ygrid, double T)
+\begin{DoxyCompactList}\small\item\em 1D table interpolation in T over monotone grid \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a173d241ce6cdd47597b858f1b358a34f}{h\+\_\+vap}} (double T)
+\begin{DoxyCompactList}\small\item\em Enthalpy of vaporization \mbox{[}J/kg\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a123d26c84c9262c7c5930857be3b0325}{P\+\_\+sat}} (double T)
+\begin{DoxyCompactList}\small\item\em Saturation pressure \mbox{[}Pa\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a780cdbaab3829932df754aaa2fe86e24}{d\+P\+\_\+sat\+\_\+d\+VT}} (double T)
+\begin{DoxyCompactList}\small\item\em Derivative of saturation pressure with respect to temperature \mbox{[}Pa/K\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a3e796a456d7cbd1a285adc6e64c7381b}{rho}} (double T)
+\begin{DoxyCompactList}\small\item\em Density of saturated vapor \mbox{[}kg/m\texorpdfstring{$^\wedge$}{\string^}3\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a52b2291c7c02870eba64b28e6e028770}{cp}} (double T)
+\begin{DoxyCompactList}\small\item\em Specific heat at constant pressure from table interpolation \mbox{[}J/(kg\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_af39f6a7b3c685bfc32f69ee0ed79800f}{cv}} (double T)
+\begin{DoxyCompactList}\small\item\em Specific heat at constant volume from table interpolation \mbox{[}J/(kg\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_ab0a521e6708d4c0c4a769bcb5abc0d9c}{mu}} (double T)
+\begin{DoxyCompactList}\small\item\em Dynamic viscosity of sodium vapor \mbox{[}Pa·s\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a25c40b2d1c7425eeea393ed8e7d8b981}{k}} (double T, double P)
+\begin{DoxyCompactList}\small\item\em Thermal conductivity \mbox{[}W/(m\texorpdfstring{$\ast$}{*}K)\mbox{]} of sodium vapor over an extended range. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_aec4295853b40ba8be61d70e2135e8c4d}{f}} (double Re)
+\begin{DoxyCompactList}\small\item\em Friction factor \mbox{[}-\/\mbox{]} (Gnielinski correlation) as a function of Reynolds number. Retrieves an error if Re \texorpdfstring{$<$}{<} 0. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_a346bf1ebc5a79a676e68f236ff9bb216}{Nu}} (double Re, double Pr)
+\begin{DoxyCompactList}\small\item\em Nusselt number \mbox{[}-\/\mbox{]} (Gnielinski correlation) as a function of Reynolds number Retrieves an error if Re \texorpdfstring{$<$}{<} 0 or Nu \texorpdfstring{$<$}{<} 0. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespacevapor__sodium_afea027e6e01ec1144bc022fc68ebc0d8}{h\+\_\+conv}} (double Re, double Pr, double \mbox{\hyperlink{namespacevapor__sodium_a25c40b2d1c7425eeea393ed8e7d8b981}{k}}, double Dh)
+\begin{DoxyCompactList}\small\item\em Convective heat transfer coefficient \mbox{[}W/m\texorpdfstring{$^\wedge$}{\string^}2/K\mbox{]} (Gnielinski correlation) as a function of Reynolds number Retrieves an error if Re \texorpdfstring{$<$}{<} 0 or Nu \texorpdfstring{$<$}{<} 0. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+constexpr double \mbox{\hyperlink{namespacevapor__sodium_af948cf9194768978a66b5199bc04bcbe}{Tcrit\+\_\+\+Na}} = 2509.\+46
+\begin{DoxyCompactList}\small\item\em Critical temperature \mbox{[}K\mbox{]}. \end{DoxyCompactList}\item 
+constexpr double \mbox{\hyperlink{namespacevapor__sodium_ab35804cf2891f81d43400bfc0f0e67f7}{Ad\+\_\+\+Na}} = 3.\+46
+\begin{DoxyCompactList}\small\item\em Adiabatic factor \mbox{[}-\/\mbox{]}. \end{DoxyCompactList}\item 
+constexpr double \mbox{\hyperlink{namespacevapor__sodium_a2e2a2eeb251dbbbe64ce9b29398085ed}{m\+\_\+g\+\_\+\+Na}} = 23e-\/3
+\begin{DoxyCompactList}\small\item\em Molar mass \mbox{[}kg/mol\mbox{]}. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Provides thermophysical and transport properties for Sodium Vapor. 
+
+This namespace contains constant data and functions to calculate key properties of sodium vapor. All functions primarily accept temperature T in Kelvin \mbox{[}K\mbox{]} and return values in standard SI units unless otherwise noted. 
+
+\label{doc-func-members}
+\Hypertarget{namespacevapor__sodium_doc-func-members}
+\doxysubsection{Function Documentation}
+\Hypertarget{namespacevapor__sodium_a27d99137e0d8e08ad695b2a560bda1e8}\index{vapor\_sodium@{vapor\_sodium}!clamp@{clamp}}
+\index{clamp@{clamp}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{clamp()}{clamp()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a27d99137e0d8e08ad695b2a560bda1e8} 
+double vapor\+\_\+sodium\+::clamp (\begin{DoxyParamCaption}\item[{double}]{x}{, }\item[{double}]{a}{, }\item[{double}]{b}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Functions that clamps a value x to the range \mbox{[}a, b\mbox{]}. 
+
+\Hypertarget{namespacevapor__sodium_a52b2291c7c02870eba64b28e6e028770}\index{vapor\_sodium@{vapor\_sodium}!cp@{cp}}
+\index{cp@{cp}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{cp()}{cp()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a52b2291c7c02870eba64b28e6e028770} 
+double vapor\+\_\+sodium\+::cp (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Specific heat at constant pressure from table interpolation \mbox{[}J/(kg\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_af39f6a7b3c685bfc32f69ee0ed79800f}\index{vapor\_sodium@{vapor\_sodium}!cv@{cv}}
+\index{cv@{cv}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{cv()}{cv()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_af39f6a7b3c685bfc32f69ee0ed79800f} 
+double vapor\+\_\+sodium\+::cv (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Specific heat at constant volume from table interpolation \mbox{[}J/(kg\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_a780cdbaab3829932df754aaa2fe86e24}\index{vapor\_sodium@{vapor\_sodium}!dP\_sat\_dVT@{dP\_sat\_dVT}}
+\index{dP\_sat\_dVT@{dP\_sat\_dVT}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{dP\_sat\_dVT()}{dP\_sat\_dVT()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a780cdbaab3829932df754aaa2fe86e24} 
+double vapor\+\_\+sodium\+::d\+P\+\_\+sat\+\_\+d\+VT (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Derivative of saturation pressure with respect to temperature \mbox{[}Pa/K\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_aec4295853b40ba8be61d70e2135e8c4d}\index{vapor\_sodium@{vapor\_sodium}!f@{f}}
+\index{f@{f}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{f()}{f()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_aec4295853b40ba8be61d70e2135e8c4d} 
+double vapor\+\_\+sodium\+::f (\begin{DoxyParamCaption}\item[{double}]{Re}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Friction factor \mbox{[}-\/\mbox{]} (Gnielinski correlation) as a function of Reynolds number. Retrieves an error if Re \texorpdfstring{$<$}{<} 0. 
+
+\Hypertarget{namespacevapor__sodium_afea027e6e01ec1144bc022fc68ebc0d8}\index{vapor\_sodium@{vapor\_sodium}!h\_conv@{h\_conv}}
+\index{h\_conv@{h\_conv}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{h\_conv()}{h\_conv()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_afea027e6e01ec1144bc022fc68ebc0d8} 
+double vapor\+\_\+sodium\+::h\+\_\+conv (\begin{DoxyParamCaption}\item[{double}]{Re}{, }\item[{double}]{Pr}{, }\item[{double}]{k}{, }\item[{double}]{Dh}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Convective heat transfer coefficient \mbox{[}W/m\texorpdfstring{$^\wedge$}{\string^}2/K\mbox{]} (Gnielinski correlation) as a function of Reynolds number Retrieves an error if Re \texorpdfstring{$<$}{<} 0 or Nu \texorpdfstring{$<$}{<} 0. 
+
+\Hypertarget{namespacevapor__sodium_a173d241ce6cdd47597b858f1b358a34f}\index{vapor\_sodium@{vapor\_sodium}!h\_vap@{h\_vap}}
+\index{h\_vap@{h\_vap}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{h\_vap()}{h\_vap()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a173d241ce6cdd47597b858f1b358a34f} 
+double vapor\+\_\+sodium\+::h\+\_\+vap (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Enthalpy of vaporization \mbox{[}J/kg\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_ad5235477b202416e683b748ef18c176f}\index{vapor\_sodium@{vapor\_sodium}!interp\_T@{interp\_T}}
+\index{interp\_T@{interp\_T}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{interp\_T()}{interp\_T()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_ad5235477b202416e683b748ef18c176f} 
+template$<$size\+\_\+t N$>$ \\
+double vapor\+\_\+sodium\+::interp\+\_\+T (\begin{DoxyParamCaption}\item[{const std\+::array$<$ double, N $>$ \&}]{Tgrid}{, }\item[{const std\+::array$<$ double, N $>$ \&}]{Ygrid}{, }\item[{double}]{T}{}\end{DoxyParamCaption})}
+
+
+
+1D table interpolation in T over monotone grid 
+
+\Hypertarget{namespacevapor__sodium_a25c40b2d1c7425eeea393ed8e7d8b981}\index{vapor\_sodium@{vapor\_sodium}!k@{k}}
+\index{k@{k}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{k()}{k()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a25c40b2d1c7425eeea393ed8e7d8b981} 
+double vapor\+\_\+sodium\+::k (\begin{DoxyParamCaption}\item[{double}]{T}{, }\item[{double}]{P}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Thermal conductivity \mbox{[}W/(m\texorpdfstring{$\ast$}{*}K)\mbox{]} of sodium vapor over an extended range. 
+
+Performs bilinear interpolation inside the experimental grid. Outside 900–1500 K or 981–98066 Pa, it extrapolates using kinetic-\/gas scaling (k \texorpdfstring{$\sim$}{\string~} sqrt(\+T)) referenced to the nearest boundary. Prints warnings when extrapolating outside of the boundaries.
+
+
+\begin{DoxyParams}{Parameters}
+{\em T} & Temperature \mbox{[}K\mbox{]} \\
+\hline
+{\em P} & Pressure \mbox{[}Pa\mbox{]} \\
+\hline
+\end{DoxyParams}
+\Hypertarget{namespacevapor__sodium_ab0a521e6708d4c0c4a769bcb5abc0d9c}\index{vapor\_sodium@{vapor\_sodium}!mu@{mu}}
+\index{mu@{mu}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{mu()}{mu()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_ab0a521e6708d4c0c4a769bcb5abc0d9c} 
+double vapor\+\_\+sodium\+::mu (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Dynamic viscosity of sodium vapor \mbox{[}Pa·s\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_a346bf1ebc5a79a676e68f236ff9bb216}\index{vapor\_sodium@{vapor\_sodium}!Nu@{Nu}}
+\index{Nu@{Nu}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{Nu()}{Nu()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a346bf1ebc5a79a676e68f236ff9bb216} 
+double vapor\+\_\+sodium\+::\+Nu (\begin{DoxyParamCaption}\item[{double}]{Re}{, }\item[{double}]{Pr}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Nusselt number \mbox{[}-\/\mbox{]} (Gnielinski correlation) as a function of Reynolds number Retrieves an error if Re \texorpdfstring{$<$}{<} 0 or Nu \texorpdfstring{$<$}{<} 0. 
+
+\Hypertarget{namespacevapor__sodium_a123d26c84c9262c7c5930857be3b0325}\index{vapor\_sodium@{vapor\_sodium}!P\_sat@{P\_sat}}
+\index{P\_sat@{P\_sat}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{P\_sat()}{P\_sat()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a123d26c84c9262c7c5930857be3b0325} 
+double vapor\+\_\+sodium\+::\+P\+\_\+sat (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Saturation pressure \mbox{[}Pa\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespacevapor__sodium_a3e796a456d7cbd1a285adc6e64c7381b}\index{vapor\_sodium@{vapor\_sodium}!rho@{rho}}
+\index{rho@{rho}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{rho()}{rho()}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a3e796a456d7cbd1a285adc6e64c7381b} 
+double vapor\+\_\+sodium\+::rho (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Density of saturated vapor \mbox{[}kg/m\texorpdfstring{$^\wedge$}{\string^}3\mbox{]} as a function of temperature T. 
+
+
+
+\label{doc-var-members}
+\Hypertarget{namespacevapor__sodium_doc-var-members}
+\doxysubsection{Variable Documentation}
+\Hypertarget{namespacevapor__sodium_ab35804cf2891f81d43400bfc0f0e67f7}\index{vapor\_sodium@{vapor\_sodium}!Ad\_Na@{Ad\_Na}}
+\index{Ad\_Na@{Ad\_Na}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{Ad\_Na}{Ad\_Na}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_ab35804cf2891f81d43400bfc0f0e67f7} 
+double vapor\+\_\+sodium\+::\+Ad\+\_\+\+Na = 3.\+46\hspace{0.3cm}{\ttfamily [constexpr]}}
+
+
+
+Adiabatic factor \mbox{[}-\/\mbox{]}. 
+
+\Hypertarget{namespacevapor__sodium_a2e2a2eeb251dbbbe64ce9b29398085ed}\index{vapor\_sodium@{vapor\_sodium}!m\_g\_Na@{m\_g\_Na}}
+\index{m\_g\_Na@{m\_g\_Na}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{m\_g\_Na}{m\_g\_Na}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_a2e2a2eeb251dbbbe64ce9b29398085ed} 
+double vapor\+\_\+sodium\+::m\+\_\+g\+\_\+\+Na = 23e-\/3\hspace{0.3cm}{\ttfamily [constexpr]}}
+
+
+
+Molar mass \mbox{[}kg/mol\mbox{]}. 
+
+\Hypertarget{namespacevapor__sodium_af948cf9194768978a66b5199bc04bcbe}\index{vapor\_sodium@{vapor\_sodium}!Tcrit\_Na@{Tcrit\_Na}}
+\index{Tcrit\_Na@{Tcrit\_Na}!vapor\_sodium@{vapor\_sodium}}
+\doxysubsubsection{\texorpdfstring{Tcrit\_Na}{Tcrit\_Na}}
+{\footnotesize\ttfamily \label{namespacevapor__sodium_af948cf9194768978a66b5199bc04bcbe} 
+double vapor\+\_\+sodium\+::\+Tcrit\+\_\+\+Na = 2509.\+46\hspace{0.3cm}{\ttfamily [constexpr]}}
+
+
+
+Critical temperature \mbox{[}K\mbox{]}. 
+

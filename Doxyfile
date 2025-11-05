@@ -6,7 +6,7 @@ EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_ALL            = YES
 
-INPUT                  = ./src ./include
+INPUT                  = .
 FILE_PATTERNS          = *.cpp *.h *.hpp
 
 QUIET                  = YES

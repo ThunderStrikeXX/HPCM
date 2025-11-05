@@ -1,0 +1,100 @@
+\doxysection{liquid\+\_\+sodium Namespace Reference}
+\hypertarget{namespaceliquid__sodium}{}\label{namespaceliquid__sodium}\index{liquid\_sodium@{liquid\_sodium}}
+
+
+Provides thermophysical properties for Liquid Sodium (Na).  
+
+
+\doxysubsubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+double \mbox{\hyperlink{namespaceliquid__sodium_a623b627263d260ad9ff8a8d8b7c18538}{rho}} (double T)
+\begin{DoxyCompactList}\small\item\em Density \mbox{[}kg/m3\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespaceliquid__sodium_a8d51a3e555a4f02ab073f863d5f4d392}{k}} (double T)
+\begin{DoxyCompactList}\small\item\em Thermal conductivity \mbox{[}W/(m\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespaceliquid__sodium_a9cddf40b7e023fbbe7da8897f8ee803d}{cp}} (double T)
+\begin{DoxyCompactList}\small\item\em Specific heat at constant pressure \mbox{[}J/(kg·K)\mbox{]} as a function of temperature. \end{DoxyCompactList}\item 
+double \mbox{\hyperlink{namespaceliquid__sodium_a486c58618892900fa0602ee46c00254e}{mu}} (double T)
+\begin{DoxyCompactList}\small\item\em Dynamic viscosity \mbox{[}Pa·s\mbox{]} using Shpilrain et al. correlation, valid for 371 K \texorpdfstring{$<$}{<} T \texorpdfstring{$<$}{<} 2500 K. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+constexpr double \mbox{\hyperlink{namespaceliquid__sodium_a65762b3f69a8a13edcb01fda6430449d}{Tcrit}} = 2509.\+46
+\begin{DoxyCompactList}\small\item\em Critical temperature \mbox{[}K\mbox{]}. \end{DoxyCompactList}\item 
+constexpr double \mbox{\hyperlink{namespaceliquid__sodium_aab1908ce27479d6f5240a218fc354212}{Tsolid}} = 370.\+87
+\begin{DoxyCompactList}\small\item\em Solidification temperature \mbox{[}K\mbox{]}. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Provides thermophysical properties for Liquid Sodium (Na). 
+
+This namespace contains constant data and functions to calculate key temperature-\/dependent properties of liquid sodium. All functions accept temperature T in Kelvin \mbox{[}K\mbox{]} and return values in standard SI units unless otherwise specified. The function give warnings if the input temperature is below the (constant) solidification temperature. 
+
+\label{doc-func-members}
+\Hypertarget{namespaceliquid__sodium_doc-func-members}
+\doxysubsection{Function Documentation}
+\Hypertarget{namespaceliquid__sodium_a9cddf40b7e023fbbe7da8897f8ee803d}\index{liquid\_sodium@{liquid\_sodium}!cp@{cp}}
+\index{cp@{cp}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{cp()}{cp()}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_a9cddf40b7e023fbbe7da8897f8ee803d} 
+double liquid\+\_\+sodium\+::cp (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Specific heat at constant pressure \mbox{[}J/(kg·K)\mbox{]} as a function of temperature. 
+
+\Hypertarget{namespaceliquid__sodium_a8d51a3e555a4f02ab073f863d5f4d392}\index{liquid\_sodium@{liquid\_sodium}!k@{k}}
+\index{k@{k}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{k()}{k()}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_a8d51a3e555a4f02ab073f863d5f4d392} 
+double liquid\+\_\+sodium\+::k (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Thermal conductivity \mbox{[}W/(m\texorpdfstring{$\ast$}{*}K)\mbox{]} as a function of temperature T. 
+
+\Hypertarget{namespaceliquid__sodium_a486c58618892900fa0602ee46c00254e}\index{liquid\_sodium@{liquid\_sodium}!mu@{mu}}
+\index{mu@{mu}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{mu()}{mu()}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_a486c58618892900fa0602ee46c00254e} 
+double liquid\+\_\+sodium\+::mu (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Dynamic viscosity \mbox{[}Pa·s\mbox{]} using Shpilrain et al. correlation, valid for 371 K \texorpdfstring{$<$}{<} T \texorpdfstring{$<$}{<} 2500 K. 
+
+\Hypertarget{namespaceliquid__sodium_a623b627263d260ad9ff8a8d8b7c18538}\index{liquid\_sodium@{liquid\_sodium}!rho@{rho}}
+\index{rho@{rho}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{rho()}{rho()}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_a623b627263d260ad9ff8a8d8b7c18538} 
+double liquid\+\_\+sodium\+::rho (\begin{DoxyParamCaption}\item[{double}]{T}{}\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+Density \mbox{[}kg/m3\mbox{]} as a function of temperature T. 
+
+
+
+\label{doc-var-members}
+\Hypertarget{namespaceliquid__sodium_doc-var-members}
+\doxysubsection{Variable Documentation}
+\Hypertarget{namespaceliquid__sodium_a65762b3f69a8a13edcb01fda6430449d}\index{liquid\_sodium@{liquid\_sodium}!Tcrit@{Tcrit}}
+\index{Tcrit@{Tcrit}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{Tcrit}{Tcrit}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_a65762b3f69a8a13edcb01fda6430449d} 
+double liquid\+\_\+sodium\+::\+Tcrit = 2509.\+46\hspace{0.3cm}{\ttfamily [constexpr]}}
+
+
+
+Critical temperature \mbox{[}K\mbox{]}. 
+
+\Hypertarget{namespaceliquid__sodium_aab1908ce27479d6f5240a218fc354212}\index{liquid\_sodium@{liquid\_sodium}!Tsolid@{Tsolid}}
+\index{Tsolid@{Tsolid}!liquid\_sodium@{liquid\_sodium}}
+\doxysubsubsection{\texorpdfstring{Tsolid}{Tsolid}}
+{\footnotesize\ttfamily \label{namespaceliquid__sodium_aab1908ce27479d6f5240a218fc354212} 
+double liquid\+\_\+sodium\+::\+Tsolid = 370.\+87\hspace{0.3cm}{\ttfamily [constexpr]}}
+
+
+
+Solidification temperature \mbox{[}K\mbox{]}. 
+
