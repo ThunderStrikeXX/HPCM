@@ -901,7 +901,7 @@ int main() {
 
     // Mass sources/fluxes
     std::vector<double> Gamma_xv(N, 0.0);         ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-    std::vector<double> m_dot_x_v(N, 0.0);        ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
+    std::vector<double> phi_x_v(N, 0.0);        ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
 
     /// The coefficient bU is needed in momentum predictor loop and pressure correction to estimate the velocities at the faces using the Rhie and Chow correction
     std::vector<double> aXU(N, 0.0),                                                    ///< Lower tridiagonal coefficient for wick velocity
@@ -1188,10 +1188,10 @@ int main() {
                     const double u_r_star = 0.5 * (u_x[i] + u_x[i + 1]) + 
                                     rhie_chow_on_off_x * rhie_chow_r;                   ///< Right face velocity [m/s] (average + RC correction)
 
-                    const double mdot_l_star = (u_l_star > 0.0) ? rho_L * u_l_star : rho_P * u_l_star;  ///< Left face mass flux [kg/(m^2 s)] (upwind discretization)
-                    const double mdot_r_star = (u_r_star > 0.0) ? rho_P * u_r_star : rho_R * u_r_star;  ///< Right face mass flux [kg/(m^2 s)] (upwind discretization)
+                    const double phi_l_star = (u_l_star > 0.0) ? rho_L * u_l_star : rho_P * u_l_star;  ///< Left face mass flux [kg/(m^2 s)] (upwind discretization)
+                    const double phi_r_star = (u_r_star > 0.0) ? rho_P * u_r_star : rho_R * u_r_star;  ///< Right face mass flux [kg/(m^2 s)] (upwind discretization)
 
-                    const double mass_imbalance = (mdot_r_star - mdot_l_star);  ///< Mass difference of the fluxes across faces [kg/(m^2 s)]
+                    const double mass_imbalance = (phi_r_star - phi_l_star);  ///< Mass difference of the fluxes across faces [kg/(m^2 s)]
                     const double mass_flux = Gamma_xv[i] * dz;                  ///< Mass flux [kg/(m^2 s)] due to external source (positive if out of the wick)
 
                     aXP[i] = -E_l;                              ///< [s/m]
@@ -1405,7 +1405,7 @@ int main() {
              * Mass flux from the wick to the vapor [kg/(m2 s)]. 
              * Calculated using the kinetic gas theory.
              */
-            m_dot_x_v[i] = beta * (vapor_sodium::P_sat(T_x_v[i]) - p_v[i]);     
+            phi_x_v[i] = beta * (vapor_sodium::P_sat(T_x_v[i]) - p_v[i]);     
 
             printf("");
 
@@ -1413,7 +1413,7 @@ int main() {
              * Variable b [-], used to calculate omega. 
              * Ratio of the overrall speed to the most probable velocity of the vapor.
              */
-            const double b = std::abs(-m_dot_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));        
+            const double b = std::abs(-phi_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));        
 
             /**
               * Linearization of the omega [-] function to correct the net evaporation/condensation mass flux
@@ -1639,12 +1639,12 @@ int main() {
                 const double Re = u_v[i] * (2 * r_inner) * rho_P / mu_P;    ///< Reynolds number [-]
 
                 const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);    ///< Friction factor [-] (according to THROHPUT)
-                const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_inner;             ///< Friction force [kg / (m3 s)]
+                const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_inner;             ///< Friction force [kg/(m2 s)]
 
-                aVU[i] = -std::max(F_l, 0.0) - D_l;
-                cVU[i] = -std::max(-F_r, 0.0) - D_r;
-                bVU[i] = (std::max(F_r, 0.0) + std::max(-F_l, 0.0)) + rho_P * dz / dt + D_l + D_r + F * dz;
-                dVU[i] = -0.5 * (p_v[i + 1] - p_v[i - 1]) + rho_P * u_v[i] * dz / dt /* + Su[i] * dz */;
+                aVU[i] = -std::max(F_l, 0.0) - D_l;                                                             ///< [kg/(m2 s)]
+                cVU[i] = -std::max(-F_r, 0.0) - D_r;                                                            ///< [kg/(m2 s)]
+                bVU[i] = (std::max(F_r, 0.0) + std::max(-F_l, 0.0)) + rho_P * dz / dt + D_l + D_r + F * dz;     ///< [kg/(m2 s)]
+                dVU[i] = -0.5 * (p_v[i + 1] - p_v[i - 1]) + rho_P * u_v[i] * dz / dt /* + Su[i] * dz */;        ///< [kg/(m s2)]
 
                 printf("");
             }
@@ -1734,16 +1734,17 @@ int main() {
                     const double u_r_star = 0.5 * (u_v[i] + u_v[i + 1]) +
                         rhie_chow_on_off_v * rhie_chow_r;                   ///< Right face velocity [m/s] (average + RC correction)
 
-                    const double mdot_l_star = (u_l_star > 0.0) ? rho_L * u_l_star : rho_P * u_l_star;  ///< Left face mass flux [kg/(m^2 s)] (upwind discretization)
-                    const double mdot_r_star = (u_r_star > 0.0) ? rho_P * u_r_star : rho_R * u_r_star;  ///< Right face mass flux [kg/(m^2 s)] (upwind discretization)
+                    const double phi_l_star = (u_l_star > 0.0) ? rho_L * u_l_star : rho_P * u_l_star;  ///< Left face mass flux [kg/(m^2 s)] (upwind discretization)
+                    const double phi_r_star = (u_r_star > 0.0) ? rho_P * u_r_star : rho_R * u_r_star;  ///< Right face mass flux [kg/(m^2 s)] (upwind discretization)
 
-                    const double mass_imbalance = (mdot_r_star - mdot_l_star);  ///< Mass difference of the fluxes across faces [kg/(m^2 s)]
-                    const double mass_flux = Gamma_xv[i] * dz;                  ///< Mass flux [kg/(m^2 s)] due to external source (positive if out of the wick)
+                    const double mass_imbalance = (phi_r_star - phi_l_star);        ///< Mass difference of the fluxes across faces [kg/(m2 s)]
+                    const double mass_flux_source = Gamma_xv[i] * dz;               ///< Mass flux [kg/(m2 s)] due to external source (positive if out of the wick)
+                    const double change_density = (rho_P - rho_old_v[i]) * dz / dt; ///< Term [kg/(m2 s)] related to the change in density
 
-                    aVP[i] = -E_l;                                              ///< [s/m]
-                    cVP[i] = -E_r;                                              ///< [s/m]
-                    bVP[i] = E_l + E_r + psi_i * dz / dt;                       ///< [s/m]
-                    dVP[i] = +mass_flux - mass_imbalance;                ///< [kg/(m^2 s)]
+                    aVP[i] = -E_l;                                                  ///< [s/m]
+                    cVP[i] = -E_r;                                                  ///< [s/m]
+                    bVP[i] = E_l + E_r + psi_i * dz / dt;                           ///< [s/m]
+                    dVP[i] = +mass_flux_source - mass_imbalance - change_density;          ///< [kg/(m^2 s)]
 
                     printf("");
                 }
