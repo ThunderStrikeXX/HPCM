@@ -6,6 +6,7 @@
 # === Output folders ===
 results/
 videos/
+old/
 
 # User-specific files
 *.rsuser
@@ -13,6 +14,7 @@ videos/
 *.user
 *.userosscache
 *.sln.docstates
+Doxyfile
 
 # Output files
 *.txt
