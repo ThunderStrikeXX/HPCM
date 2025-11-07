@@ -1414,6 +1414,8 @@ int main() {
          */
         std::array<std::array<double, 6>, N> ABC{};
 
+        std::array<std::array<double, 6>, N> ABC_theory{};
+
         /**
          * @brief Calculates the parabolas coefficients for each node
          */
@@ -1523,11 +1525,34 @@ int main() {
 
             const double Ex8 = (h_vx_x * r_interface * r_interface) / (2.0 * r_inner) * aGamma[i];
 
+            const double k_int_w = steel::k(T_w_x[i]);
+            const double k_int_x = liquid_sodium::k(T_w_x[i]);
+            const double k_bulk_w = steel::k(T_w_bulk[i]);
+
+            ABC_theory[i][5] = (-q_o_w[i]
+                + 2 * ((T_x_bulk[i] - T_w_bulk[i] + q_o_w[i] * (Eio1 - r_interface) / k_bulk_w - Evi1 / (Ex4 - Evi1 * Ex3)) / (2 * r_outer * (Eio1 - r_inner) + r_inner * r_inner - Eio2)) * k_int_w * (r_outer - r_inner)
+                + k_int_x * (Ex8 + Ex6 * T_v_bulk[i] + Ex7 * dPg - Ex3 * T_x_bulk[i]) / (Ex4 - Evi1 * Ex3)) /
+                (2 * (r_interface - r_outer) * k_int_w * (r_interface * r_interface + (Evi1 * (Ex5 - Evi2 * Ex3)) / (Ex4 - Evi1 * Ex3)) / (2 * r_outer * (Eio1 - r_inner) + r_inner * r_inner - Eio2)
+                    + k_int_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3));
+
+            ABC_theory[i][2] = (T_x_bulk[i] - T_w_bulk[i] + q_o_w[i] * (Eio1 - r_interface) / k_bulk_w - Evi1 / (Ex4 - Evi1 * Ex3)
+                + ABC_theory[i][5] * (r_interface * r_interface + Evi1 * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3)))
+                / (2 * r_outer * (Eio1 - r_interface) + r_interface * r_interface - Eio2);
+
+            ABC_theory[i][1] = q_o_w[i] / k_bulk_w - 2 * r_outer * ABC_theory[i][5];
+
+            ABC_theory[i][0] = T_w_bulk[i] - Eio1 * q_o_w[i] / k_bulk_w - 2 * r_outer * Eio1 * ABC_theory[i][5];
+
+            ABC_theory[i][4] = (Ex8 + T_v_bulk[i] * Ex6 + Ex7 * dPg - Ex3 * T_x_bulk[i] - (Ex5 - Evi2 * Ex3) * ABC_theory[i][5]) / (Ex4 - Evi1 * Ex3);
+
+            ABC_theory[i][3] = T_x_bulk[i] - Evi1 * ABC_theory[i][4] - Evi2 * ABC_theory[i][5];
+
+
             // LHS matrix A 6x6
             A[0] = { 1.0, Eio1, Eio2, 0.0, 0.0, 0.0 };
             A[1] = { 0.0, 0.0,    0.0,    1.0, Evi1, Evi2 };
             A[2] = { 1.0, r_interface,  r_interface * r_interface, -1.0, -r_interface, -r_interface * r_interface };
-            A[3] = { 0.0, steel::k(T_w_x[i]),  2.0 * r_interface * steel::k(T_w_x[i]), 0.0, -liquid_sodium::k(T_w_x[i]), -2.0 * r_interface * liquid_sodium::k(T_w_x[i]) };
+            A[3] = { 0.0, k_int_w,  2.0 * r_interface * k_int_w, 0.0, -k_int_x, -2.0 * r_interface * k_int_x };
             A[4] = { 0.0, 1.0,    2.0 * r_outer, 0.0, 0.0, 0.0 };
             A[5] = { 0.0, 0.0,    0.0,       Ex3, Ex4, Ex5 };
 

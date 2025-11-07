@@ -7,6 +7,7 @@
 results/
 videos/
 old/
+docs/
 
 # User-specific files
 *.rsuser
@@ -15,6 +16,9 @@ old/
 *.userosscache
 *.sln.docstates
 Doxyfile
+*.sln
+*.vcxproj
+*.vcxproj.filters
 
 # Output files
 *.txt
