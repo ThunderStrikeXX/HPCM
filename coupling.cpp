@@ -1533,19 +1533,19 @@ int main() {
                 + 2 * ((T_x_bulk[i] - T_w_bulk[i] + q_o_w[i] * (Eio1 - r_interface) / k_bulk_w - Evi1 / (Ex4 - Evi1 * Ex3)) / (2 * r_outer * (Eio1 - r_inner) + r_inner * r_inner - Eio2)) * k_int_w * (r_outer - r_inner)
                 + k_int_x * (Ex8 + Ex6 * T_v_bulk[i] + Ex7 * dPg - Ex3 * T_x_bulk[i]) / (Ex4 - Evi1 * Ex3)) /
                 (2 * (r_interface - r_outer) * k_int_w * (r_interface * r_interface + (Evi1 * (Ex5 - Evi2 * Ex3)) / (Ex4 - Evi1 * Ex3)) / (2 * r_outer * (Eio1 - r_inner) + r_inner * r_inner - Eio2)
-                    + k_int_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3));
+                    + k_int_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_interface * k_int_x);
 
             ABC_theory[i][2] = (T_x_bulk[i] - T_w_bulk[i] + q_o_w[i] * (Eio1 - r_interface) / k_bulk_w - Evi1 / (Ex4 - Evi1 * Ex3)
                 + ABC_theory[i][5] * (r_interface * r_interface + Evi1 * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3)))
-                / (2 * r_outer * (Eio1 - r_interface) + r_interface * r_interface - Eio2);
+                / (2 * r_outer * (Eio1 - r_interface) + r_interface * r_interface - Eio2); // OK
 
-            ABC_theory[i][1] = q_o_w[i] / k_bulk_w - 2 * r_outer * ABC_theory[i][5];
+            ABC_theory[i][1] = q_o_w[i] / k_bulk_w - 2 * r_outer * ABC_theory[i][2]; // OK
 
-            ABC_theory[i][0] = T_w_bulk[i] - Eio1 * q_o_w[i] / k_bulk_w - 2 * r_outer * Eio1 * ABC_theory[i][5];
+            ABC_theory[i][0] = T_w_bulk[i] - Eio1 * q_o_w[i] / k_bulk_w + (2 * r_outer * Eio1 - Eio2) * ABC_theory[i][2]; // OK
 
-            ABC_theory[i][4] = (Ex8 + T_v_bulk[i] * Ex6 + Ex7 * dPg - Ex3 * T_x_bulk[i] - (Ex5 - Evi2 * Ex3) * ABC_theory[i][5]) / (Ex4 - Evi1 * Ex3);
+            ABC_theory[i][4] = (Ex8 + T_v_bulk[i] * Ex6 + Ex7 * dPg - Ex3 * T_x_bulk[i] - (Ex5 - Evi2 * Ex3) * ABC_theory[i][5]) / (Ex4 - Evi1 * Ex3); // OK
 
-            ABC_theory[i][3] = T_x_bulk[i] - Evi1 * ABC_theory[i][4] - Evi2 * ABC_theory[i][5];
+            ABC_theory[i][3] = T_x_bulk[i] - Evi1 * ABC_theory[i][4] - Evi2 * ABC_theory[i][5]; // OK
 
 
             // LHS matrix A 6x6
@@ -1561,7 +1561,7 @@ int main() {
             B[1] = T_x_bulk[i];                                    // row2: [0 0 1 0 0]
             B[2] = 0.0;                                            // row3: [0 0 0 0 0]
             B[3] = 0.0;                                            // row4: [0 0 0 0 0]
-            B[4] = q_o_w[i] / steel::k(T_w_bulk[i]);               // row5: [q''/kw 0 0 0 0]
+            B[4] = q_o_w[i] / k_bulk_w;               // row5: [q''/kw 0 0 0 0]
             B[5] = Ex6 * T_v_bulk[i] + Ex7 * dPg + Ex8;            // row6: [Ex8 0 0 Ex6 Ex7]
 
             ABC[i] = solve6(A, B); ///< Returns [a_w, b_w, c_w, a_x, b_x, c_x]
