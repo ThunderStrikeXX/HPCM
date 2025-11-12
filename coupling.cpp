@@ -10,8 +10,6 @@
 #include <cstddef>
 #include <filesystem>
 
-#define DEBUG_POINT() ((void)0)
-
 bool warnings = false;
 
 // =======================================================================
@@ -857,6 +855,8 @@ int main() {
         cVU(N, 0.0),                                                                    ///< Upper tridiagonal coefficient for vapor velocity
         dVU(N, 0.0);                                                                    ///< Known vector for vapor velocity
 
+    double total_mass = 0;
+
     // Create result folder
     std::filesystem::create_directories("results");
 
@@ -930,8 +930,6 @@ int main() {
                       std::min(new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv), 
                                new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv, bVU)));*/
 
-        DEBUG_POINT();
-
         // =======================================================================
         //
         //                           [1. SOLVE WALL]
@@ -960,7 +958,6 @@ int main() {
         /**
          * @brief Loop on nodes. Assembles the coefficients for the tridiagonal system of wall temperature
          */
-
         for (int i = 1; i < N - 1; ++i) {
 
             /// Physical properties of the i-th wall node
@@ -986,8 +983,6 @@ int main() {
         }
 
         T_w_bulk = solveTridiagonal(aTW, bTW, cTW, dTW);        ///< Vector of final wall bulk temperatures
-
-        DEBUG_POINT();
 
         #pragma endregion
 
@@ -1093,8 +1088,6 @@ int main() {
 
             u_x = solveTridiagonal(aXU, bXU, cXU, dXU);
 
-            DEBUG_POINT();
-
             #pragma endregion
 
             /// Inner iterations variables reset
@@ -1173,8 +1166,6 @@ int main() {
 
                 p_prime_x = solveTridiagonal(aXP, bXP, cXP, dXP);
 
-                DEBUG_POINT();
-
                 #pragma endregion
 
                 // =======================================================================
@@ -1190,7 +1181,6 @@ int main() {
                   */
                 p_error_x = 0.0;
 
-                
                 for (int i = 0; i < N; i++) {
 
                     double p_prev_x = p_x[i];
@@ -1218,7 +1208,6 @@ int main() {
                   */
                 u_error_x = 0.0;
 
-                
                 for (int i = 1; i < N - 1; i++) {
 
                     double u_prev = u_x[i];
@@ -1230,13 +1219,9 @@ int main() {
                 #pragma endregion
 
                 inner_iter_x++;
-
-                DEBUG_POINT();
             }
 
-            outer_iter_x++;
-
-            DEBUG_POINT();
+            outer_iter_x++;  
         }
 
         // =======================================================================
@@ -1247,8 +1232,6 @@ int main() {
 
         #pragma region temperature_calculator
 
-        DEBUG_POINT();
-
         /// Tridiagonal coefficients for the wick temperature
         std::vector<double> aXT(N, 0.0), 
                                 bXT(N, 0.0), 
@@ -1258,8 +1241,6 @@ int main() {
         /**
          * @brief Calculates the coefficients for the tridiagonal system of the wick temperature T
          */
-
-        
         for (int i = 1; i < N - 1; i++) {
 
             const double rho_P = liquid_sodium::rho(T_x_bulk[i]);       ///< Density [kg/m3] of the central cell
@@ -1333,8 +1314,6 @@ int main() {
 
         T_x_bulk = solveTridiagonal(aXT, bXT, cXT, dXT);
 
-        DEBUG_POINT();
-
         #pragma endregion
 
         #pragma endregion
@@ -1358,12 +1337,14 @@ int main() {
          * @brief Calculates the parabolas coefficients for each node
          */
 
+        total_mass = 0.0;
+
         for (int i = 0; i < N; ++i) {
 
             std::array<std::array<double, 6>, 6> A{};             ///< Linear system matrix A
             std::array<double, 6> B{};               ///< Linear system vector B
 
-            const double eps_s = 0.4;                                           ///< Surface fraction of the wick available for phasic interface [-]
+            const double eps_s = 1.0;                                           ///< Surface fraction of the wick available for phasic interface [-]
             const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_x_v[i]);      ///< Mass transfer parameter beta [s/m]
             const double sigma_e = 1.0;                                         ///< Evaporation accomodation coefficient [-]. 1 means optimal evaporation
             const double sigma_c = 1.0;                                         ///< Condensation accomodation coefficient [-]. 1 means optimal condensation
@@ -1373,8 +1354,6 @@ int main() {
              * Calculated using the kinetic gas theory.
              */
             phi_x_v[i] = beta * (vapor_sodium::P_sat(T_x_v[i]) - p_v[i]);     
-
-            DEBUG_POINT();
 
             /**
              * Variable b [-], used to calculate omega. 
@@ -1482,13 +1461,13 @@ int main() {
 
             ABC[i][2] = alpha * (delta + gamma * ABC[i][5]);
 
-            ABC[i][1] = q_o_w[i] / k_bulk_w - 2 * r_outer * ABC[i][2]; // OK
+            ABC[i][1] = q_o_w[i] / k_bulk_w - 2 * r_outer * ABC[i][2];
 
-            ABC[i][0] = T_w_bulk[i] - Eio1 * q_o_w[i] / k_bulk_w + (2 * r_outer * Eio1 - Eio2) * ABC[i][2]; // OK
+            ABC[i][0] = T_w_bulk[i] - Eio1 * q_o_w[i] / k_bulk_w + (2 * r_outer * Eio1 - Eio2) * ABC[i][2]; 
 
-            ABC[i][4] = (Ex8 + T_v_bulk[i] * Ex6 + Ex7 * dPg - Ex3 * T_x_bulk[i] - (Ex5 - Evi2 * Ex3) * ABC[i][5]) / (Ex4 - Evi1 * Ex3); // OK
+            ABC[i][4] = (Ex8 + T_v_bulk[i] * Ex6 + Ex7 * dPg - Ex3 * T_x_bulk[i] - (Ex5 - Evi2 * Ex3) * ABC[i][5]) / (Ex4 - Evi1 * Ex3); 
 
-            ABC[i][3] = T_x_bulk[i] - Evi1 * ABC[i][4] - Evi2 * ABC[i][5]; // OK
+            ABC[i][3] = T_x_bulk[i] - Evi1 * ABC[i][4] - Evi2 * ABC[i][5];
 
             // Update temperatures at the interfaces
             T_o_w[i] = ABC[i][0] + ABC[i][1] * r_outer + ABC[i][2] * r_outer * r_outer;             ///< Temperature at the outer wall
@@ -1513,14 +1492,12 @@ int main() {
 
             Q_mass_vapor[i] = Gamma_xv[i] * h_xv_v;  ///< Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
             Q_mass_wick[i] = -Gamma_xv[i] * h_vx_x;  ///< Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
-
-            DEBUG_POINT();
         }
 
         // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
         p_outlet_v = vapor_sodium::P_sat(T_x_v[N - 1]);
 
-        DEBUG_POINT();
+        for (int i = 0; i < N; ++i) total_mass += Gamma_xv[i];
 
         #pragma endregion
 
@@ -1622,7 +1599,7 @@ int main() {
                 bVU[i] = (std::max(F_r, 0.0) + std::max(-F_l, 0.0)) + rho_P * dz / dt + D_l + D_r + F * dz;     ///< [kg/(m2 s)]
                 dVU[i] = -0.5 * (p_v[i + 1] - p_v[i - 1]) + rho_P * u_v[i] * dz / dt /* + Su[i] * dz */;        ///< [kg/(m s2)]
 
-                DEBUG_POINT();
+                
             }
 
             /// Diffusion coefficients for the first and last node to define BCs
@@ -1651,7 +1628,7 @@ int main() {
 
             u_v = solveTridiagonal(aVU, bVU, cVU, dVU);
 
-            DEBUG_POINT();
+            
 
             #pragma endregion
 
@@ -1723,7 +1700,7 @@ int main() {
                     bVP[i] = E_l + E_r + psi_i * dz / dt;                           ///< [s/m]
                     dVP[i] = +mass_flux_source - mass_imbalance - change_density;          ///< [kg/(m^2 s)]
 
-                    DEBUG_POINT();
+                    
                 }
 
                 /// BCs for the correction of pressure: zero gradient at first node
@@ -1737,8 +1714,6 @@ int main() {
                 dVP[N - 1] = 0.0;
 
                 p_prime_v = solveTridiagonal(aVP, bVP, cVP, dVP);
-
-                DEBUG_POINT();
 
                 #pragma endregion
 
@@ -1768,7 +1743,7 @@ int main() {
                 p_storage_v[0] = p_storage_v[1];
                 p_storage_v[N + 1] = p_outlet_v;
 
-                DEBUG_POINT();
+                
 
                 #pragma endregion
 
@@ -1813,19 +1788,13 @@ int main() {
                     u_error_v = std::max(u_error_v, std::fabs(u_v[i] - u_prev_v));
                 }
 
-                DEBUG_POINT();
-
                 #pragma endregion
 
                 inner_iter_v++;
             }
 
             outer_iter_v++;
-
-            DEBUG_POINT();
         }
-
-        DEBUG_POINT();
 
         // =======================================================================
         //
@@ -2032,8 +2001,6 @@ int main() {
         // Update density with new p,T
         eos_update(rho_v, p_v, T_v_bulk);
 
-        DEBUG_POINT();
-
         #pragma endregion
 
         #pragma endregion
@@ -2196,7 +2163,7 @@ int main() {
             "results/wick_vapor_mass_source.txt "
             "results/rho_vapor.txt");*/
 
-        DEBUG_POINT();
+        
 
         #pragma endregion
     }
