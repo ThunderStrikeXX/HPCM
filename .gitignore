@@ -4,7 +4,6 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # === Output folders ===
-results/
 videos/
 old/
 docs/
@@ -16,9 +15,6 @@ docs/
 *.userosscache
 *.sln.docstates
 Doxyfile
-*.sln
-*.vcxproj
-*.vcxproj.filters
 
 # Output files
 *.txt
