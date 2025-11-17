@@ -686,8 +686,14 @@ int main() {
     const double power = 1e3;               ///< Power at the evaporator side [W]
     const double T_env = 280.0;             ///< External environmental temperature [K]
 
+    // Evaporation and condensation parameters
+    const double eps_s = 1.0;                                           ///< Surface fraction of the wick available for phasic interface [-]
+    const double sigma_e = 1.0;                                         ///< Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 1.0;                                         ///< Condensation accomodation coefficient [-]. 1 means optimal condensation
+    double Omega = 1.0;
+
     // Geometric parameters
-    const int N = 100;                                                         ///< Number of axial nodes [-]
+    const int N = 500;                                                         ///< Number of axial nodes [-]
     const double L = 0.982; 			                                        ///< Length of the heat pipe [m]
     const double dz = L / N;                                                    ///< Axial discretization step [m]
     const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
@@ -738,21 +744,31 @@ int main() {
     const int N_c = static_cast<int>(std::ceil(condenser_length / dz));     ///< Number of nodes of the condenser region [-]
     const int N_a = N - (N_e + N_c);                                        ///< Number of nodes of the adiabadic region [-]
 
-    // Initial values for the temperatures distributions
-    double T_o_w_min = 875.0, T_o_w_max = 1100.0;               ///< Extremes for the outer wall initial temperature [K]
-    double T_w_min = 880.0, T_w_max = 1095.0;                   ///< Extremes for the wall bulk initial temperature [K]
-    double T_w_x_min = 885.0, T_w_x_max = 1090.0;               ///< Extremes for the wall wick interface initial temperature [K]
-    double T_x_min = 890.0, T_x_max = 1085.0;                   ///< Extremes for the wick bulk initial temperature [K]
-    double T_x_v_min = 895.0, T_x_v_max = 1080.0;               ///< Extremes for the wick vapor initial temperature [K]
-    double T_v_min = 900.0, T_v_max = 1075.0;                   ///< Extremes for the vapor bulk initial temperature [K]
+    const double T_full = 800.0;
 
     // Initialization of the initial temperatures using the extremes in a linear distribution
-    std::vector<double> T_o_w = linspace(T_o_w_max, T_o_w_min, N);
-    std::vector<double> T_w_bulk = linspace(T_w_max, T_w_min, N);
-    std::vector<double> T_w_x = linspace(T_w_x_max, T_w_x_min, N);
-    std::vector<double> T_x_bulk = linspace(T_x_max, T_x_min, N);
-    std::vector<double> T_x_v = linspace(T_x_v_max, T_x_v_min, N);
-    std::vector<double> T_v_bulk = linspace(T_v_max, T_v_min, N);
+    std::vector<double> T_o_w(N, T_full);
+    std::vector<double> T_w_bulk(N, T_full);
+    std::vector<double> T_w_x(N, T_full);
+    std::vector<double> T_x_bulk(N, T_full);
+    std::vector<double> T_x_v(N, T_full);
+    std::vector<double> T_v_bulk(N, T_full);
+
+    //// Initial values for the temperatures distributions
+    //double T_o_w_min = 875.0, T_o_w_max = 1100.0;               ///< Extremes for the outer wall initial temperature [K]
+    //double T_w_min = 880.0, T_w_max = 1095.0;                   ///< Extremes for the wall bulk initial temperature [K]
+    //double T_w_x_min = 885.0, T_w_x_max = 1090.0;               ///< Extremes for the wall wick interface initial temperature [K]
+    //double T_x_min = 890.0, T_x_max = 1085.0;                   ///< Extremes for the wick bulk initial temperature [K]
+    //double T_x_v_min = 895.0, T_x_v_max = 1080.0;               ///< Extremes for the wick vapor initial temperature [K]
+    //double T_v_min = 900.0, T_v_max = 1075.0;                   ///< Extremes for the vapor bulk initial temperature [K]
+
+    //// Initialization of the initial temperatures using the extremes in a linear distribution
+    //std::vector<double> T_o_w = linspace(T_o_w_max, T_o_w_min, N);
+    //std::vector<double> T_w_bulk = linspace(T_w_max, T_w_min, N);
+    //std::vector<double> T_w_x = linspace(T_w_x_max, T_w_x_min, N);
+    //std::vector<double> T_x_bulk = linspace(T_x_max, T_x_min, N);
+    //std::vector<double> T_x_v = linspace(T_x_v_max, T_x_v_min, N);
+    //std::vector<double> T_v_bulk = linspace(T_v_max, T_v_min, N);
 
     // Old temperature variables
     std::vector<double> T_x_v_old = T_x_v;
@@ -840,8 +856,9 @@ int main() {
     const int SST_model_turbulence_on_off = 0;    ///< 0: no vapor turbulence, 1: vapor with turbulence
 
     // Mass sources/fluxes
-    std::vector<double> Gamma_xv(N, 0.0);         ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-    std::vector<double> phi_x_v(N, 0.0);        ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
+    std::vector<double> phi_x_v(N, 0.0);            ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
+    std::vector<double> Gamma_xv_vapor(N, 0.0);     ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
+    std::vector<double> Gamma_xv_wick(N, 0.0);      ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
 
     /// The coefficient bU is needed in momentum predictor loop and pressure correction to estimate the velocities at the faces using the Rhie and Chow correction
     std::vector<double> aXU(N, 0.0),                                                    ///< Lower tridiagonal coefficient for wick velocity
@@ -1344,16 +1361,16 @@ int main() {
             std::array<std::array<double, 6>, 6> A{};             ///< Linear system matrix A
             std::array<double, 6> B{};               ///< Linear system vector B
 
-            const double eps_s = 1.0;                                           ///< Surface fraction of the wick available for phasic interface [-]
-            const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_x_v[i]);      ///< Mass transfer parameter beta [s/m]
-            const double sigma_e = 1.0;                                         ///< Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-            const double sigma_c = 1.0;                                         ///< Condensation accomodation coefficient [-]. 1 means optimal condensation
-
             /**
              * Mass flux from the wick to the vapor [kg/(m2 s)]. 
              * Calculated using the kinetic gas theory.
              */
-            phi_x_v[i] = beta * (vapor_sodium::P_sat(T_x_v[i]) - p_v[i]);     
+            phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) - 
+                            sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
+                            (std::sqrt(2 * M_PI * Rv));
+
+            Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_inner;
+            Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_inner * eps_s) / (r_interface * r_interface - r_inner * r_inner);
 
             /**
              * Variable b [-], used to calculate omega. 
@@ -1364,7 +1381,6 @@ int main() {
             /**
               * Linearization of the omega [-] function to correct the net evaporation/condensation mass flux
               */
-            double Omega;
             if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
             else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
             else Omega = 2.0 * b * std::sqrt(M_PI);
@@ -1384,13 +1400,12 @@ int main() {
             const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));   ///< Derivative of the saturation pressure wrt T [Pa/K]   
 
             const double fac = (2.0 * r_inner * eps_s * beta) / (r_interface * r_interface);    ///< Useful factor in the coefficients calculation [s / m^2]
-
             double h_xv_v;      ///< Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
             double h_vx_x;      ///< Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
             // TODO implementare h
 
-            if (Gamma_xv[i] > 0.0) {
+            if (phi_x_v[i] > 0.0) {
 
                 // Evaporation case
                 h_xv_v = vapor_sodium::h(T_x_v[i]);
@@ -1410,9 +1425,6 @@ int main() {
              */
             const double dPg = (p_v[i] / rho_v[i]) * (rho_v[i] - rho_old_v[i])
                 + (p_v[i] / T_v_bulk[i]) * (T_v_bulk[i] - T_old_v[i]);   
-
-            // Calculate old mass transfer rate
-            Gamma_xv[i] = fac * (sigma_e * Psat - sigma_c * Omega * p_v[i]);        ///< Mass volumetric source [kg/(m3 s)] (positive if evaporation)
 
             // Coefficients for the linearization of the new mass transfer rate
             bGamma[i] = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
@@ -1496,8 +1508,6 @@ int main() {
 
         // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
         p_outlet_v = vapor_sodium::P_sat(T_x_v[N - 1]);
-
-        for (int i = 0; i < N; ++i) total_mass += Gamma_xv[i];
 
         #pragma endregion
 
@@ -1628,8 +1638,6 @@ int main() {
 
             u_v = solveTridiagonal(aVU, bVU, cVU, dVU);
 
-            
-
             #pragma endregion
 
             /// Inner iterations variables reset
@@ -1692,7 +1700,7 @@ int main() {
                     const double phi_r_star = (u_r_star > 0.0) ? rho_P * u_r_star : rho_R * u_r_star;  ///< Right face mass flux [kg/(m^2 s)] (upwind discretization)
 
                     const double mass_imbalance = (phi_r_star - phi_l_star);        ///< Mass difference of the fluxes across faces [kg/(m2 s)]
-                    const double mass_flux_source = Gamma_xv[i] * dz;               ///< Mass flux [kg/(m2 s)] due to external source (positive if out of the wick)
+                    const double mass_flux_source = Gamma_xv_vapor[i] * dz;               ///< Mass flux [kg/(m2 s)] due to external source (positive if out of the wick)
                     const double change_density = (rho_P - rho_old_v[i]) * dz / dt; ///< Term [kg/(m2 s)] related to the change in density
 
                     aVP[i] = -E_l;                                                  ///< [s/m]
@@ -2095,7 +2103,7 @@ int main() {
             o_w_temperature_output << T_o_w[i] << " ";
             w_bulk_temperature_output << T_w_bulk[i] << " ";
 
-            x_v_mass_flux_output << Gamma_xv[i] << " ";
+            x_v_mass_flux_output << phi_x_v[i] << " ";
 
             o_w_heat_flux_output << q_o_w[i] << " ";
             w_x_heat_flux_output << q_w_x_wall[i] << " ";
