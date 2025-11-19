@@ -57,7 +57,7 @@ def robust_ylim(y):
 
 # --- Figure principale ---
 fig, ax = plt.subplots(figsize=(11, 6))  # più larga
-plt.subplots_adjust(left=0.06, bottom=0.25, right=0.70)  # lascia spazio per 2 colonne
+plt.subplots_adjust(left=0.08, bottom=0.25, right=0.70)  # lascia spazio per 2 colonne
 line, = ax.plot([], [], lw=2)
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")
