@@ -682,6 +682,7 @@ int main() {
 
             #pragma region wick
 
+            /*
             /// Evaluates maximum absolute value of the wick velocity
             const double max_abs_u =
                 std::abs(*std::max_element(u_x.begin(), u_x.end(),
@@ -691,13 +692,10 @@ int main() {
             /// Evaluates minimum value of the wick temperature
             const double min_T_wick = *std::min_element(T_x_bulk.begin(), T_x_bulk.end());
 
-            /*std::cout << "Solving wick! Time elapsed:" << dt * n << "/" << time_total
+            std::cout << "Solving wick! Time elapsed:" << dt * n << "/" << time_total
                 << ", max courant number: " << max_abs_u * dt / dz
-                << ", max reynolds number: " << max_abs_u * r_w *liquid_sodium::rho(min_T_wick) / liquid_sodium::mu(min_T_wick) << "\n";*/
-
-            // Backup old variables
-            T_old_x = T_x_bulk;
-            p_old_x = p_x;
+                << ", max reynolds number: " << max_abs_u * r_w *liquid_sodium::rho(min_T_wick) / liquid_sodium::mu(min_T_wick) << "\n";
+            */
 
             /**
              * Pressure coupling hypotheses: the meniscus in the last cell of the domain is 
@@ -733,6 +731,8 @@ int main() {
                     const double rho_P = liquid_sodium::rho(T_x_bulk_iter[i]);    
                     const double rho_L = liquid_sodium::rho(T_x_bulk_iter[i - 1]);
                     const double rho_R = liquid_sodium::rho(T_x_bulk_iter[i + 1]);
+
+                    const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
 
                     const double mu_P = liquid_sodium::mu(T_x_bulk_iter[i]);
                     const double mu_L = liquid_sodium::mu(T_x_bulk_iter[i - 1]);
@@ -781,7 +781,7 @@ int main() {
                         + CF * mu_P * dz / sqrt(K) * abs(u_x_iter[i]);
                     dXU[i] = 
                         -0.5 * (p_x_iter[i + 1] - p_x_iter[i - 1])
-                        + rho_P * u_x_old[i] * dz / dt;
+                        + rho_P_old * u_x_old[i] * dz / dt;
                 }
 
                 /// Diffusion coefficients for the first and last node to define BCs
@@ -917,14 +917,14 @@ int main() {
                     for (int i = 0; i < N; i++) {
 
                         double p_prev_x = p_x[i];
-                        p_x_iter[i] += p_prime_x_iter[i];         // Note that PISO does not require an under-relaxation factor
-                        p_storage_x_iter[i + 1] = p_x_iter[i];
+                        p_x_iter[i] += p_prime_x[i];         // Note that PISO does not require an under-relaxation factor
+                        p_storage_x[i + 1] = p_x_iter[i];
 
                         p_error_x = std::max(p_error_x, std::fabs(p_x_iter[i] - p_prev_x));
                     }
 
-                    p_storage_x_iter[0] = p_storage_x_iter[1];
-                    p_storage_x_iter[N + 1] = p_outlet_x;
+                    p_storage_x[0] = p_storage_x[1];
+                    p_storage_x[N + 1] = p_outlet_x;
 
                     #pragma endregion
 
@@ -944,7 +944,7 @@ int main() {
                     for (int i = 1; i < N - 1; i++) {
 
                         double u_prev = u_x[i];
-                        u_x_iter[i] = u_x_iter[i] - (p_prime_x_iter[i + 1] - p_prime_x_iter[i - 1]) / (2.0 * dz * bXU[i]);
+                        u_x_iter[i] = u_x_iter[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * dz * bXU[i]);
 
                         u_error_x = std::max(u_error_x, std::fabs(u_x_iter[i] - u_prev));
                     }
@@ -982,6 +982,8 @@ int main() {
                 const double rho_L = liquid_sodium::rho(T_x_bulk_iter[i - 1]);
                 const double rho_R = liquid_sodium::rho(T_x_bulk_iter[i + 1]);
 
+                const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
+
                 const double k_cond_P = liquid_sodium::k(T_x_bulk_iter[i]);
                 const double k_cond_L = liquid_sodium::k(T_x_bulk_iter[i - 1]);
                 const double k_cond_R = liquid_sodium::k(T_x_bulk_iter[i + 1]);
@@ -989,6 +991,8 @@ int main() {
                 const double cp_P = liquid_sodium::cp(T_x_bulk_iter[i]);
                 const double cp_L = liquid_sodium::cp(T_x_bulk_iter[i - 1]);
                 const double cp_R = liquid_sodium::cp(T_x_bulk_iter[i + 1]);
+                 
+                const double cp_P_old = liquid_sodium::cp(T_x_bulk_old[i]);
 
                 /// Diffusion coefficient [W/(m^2 K)] of the left face (average)
                 const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;        
@@ -1059,7 +1063,7 @@ int main() {
                     + D_l + D_r 
                     + rho_P * cp_P * dz / dt;   /// [W/(m2 K)]
                 dXT[i] =
-                    rho_P * cp_P * dz / dt * T_x_bulk_old[i]
+                    rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
                     + Q_flux_wick[i] * dz
                     + Q_mass_wick[i] * dz;              /// [W/m2]
             }
@@ -1110,18 +1114,18 @@ int main() {
                  * Mass flux from the wick to the vapor [kg/(m2 s)]. 
                  * Calculated using the kinetic gas theory.
                  */
-                phi_x_v_iter[i] = (sigma_e * vapor_sodium::P_sat(T_x_v_iter[i]) / std::sqrt(T_x_v_iter[i]) -
+                phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v_iter[i]) / std::sqrt(T_x_v_iter[i]) -
                                 sigma_c * Omega * p_v_iter[i] / std::sqrt(T_v_bulk_iter[i])) /
                                 (std::sqrt(2 * M_PI * Rv));
 
-                Gamma_xv_vapor_iter[i] = phi_x_v[i] * 2.0 * eps_s / r_inner;
-                Gamma_xv_wick_iter[i] = phi_x_v[i] * (2.0 * r_inner * eps_s) / (r_w * r_w - r_inner * r_inner);
+                Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_inner;
+                Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_inner * eps_s) / (r_w * r_w - r_inner * r_inner);
 
                 /**
                  * Variable b [-], used to calculate omega. 
                  * Ratio of the overrall speed to the most probable velocity of the vapor.
                  */
-                const double b = std::abs(-phi_x_v_iter[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
+                const double b = std::abs(-phi_x_v[i] / (p_v_iter[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
 
                 /**
                   * Linearization of the omega [-] function to correct the net evaporation/condensation mass flux
@@ -1148,7 +1152,7 @@ int main() {
                 double h_xv_v;          /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
                 double h_vx_x;          /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
-                if (phi_x_v[i] > 0.0) {
+                if (phi_x_v_iter[i] > 0.0) {
 
                     // Evaporation case
                     h_xv_v = vapor_sodium::h(T_x_v_iter[i]);
@@ -1211,23 +1215,23 @@ int main() {
                 if (i <= evaporator_nodes) q_o_w[i] = q_pp_evaporator;                                  /// Evaporator imposed heat flux
                 else if (i >= (N - condenser_nodes)) {
 
-                    double conv = h_conv * (T_o_w_iter[i] - T_env);                                          /// Condenser convective heat flux
-                    double irr = emissivity * sigma * (std::pow(T_o_w_iter[i], 4) - std::pow(T_env, 4));     /// Condenser irradiation heat flux
+                    double conv = h_conv * (T_o_w[i] - T_env);                                          /// Condenser convective heat flux
+                    double irr = emissivity * sigma * (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));     /// Condenser irradiation heat flux
 
                     q_o_w[i] = -(conv + irr);                                                           /// Heat flux at the outer wall (positive if to the wall)
                 }
                                                                                        
                 q_w_x_wall[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_w);               // Heat flux across wall-wick interface (positive if to wick)
                 q_w_x_wick[i] = k_int_x * (ABC[i][1] + 2.0 * ABC[i][2] * r_w);       // Heat flux across wall-wick interface (positive if to wick)
-                q_x_v_wick[i] = liquid_sodium::k(T_x_v_iter[i]) * (ABC[i][4] + 2.0 * ABC[i][5] * r_inner);           // Heat flux across wick-vapor interface (positive if to vapor)
-                q_x_v_vapor[i] = vapor_sodium::k(T_x_v_iter[i], p_v_iter[i]) * (ABC[i][4] + 2.0 * ABC[i][5] * r_inner);   // Heat flux across wick-vapor interface (positive if to vapor)
+                q_x_v_wick[i] = liquid_sodium::k(T_x_v[i]) * (ABC[i][4] + 2.0 * ABC[i][5] * r_inner);           // Heat flux across wick-vapor interface (positive if to vapor)
+                q_x_v_vapor[i] = vapor_sodium::k(T_x_v[i], p_v_iter[i]) * (ABC[i][4] + 2.0 * ABC[i][5] * r_inner);   // Heat flux across wick-vapor interface (positive if to vapor)
 
                 Q_mass_vapor[i] = Gamma_xv_vapor[i] * h_xv_v;  /// Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;  /// Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
-            p_outlet_v = vapor_sodium::P_sat(T_x_v_iter[N - 1]);
+            p_outlet_v = vapor_sodium::P_sat(T_x_v[N - 1]);
 
             #pragma endregion
 
@@ -1294,6 +1298,8 @@ int main() {
                     const double rho_L = rho_v_iter[i - 1];
                     const double rho_R = rho_v_iter[i + 1];
 
+                    const double rho_P_old = rho_v_old[i];
+
                     const double mu_P = vapor_sodium::mu(T_v_bulk_iter[i]);
                     const double mu_L = vapor_sodium::mu(T_v_bulk_iter[i - 1]);
                     const double mu_R = vapor_sodium::mu(T_v_bulk_iter[i + 1]);
@@ -1343,7 +1349,7 @@ int main() {
                     const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);  
 
                     /// Friction force [kg/(m2 s)]
-                    const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_inner;    
+                    const double F = 0.25 * f * rho_P * std::abs(u_v_iter[i]) / r_inner;
 
                     aVU[i] = 
                         - std::max(F_l, 0.0) 
@@ -1357,8 +1363,8 @@ int main() {
                         + D_l + D_r 
                         + F * dz;                           /// [kg/(m2 s)]
                     dVU[i] = 
-                        - 0.5 * (p_v[i + 1] - p_v[i - 1]) 
-                        + rho_P * u_v_old[i] * dz / dt;         /// [kg/(m s2)]
+                        - 0.5 * (p_v_iter[i + 1] - p_v_iter[i - 1])
+                        + rho_P_old * u_v_old[i] * dz / dt;         /// [kg/(m s2)]
                 }
 
                 /// Diffusion coefficients for the first and last node to define BCs
@@ -1477,7 +1483,7 @@ int main() {
                         const double mass_flux_source = Gamma_xv_vapor_iter[i] * dz;
 
                         /// Term [kg/(m2 s)] related to the change in density
-                        const double change_density = (rho_P - rho_old_v_iter[i]) * dz / dt;
+                        const double change_density = (rho_P - rho_v_old[i]) * dz / dt;
 
                         aVP[i] = 
                             - E_l;              /// [s/m]
@@ -1535,9 +1541,6 @@ int main() {
 
                     #pragma endregion
 
-                    // Save density connected to the pressure field of timestep n
-                    rho_old_v_iter = rho_v_iter;
-
                     // Update density with new p,T, to get the density connected to the pressure field of timestep n+1
                     eos_update(rho_v_iter, p_v_iter, T_v_bulk_iter);
 
@@ -1553,7 +1556,6 @@ int main() {
                       * @brief Corrects the velocity with p' and checks the sonic limit
                       */
                     u_error_v = 0.0;
-
                 
                     for (int i = 1; i < N - 1; i++) {
 
@@ -1727,6 +1729,8 @@ int main() {
                 const double cp_L = vapor_sodium::cp(T_v_bulk_iter[i - 1]);
                 const double cp_R = vapor_sodium::cp(T_v_bulk_iter[i + 1]);
 
+                const double cp_P_old = vapor_sodium::cp(T_v_bulk_old[i]);
+
                 const double mu_P = vapor_sodium::mu(T_v_bulk_iter[i]);
 
                 const double keff_P = k_cond_P + SST_model_turbulence_on_off * (mu_t[i] * cp_P / Pr_t);     
@@ -1783,9 +1787,9 @@ int main() {
                 /// Vapor volumetric heat source [W/m^3] due to phase change and heat flux at the interface
                 Q_flux_vapor[i] = 2 * q_x_v_vapor_iter[i] / r_inner;
 
-                const double dpdz_up = (u_v[i] >= 0.0)
-                    ? u_v[i] * (p_v[i] - p_v[i - 1]) / dz
-                    : u_v[i] * (p_v[i + 1] - p_v[i]) / dz;
+                const double dpdz_up = (u_v_iter[i] >= 0.0)
+                    ? u_v_iter[i] * (p_v_iter[i] - p_v_iter[i - 1]) / dz
+                    : u_v_iter[i] * (p_v_iter[i + 1] - p_v_iter[i]) / dz;
 
                 aVT[i] = 
                     - D_l 
@@ -1796,7 +1800,7 @@ int main() {
                 bVT[i] = 
                     + (std::max(C_r, 0.0) + std::max(-C_l, 0.0)) 
                     + D_l + D_r 
-                    + rho_v_old[i] * cp_P * dz / dt;        /// [W/(m2 K)]
+                    + rho_v_old[i] * cp_P_old * dz / dt;        /// [W/(m2 K)]
 
                 const double pressure_work = (p_v_iter[i] - p_v_old[i]) / dt + dpdz_up;
 
@@ -1805,7 +1809,7 @@ int main() {
                         + (u_v_iter[i] + u_v_iter[i - 1]) * (u_v_iter[i] + u_v_iter[i - 1])) / (dz * dz);
 
                 dVT[i] = 
-                    + rho_v_old[i] * cp_P * dz / dt * T_old_v[i]
+                    + rho_v_old[i] * cp_P * dz / dt * T_v_bulk_old[i]
                     + pressure_work * dz
                     + viscous_dissipation * dz
                     + Q_flux_vapor[i] * dz
@@ -1827,7 +1831,7 @@ int main() {
             T_v_bulk = solveTridiagonal(aVT, bVT, cVT, dVT);
 
             // Update density with new p,T
-            eos_update(rho_v, p_v, T_v_bulk);
+            eos_update(rho_v_iter, p_v_iter, T_v_bulk);
 
             #pragma endregion
 
@@ -1892,25 +1896,6 @@ int main() {
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
 				L1 += eps;
-
-				Aold = Q_flux_vapor_iter[i];
-				Anew = Q_flux_vapor[i];
-				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-				L1 += eps;
-
-				Aold = Q_flux_wick_iter[i];
-				Anew = Q_flux_wick[i];
-				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-				L1 += eps;
-
-				Aold = Q_flux_wall_iter[i];
-				Anew = Q_flux_wall[i];
-				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-				L1 += eps;
-
             }
 
             if (L1 < picTolerance)
@@ -1927,9 +1912,6 @@ int main() {
                 rho_v_iter[i] = rho_v[i];
                 Gamma_xv_vapor_iter[i] = Gamma_xv_vapor[i];
                 Gamma_xv_wick_iter[i] = Gamma_xv_wick[i];
-                Q_flux_vapor_iter[i] = Q_flux_vapor[i];
-                Q_flux_wick_iter[i] = Q_flux_wick[i];
-                Q_flux_wall_iter[i] = Q_flux_wall[i];
             }
         }
 
@@ -1945,9 +1927,6 @@ int main() {
             rho_v_old[i] = rho_v[i];
             Gamma_xv_vapor_old[i] = Gamma_xv_vapor[i];
             Gamma_xv_wick_old[i] = Gamma_xv_wick[i];
-            Q_flux_vapor_old[i] = Q_flux_vapor[i];
-            Q_flux_wick_old[i] = Q_flux_wick[i];
-            Q_flux_wall_old[i] = Q_flux_wall[i];
         }
 
         // =======================================================================
