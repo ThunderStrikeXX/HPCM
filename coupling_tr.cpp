@@ -192,7 +192,7 @@ double new_dt_v(double dz, double dt_old,
     const double Rv = 361.8;                            /// Gas constant for the sodium vapor [J/(kg K)]
     const double CSV_mass = 0.5;                        /// Limit coefficient: mass fraction allowed to change per time step
     const double CSV_flux = 0.5;                        /// Limit coefficient: mass fraction allowed to change per time step
-    const double CP = 0.5;                              /// Limit coefficient:
+    const double CP = 10;                              /// Limit coefficient:
     const double epsS = 1e-12;                          /// This is to prevent divisions by zero (e.g. if the source is zero)
 	const double epsT = 1e-12;                          /// This is to prevent divisions by zero (e.g. if the source is zero)
     const double theta = 0.9;                           /// Adjusting coefficient for the timestep candidate 
@@ -291,7 +291,7 @@ int main() {
     const double A_v_cross = M_PI * r_v * r_v;                              /// Vapor cross-sectional area [m^2]
 
     // Time-stepping parameters
-    double dt = 1e-8;                       /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-4;                  /// Initial time step [s] (then it is updated according to the limits)
     const int nSteps = 1e20;                /// Number of timesteps [-]
     double time_total = 0.0;                /// Total simulation time [s]
 
@@ -442,7 +442,7 @@ int main() {
     std::vector<double> 
         aVU(N, 0.0),                                                /// Lower tridiagonal coefficient for vapor velocity
         bVU(N, 2 * (4.0 / 3.0 * vapor_sodium::mu(T_init) / dz) 
-            + dz / dt * rho_v[0]),                                  /// Central tridiagonal coefficient for vapor velocity
+            + dz / dt_user * rho_v[0]),                                  /// Central tridiagonal coefficient for vapor velocity
         cVU(N, 0.0),                                                /// Upper tridiagonal coefficient for vapor velocity
         dVU(N, 0.0);                                                /// Known vector for vapor velocity
 
@@ -472,12 +472,12 @@ int main() {
 
     std::ofstream x_v_temperature_output(name + "/wick_vapor_interface_temperature.txt", std::ios::trunc);
     std::ofstream w_x_temperature_output(name + "/wall_wick_interface_temperature.txt", std::ios::trunc);
-    std::ofstream o_w_temperature_output(name + "/outer_iall_temperature.txt", std::ios::trunc);
+    std::ofstream o_w_temperature_output(name + "/outer_wall_temperature.txt", std::ios::trunc);
     std::ofstream w_bulk_temperature_output(name + "/wall_bulk_temperature.txt", std::ios::trunc);
 
     std::ofstream x_v_mass_flux_output(name + "/wick_vapor_mass_source.txt", std::ios::trunc);
 
-    std::ofstream o_w_heat_flux_output(name + "/outer_iall_heat_flux.txt", std::ios::trunc);
+    std::ofstream o_w_heat_flux_output(name + "/outer_wall_heat_flux.txt", std::ios::trunc);
     std::ofstream w_x_heat_flux_output(name + "/wall_wick_heat_flux.txt", std::ios::trunc);
     std::ofstream x_v_heat_flux_output(name + "/wick_vapor_heat_flux.txt", std::ios::trunc);
 
@@ -523,19 +523,23 @@ int main() {
 
     int n = 0;
 
+    double dt_code = dt_user;
+	double dt = dt_user;
+
     /**
      * @brief Time-stepping loop. The timestep is calculated at the beginning of each loop.
      */
-    for (int n = 0; n < nSteps; ++n) {
+    for (int n = 0; n < nSteps; ++n) { 
 
-        n += 1; 
+        double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_flux_wall);
+        double dt_cand_x = new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_flux_wick);
+        double dt_cand_v = new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_flux_vapor, bVU);
 
-		time_total += dt;
+        dt_code = std::min(std::min(dt_cand_w, dt_cand_x), std::min(dt_cand_x, dt_cand_v));
 
-        dt = std::min(dt, std::min(std::min(new_dt_w(dz, dt, T_w_bulk, Q_flux_wall),
-                               new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_flux_wick)),
-                      std::min(new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_flux_wick),
-                               new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_flux_vapor, bVU))));
+        dt = std::min(dt_user, dt_code);
+
+        time_total += dt;
 
 		// Picard: iter values = old values
         for (int i = 0; i < N; ++i) {
@@ -1149,17 +1153,35 @@ int main() {
                 T_w_x[i] = ABC[i][0] + ABC[i][1] * r_i + ABC[i][2] * r_i * r_i; /// Temperature at the wall wick interface
                 T_x_v[i] = ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v; /// Temperature at the wick vapor interface
 
-                // Update heat fluxes at the interfaces
-                if (i <= evaporator_nodes) q_o_w[i] = q_pp_evaporator;      /// Evaporator imposed heat flux
-                else if (i >= (N - condenser_nodes)) {
+                std::vector<double> q_raw(N, 0.0);
 
-                    double conv = h_conv * (T_o_w_iter[i] - T_env);         /// Condenser convective heat flux
-                    double irr = 
-                        emissivity * sigma * 
-                        (std::pow(T_o_w_iter[i], 4) - std::pow(T_env, 4));  /// Condenser irradiation heat flux
+                for (int i = 0; i < N; ++i) {
 
-                    q_o_w[i] = -(conv + irr);                               /// Heat flux at the outer wall (positive if to the wall)
+                    if (i <= evaporator_nodes) q_raw[i] = q_pp_evaporator;
+                    else if (i >= N - condenser_nodes) {
+
+                        double conv = h_conv * (T_o_w_iter[i] - T_env);
+                        double irr = emissivity * sigma *
+                            (std::pow(T_o_w_iter[i], 4) - std::pow(T_env, 4));
+
+                        q_raw[i] = -(conv + irr);
+                    }
                 }
+
+                // Light smoothing (3-point binomial filter)
+                std::vector<double> q_smooth(N);
+
+                for (int i = 0; i < N; ++i) {
+
+                    double qm = q_raw[i];
+                    double ql = (i > 0 ? q_raw[i - 1] : q_raw[i]);
+                    double qr = (i < N - 1 ? q_raw[i + 1] : q_raw[i]);
+
+                    // filtro di smoothing: [0.25, 0.5, 0.25]
+                    q_smooth[i] = 0.25 * ql + 0.5 * qm + 0.25 * qr;
+                }
+
+                q_o_w = q_smooth;
                                                                                        
                 q_w_x_wall[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i);  /// Heat flux across wall-wick interface (positive if to wick)
                 q_w_x_wick[i] = k_int_x * (ABC[i][1] + 2.0 * ABC[i][2] * r_i);  /// Heat flux across wall-wick interface (positive if to wick)
@@ -1857,7 +1879,7 @@ int main() {
 
         #pragma region output
 
-        const int output_every = 1000;
+        const int output_every = 100;
 
         if(n % output_every == 0){
             for (int i = 0; i < N; ++i) {
