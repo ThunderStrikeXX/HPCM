@@ -264,6 +264,38 @@ std::vector<double> read_last_row(const std::string& filename, int N) {
     return out;
 }
 
+double read_last_value(const std::string& filename) {
+
+    std::ifstream f(filename);
+    std::string line, last;
+
+    // Prende l'ultima riga
+    while (std::getline(f, line)) last = line;
+    if (last.empty()) return 0.0;
+
+    // Scansiona la riga e legge l'ultimo token numerico
+    std::string token;
+    double last_value = 0.0;
+
+    for (char c : last) {
+        if (c == ' ' || c == '\t') {
+            if (!token.empty()) {
+                last_value = std::stod(token);
+                token.clear();
+            }
+        }
+        else {
+            token.push_back(c);
+        }
+    }
+
+    // Ultimo token se presente
+    if (!token.empty()) last_value = std::stod(token);
+
+    return last_value;
+}
+
+
 std::string select_case() {
 
     std::vector<std::string> cases;
@@ -282,7 +314,7 @@ std::string select_case() {
         std::cout << i << ": " << cases[i] << "\n";
     }
 
-    std::cout << "Press ENTER for a new simulation or input the number of the simulation you want to continue and then press ENTER to continue a simulation";
+    std::cout << "Press ENTER for a new case. Input the number and press ENTER to load a case: ";
 
     std::string s;
     std::getline(std::cin, s);
@@ -379,6 +411,9 @@ int main() {
     std::vector<double> mesh(N, 0.0);
     for (int i = 0; i < N; ++i) mesh[i] = i * dz;
 
+    // Output precision
+    const int global_precision = 8;
+
     // Node partition
     const int N_e = static_cast<int>(std::floor(evaporator_length / dz));   /// Number of nodes of the evaporator region [-]
     const int N_c = static_cast<int>(std::ceil(condenser_length / dz));     /// Number of nodes of the condenser region [-]
@@ -394,22 +429,11 @@ int main() {
     std::vector<double> T_x_v(N, T_init);
     std::vector<double> T_v_bulk(N, T_init);
 
-    // Initialization of the temperatures 
-    std::vector<double> T_o_w(N, T_init);
-    std::vector<double> T_w_bulk(N, T_init);
-    std::vector<double> T_w_x(N, T_init);
-    std::vector<double> T_x_bulk(N, T_init);
-    std::vector<double> T_x_v(N, T_init);
-    std::vector<double> T_v_bulk(N, T_init);
-
     // Wick fields
     std::vector<double> u_x(N, -0.0001);                                            /// Wick velocity field [m/s]
     std::vector<double> p_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));               /// Wick pressure field [Pa]
     std::vector<double> p_storage_x(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));      /// Wick padded pressure vector for R&C correction [Pa]
     double* p_padded_x = &p_storage_x[1];                                           /// Poìnter to work on the wick pressure padded storage with the same indes
-
-    std::vector<double> u_x_old = u_x;
-    std::vector<double> p_x_old = p_x;
 
     // Vapor fields
     std::vector<double> u_v(N, 0.1);                                                /// Vapor velocity field [m/s]
@@ -417,10 +441,6 @@ int main() {
     std::vector<double> rho_v(N, 8e-3);                                             /// Vapor density field [Pa]
     std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_v_bulk[N - 1]));   /// Vapor padded pressure vector for R&C correction [Pa]
     double* p_padded_v = &p_storage_v[1];                                           /// Poìnter to work on the storage with the same indes
-
-    std::vector<double> u_v_old = u_v;
-    std::vector<double> p_v_old = p_v;
-    std::vector<double> rho_v_old = rho_v;
 
     /// Initialization of the vapor pressure
     for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);
@@ -446,8 +466,30 @@ int main() {
 
     std::string case_chosen = select_case();
 
-    if (!case_chosen.empty())  {
+    if(case_chosen.empty()) {
 
+        // Create result folder
+        int new_case = 0;
+        while (true) {
+            case_chosen = "case_" + std::to_string(new_case);
+            if (!std::filesystem::exists(case_chosen)) {
+                std::filesystem::create_directory(case_chosen);
+                break;
+            }
+            new_case++;
+        }
+
+        std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
+        mesh_output << std::setprecision(8);
+
+        for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
+
+        mesh_output.flush();
+        mesh_output.close();
+
+    } else {
+
+        // Load state variables
         u_v = read_last_row(case_chosen + "/vapor_velocity.txt", N);
         p_v = read_last_row(case_chosen + "/vapor_pressure.txt", N);
         T_v_bulk = read_last_row(case_chosen + "/vapor_bulk_temperature.txt", N);
@@ -469,35 +511,64 @@ int main() {
 
         rho_v = read_last_row(case_chosen + "/rho_vapor.txt", N);
 
-        for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
-        p_storage_x[0] = p_storage_x[1];
-        p_storage_x[N + 1] = p_storage_x[N];
-
-        for (int i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
-        p_storage_v[0] = p_storage_v[1];
-        p_storage_v[N + 1] = p_storage_v[N];
-
-        // Heat fluxes at the interfaces [W/m^2]
-        std::vector<double> q_o_w(N, 0.0);           /// Heat flux [W/m^2] across outer wall in wall region (positive if directed to wall)
-        std::vector<double> q_w_x_wall(N, 0.0);      /// Heat flux [W/m^2] across wall-wick interface in the wall region (positive if directed to wick)
-        std::vector<double> q_w_x_wick(N, 0.0);      /// Heat flux [W/m^2] across wall-wick interface in the wick region (positive if directed to wick)
-        std::vector<double> q_x_v_wick(N, 0.0);      /// Heat flux [W/m^2] across wick-vapor interface in the wick region (positive if directed to vapor)
-        std::vector<double> q_x_v_vapor(N, 0.0);     /// Heat flux [W/m^2] across wick-vapor interface in the vapor region (positive if directed to vapor)
-
-        std::vector<double> Q_flux_wall(N, 0.0);     /// Wall heat source due to fluxes [W/m3]
-        std::vector<double> Q_flux_wick(N, 0.0);     /// Wick heat source due to fluxes [W/m3]
-        std::vector<double> Q_flux_vapor(N, 0.0);    /// Vapor heat source due to fluxes[W/m3]
-
-        std::vector<double> Q_mass_vapor(N, 0.0);    /// Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
-        std::vector<double> Q_mass_wick(N, 0.0);     /// Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the wick
-
-        // Mass sources/fluxes
-        std::vector<double> phi_x_v(N, 0.0);            /// Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
-        std::vector<double> Gamma_xv_vapor(N, 0.0);     /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-        std::vector<double> Gamma_xv_wick(N, 0.0);      /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-
+		time_total = read_last_value(case_chosen + "/time.txt");
     }
+
+    // Steam outputs
+    std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
+
+    std::ofstream v_velocity_output(case_chosen + "/vapor_velocity.txt", std::ios::app);
+    std::ofstream v_pressure_output(case_chosen + "/vapor_pressure.txt", std::ios::app);
+    std::ofstream v_bulk_temperature_output(case_chosen + "/vapor_bulk_temperature.txt", std::ios::app);
+
+    std::ofstream x_velocity_output(case_chosen + "/wick_velocity.txt", std::ios::app);
+    std::ofstream x_pressure_output(case_chosen + "/wick_pressure.txt", std::ios::app);
+    std::ofstream x_bulk_temperature_output(case_chosen + "/wick_bulk_temperature.txt", std::ios::app);
+
+    std::ofstream x_v_temperature_output(case_chosen + "/wick_vapor_interface_temperature.txt", std::ios::app);
+    std::ofstream w_x_temperature_output(case_chosen + "/wall_wick_interface_temperature.txt", std::ios::app);
+    std::ofstream o_w_temperature_output(case_chosen + "/outer_wall_temperature.txt", std::ios::app);
+    std::ofstream w_bulk_temperature_output(case_chosen + "/wall_bulk_temperature.txt", std::ios::app);
+
+    std::ofstream x_v_mass_flux_output(case_chosen + "/wick_vapor_mass_source.txt", std::ios::app);
+
+    std::ofstream o_w_heat_flux_output(case_chosen + "/outer_wall_heat_flux.txt", std::ios::app);
+    std::ofstream w_x_heat_flux_output(case_chosen + "/wall_wick_heat_flux.txt", std::ios::app);
+    std::ofstream x_v_heat_flux_output(case_chosen + "/wick_vapor_heat_flux.txt", std::ios::app);
+
+    std::ofstream rho_output(case_chosen + "/rho_vapor.txt", std::ios::app);
+
+    time_output << std::setprecision(global_precision);
+
+    v_velocity_output << std::setprecision(global_precision);
+    v_pressure_output << std::setprecision(global_precision);
+    v_bulk_temperature_output << std::setprecision(global_precision);
+
+    x_velocity_output << std::setprecision(global_precision);
+    x_pressure_output << std::setprecision(global_precision);
+    x_bulk_temperature_output << std::setprecision(global_precision);
+
+    x_v_temperature_output << std::setprecision(global_precision);
+    w_x_temperature_output << std::setprecision(global_precision);
+    o_w_temperature_output << std::setprecision(global_precision);
+    w_bulk_temperature_output << std::setprecision(global_precision);
+
+    x_v_mass_flux_output << std::setprecision(global_precision);
+
+    o_w_heat_flux_output << std::setprecision(global_precision);
+    w_x_heat_flux_output << std::setprecision(global_precision);
+    x_v_heat_flux_output << std::setprecision(global_precision);
+
+    rho_output << std::setprecision(global_precision);
 	
+    for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
+    p_storage_x[0] = p_storage_x[1];
+    p_storage_x[N + 1] = p_storage_x[N];
+
+    for (int i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
+    p_storage_v[0] = p_storage_v[1];
+    p_storage_v[N + 1] = p_storage_v[N];
+
     // Old values
     std::vector<double> T_o_w_old = T_o_w;
     std::vector<double> T_w_bulk_old = T_w_bulk;
@@ -572,74 +643,6 @@ int main() {
             + dz / dt_user * rho_v[0]),                                  /// Central tridiagonal coefficient for vapor velocity
         cVU(N, 0.0),                                                /// Upper tridiagonal coefficient for vapor velocity
         dVU(N, 0.0);                                                /// Known vector for vapor velocity
-
-    // Create result folder
-    int new_case = 0;
-    std::string name = "case_0";
-    while (true) {
-        name = "case_" + std::to_string(new_case);
-        if (!std::filesystem::exists(name)) {
-            std::filesystem::create_directory(name);
-            break;
-        }
-        new_case++;
-    }
-
-    // Print results in file
-    std::ofstream mesh_output(name + "/mesh.txt", std::ios::trunc);
-    std::ofstream time_output(name + "/time.txt", std::ios::trunc);
-
-    std::ofstream v_velocity_output(name + "/vapor_velocity.txt", std::ios::trunc);
-    std::ofstream v_pressure_output(name + "/vapor_pressure.txt", std::ios::trunc);
-    std::ofstream v_bulk_temperature_output(name + "/vapor_bulk_temperature.txt", std::ios::trunc);
-
-    std::ofstream x_velocity_output(name + "/wick_velocity.txt", std::ios::trunc);
-    std::ofstream x_pressure_output(name + "/wick_pressure.txt", std::ios::trunc);
-    std::ofstream x_bulk_temperature_output(name + "/wick_bulk_temperature.txt", std::ios::trunc);
-
-    std::ofstream x_v_temperature_output(name + "/wick_vapor_interface_temperature.txt", std::ios::trunc);
-    std::ofstream w_x_temperature_output(name + "/wall_wick_interface_temperature.txt", std::ios::trunc);
-    std::ofstream o_w_temperature_output(name + "/outer_wall_temperature.txt", std::ios::trunc);
-    std::ofstream w_bulk_temperature_output(name + "/wall_bulk_temperature.txt", std::ios::trunc);
-
-    std::ofstream x_v_mass_flux_output(name + "/wick_vapor_mass_source.txt", std::ios::trunc);
-
-    std::ofstream o_w_heat_flux_output(name + "/outer_wall_heat_flux.txt", std::ios::trunc);
-    std::ofstream w_x_heat_flux_output(name + "/wall_wick_heat_flux.txt", std::ios::trunc);
-    std::ofstream x_v_heat_flux_output(name + "/wick_vapor_heat_flux.txt", std::ios::trunc);
-
-    std::ofstream rho_output(name + "/rho_vapor.txt", std::ios::trunc);
-
-    const int global_precision = 8;
-
-    mesh_output << std::setprecision(global_precision);
-    time_output << std::setprecision(global_precision);
-
-    v_velocity_output << std::setprecision(global_precision);
-    v_pressure_output << std::setprecision(global_precision);
-    v_bulk_temperature_output << std::setprecision(global_precision);
-
-    x_velocity_output << std::setprecision(global_precision);
-    x_pressure_output << std::setprecision(global_precision);
-    x_bulk_temperature_output << std::setprecision(global_precision);
-
-    x_v_temperature_output << std::setprecision(global_precision);
-    w_x_temperature_output << std::setprecision(global_precision);
-    o_w_temperature_output << std::setprecision(global_precision);
-    w_bulk_temperature_output << std::setprecision(global_precision);
-
-    x_v_mass_flux_output << std::setprecision(global_precision);
-
-    o_w_heat_flux_output << std::setprecision(global_precision);
-    w_x_heat_flux_output << std::setprecision(global_precision);
-    x_v_heat_flux_output << std::setprecision(global_precision);
-
-    rho_output << std::setprecision(global_precision);
-
-    for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
-
-    mesh_output.flush();
-    mesh_output.close();
 
     #pragma endregion
 
