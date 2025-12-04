@@ -71,18 +71,97 @@ std::vector<double> solveTridiagonal(const std::vector<double>& a,
 
 #pragma region initialization_algorithms
 
-/**
- * @brief Generate N linearly spaced values from T_min to T_max.
- * @param T_min start value.
- * @param T_max end value.
- * @param N number of points.
- * @return Vector of uniformly spaced values.
- */
-std::vector<double> linspace(double T_min, double T_max, int N) {
-    std::vector<double> T(N);
-    double dT = (T_max - T_min) / (N - 1);
-    for (int i = 0; i < N; i++) T[i] = T_min + i * dT;
-    return T;
+
+std::vector<double> read_last_row(const std::string& filename, int N) {
+
+    std::ifstream f(filename);
+    std::string line, last;
+
+    while (std::getline(f, line)) last = line;
+    if (last.empty()) return std::vector<double>(N, 0.0);
+
+    std::vector<double> out;
+    out.reserve(N);
+
+    std::string token;
+    for (char c : last) {
+        if (c == ' ' || c == '\t') {
+            if (!token.empty()) {
+                out.push_back(std::stod(token));
+                token.clear();
+            }
+        }
+        else {
+            token.push_back(c);
+        }
+    }
+    if (!token.empty()) out.push_back(std::stod(token));
+
+    if (out.size() != N) out.resize(N, 0.0);
+    return out;
+}
+
+double read_last_value(const std::string& filename) {
+
+    std::ifstream f(filename);
+    std::string line, last;
+
+    // Prende l'ultima riga
+    while (std::getline(f, line)) last = line;
+    if (last.empty()) return 0.0;
+
+    // Scansiona la riga e legge l'ultimo token numerico
+    std::string token;
+    double last_value = 0.0;
+
+    for (char c : last) {
+        if (c == ' ' || c == '\t') {
+            if (!token.empty()) {
+                last_value = std::stod(token);
+                token.clear();
+            }
+        }
+        else {
+            token.push_back(c);
+        }
+    }
+
+    // Ultimo token se presente
+    if (!token.empty()) last_value = std::stod(token);
+
+    return last_value;
+}
+
+
+std::string select_case() {
+
+    std::vector<std::string> cases;
+
+    for (const auto& entry : std::filesystem::directory_iterator(".")) {
+        if (entry.is_directory()) {
+            const std::string name = entry.path().filename().string();
+            if (name.rfind("case_", 0) == 0) cases.push_back(name);
+        }
+    }
+
+    if (cases.empty()) return "";
+
+    std::cout << "Cases found:\n";
+    for (size_t i = 0; i < cases.size(); ++i) {
+        std::cout << i << ": " << cases[i] << "\n";
+    }
+
+    std::cout << "Press ENTER for a new case. Input the number and press ENTER to load a case: ";
+
+    std::string s;
+    std::getline(std::cin, s);
+
+    if (s.empty()) return "";
+
+    int idx = std::stoi(s);
+    if (idx < 0 || idx >= static_cast<int>(cases.size())) return "";
+
+    return cases[idx];
 }
 
 #pragma endregion
@@ -235,98 +314,6 @@ double new_dt_v(double dz, double dt_old,
 
 #pragma endregion
 
-std::vector<double> read_last_row(const std::string& filename, int N) {
-
-    std::ifstream f(filename);
-    std::string line, last;
-
-    while (std::getline(f, line)) last = line;
-    if (last.empty()) return std::vector<double>(N, 0.0);
-
-    std::vector<double> out;
-    out.reserve(N);
-
-    std::string token;
-    for (char c : last) {
-        if (c == ' ' || c == '\t') {
-            if (!token.empty()) {
-                out.push_back(std::stod(token));
-                token.clear();
-            }
-        }
-        else {
-            token.push_back(c);
-        }
-    }
-    if (!token.empty()) out.push_back(std::stod(token));
-
-    if (out.size() != N) out.resize(N, 0.0);
-    return out;
-}
-
-double read_last_value(const std::string& filename) {
-
-    std::ifstream f(filename);
-    std::string line, last;
-
-    // Prende l'ultima riga
-    while (std::getline(f, line)) last = line;
-    if (last.empty()) return 0.0;
-
-    // Scansiona la riga e legge l'ultimo token numerico
-    std::string token;
-    double last_value = 0.0;
-
-    for (char c : last) {
-        if (c == ' ' || c == '\t') {
-            if (!token.empty()) {
-                last_value = std::stod(token);
-                token.clear();
-            }
-        }
-        else {
-            token.push_back(c);
-        }
-    }
-
-    // Ultimo token se presente
-    if (!token.empty()) last_value = std::stod(token);
-
-    return last_value;
-}
-
-
-std::string select_case() {
-
-    std::vector<std::string> cases;
-
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-        if (entry.is_directory()) {
-            const std::string name = entry.path().filename().string();
-            if (name.rfind("case_", 0) == 0) cases.push_back(name);
-        }
-    }
-
-    if (cases.empty()) return "";
-
-    std::cout << "Cases found:\n";
-    for (size_t i = 0; i < cases.size(); ++i) {
-        std::cout << i << ": " << cases[i] << "\n";
-    }
-
-    std::cout << "Press ENTER for a new case. Input the number and press ENTER to load a case: ";
-
-    std::string s;
-    std::getline(std::cin, s);
-
-    if (s.empty()) return "";
-
-    int idx = std::stoi(s);
-    if (idx < 0 || idx >= static_cast<int>(cases.size())) return "";
-
-    return cases[idx];
-}
-
 /**
  * @brief Simplified 1D transient coupling between wall, wick, and vapor.
  */
@@ -432,6 +419,7 @@ int main() {
     // Wick fields
     std::vector<double> u_x(N, -0.0001);                                            /// Wick velocity field [m/s]
     std::vector<double> p_x(N, vapor_sodium::P_sat(T_v_bulk[N - 1]));               /// Wick pressure field [Pa]
+    std::vector<double> rho_x(N, 700);                                             /// Vapor density field [Pa]
     std::vector<double> p_storage_x(N + 2, vapor_sodium::P_sat(T_x_v[N - 1]));      /// Wick padded pressure vector for R&C correction [Pa]
     double* p_padded_x = &p_storage_x[1];                                           /// Poìnter to work on the wick pressure padded storage with the same indes
 
@@ -441,6 +429,13 @@ int main() {
     std::vector<double> rho_v(N, 8e-3);                                             /// Vapor density field [Pa]
     std::vector<double> p_storage_v(N + 2, vapor_sodium::P_sat(T_v_bulk[N - 1]));   /// Vapor padded pressure vector for R&C correction [Pa]
     double* p_padded_v = &p_storage_v[1];                                           /// Poìnter to work on the storage with the same indes
+
+    // Vapor Equation of State update function. Updates density
+    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
+
+        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
+
+    }; eos_update(rho_v, p_v, T_v_bulk);
 
     /// Initialization of the vapor pressure
     for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);
@@ -460,9 +455,12 @@ int main() {
     std::vector<double> Q_mass_wick(N, 0.0);     /// Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the wick
 
     // Mass sources/fluxes
-    std::vector<double> phi_x_v(N, 0.0);            /// Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
-    std::vector<double> Gamma_xv_vapor(N, 0.0);     /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-    std::vector<double> Gamma_xv_wick(N, 0.0);      /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
+    std::vector<double> phi_x_v(N, 0.0);                /// Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
+    std::vector<double> Gamma_xv_vapor(N, 0.0);         /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
+    std::vector<double> Gamma_xv_wick(N, 0.0);          /// Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
+
+	std::vector<double> saturation_pressure(N, 0.0);    /// Saturation pressure field [Pa]
+	std::vector<double> sonic_velocity(N, 0.0);         /// Sonic velocity field [m/s]
 
     std::string case_chosen = select_case();
 
@@ -493,10 +491,12 @@ int main() {
         u_v = read_last_row(case_chosen + "/vapor_velocity.txt", N);
         p_v = read_last_row(case_chosen + "/vapor_pressure.txt", N);
         T_v_bulk = read_last_row(case_chosen + "/vapor_bulk_temperature.txt", N);
+        rho_v = read_last_row(case_chosen + "/rho_vapor.txt", N);
 
         u_x = read_last_row(case_chosen + "/wick_velocity.txt", N);
         p_x = read_last_row(case_chosen + "/wick_pressure.txt", N);
         T_x_bulk = read_last_row(case_chosen + "/wick_bulk_temperature.txt", N);
+        rho_x = read_last_row(case_chosen + "/rho_wick.txt", N);
 
         T_x_v = read_last_row(case_chosen + "/wick_vapor_interface_temperature.txt", N);
         T_w_x = read_last_row(case_chosen + "/wall_wick_interface_temperature.txt", N);
@@ -506,10 +506,16 @@ int main() {
         phi_x_v = read_last_row(case_chosen + "/wick_vapor_mass_source.txt", N);
 
         q_o_w = read_last_row(case_chosen + "/outer_wall_heat_flux.txt", N);
-        q_w_x_wall = read_last_row(case_chosen + "/wall_wick_heat_flux.txt", N);
-        q_w_x_wick = read_last_row(case_chosen + "/wick_vapor_heat_flux.txt", N);
+        q_w_x_wall = read_last_row(case_chosen + "/wall_wx_heat_flux.txt", N);
+        q_w_x_wick = read_last_row(case_chosen + "/wick_wx_heat_flux.txt", N);
+        q_x_v_wick = read_last_row(case_chosen + "/wick_xv_heat_flux.txt", N);
+        q_x_v_vapor = read_last_row(case_chosen + "/vapor_xv_heat_flux.txt", N);
 
-        rho_v = read_last_row(case_chosen + "/rho_vapor.txt", N);
+        Q_flux_wall = read_last_row(case_chosen + "/wall_heat_source_flux.txt", N);
+        Q_flux_wick = read_last_row(case_chosen + "/wick_heat_source_flux.txt", N);
+        Q_flux_vapor = read_last_row(case_chosen + "/vapor_heat_source_flux.txt", N);
+        Q_mass_vapor = read_last_row(case_chosen + "/vapor_heat_source_mass.txt", N);
+        Q_mass_wick = read_last_row(case_chosen + "/wick_heat_source_mass.txt", N);
 
 		time_total = read_last_value(case_chosen + "/time.txt");
     }
@@ -520,10 +526,12 @@ int main() {
     std::ofstream v_velocity_output(case_chosen + "/vapor_velocity.txt", std::ios::app);
     std::ofstream v_pressure_output(case_chosen + "/vapor_pressure.txt", std::ios::app);
     std::ofstream v_bulk_temperature_output(case_chosen + "/vapor_bulk_temperature.txt", std::ios::app);
+    std::ofstream v_rho_output(case_chosen + "/rho_vapor.txt", std::ios::app);
 
     std::ofstream x_velocity_output(case_chosen + "/wick_velocity.txt", std::ios::app);
     std::ofstream x_pressure_output(case_chosen + "/wick_pressure.txt", std::ios::app);
     std::ofstream x_bulk_temperature_output(case_chosen + "/wick_bulk_temperature.txt", std::ios::app);
+    std::ofstream x_rho_output(case_chosen + "/rho_liquid.txt", std::ios::app);
 
     std::ofstream x_v_temperature_output(case_chosen + "/wick_vapor_interface_temperature.txt", std::ios::app);
     std::ofstream w_x_temperature_output(case_chosen + "/wall_wick_interface_temperature.txt", std::ios::app);
@@ -532,21 +540,32 @@ int main() {
 
     std::ofstream x_v_mass_flux_output(case_chosen + "/wick_vapor_mass_source.txt", std::ios::app);
 
-    std::ofstream o_w_heat_flux_output(case_chosen + "/outer_wall_heat_flux.txt", std::ios::app);
-    std::ofstream w_x_heat_flux_output(case_chosen + "/wall_wick_heat_flux.txt", std::ios::app);
-    std::ofstream x_v_heat_flux_output(case_chosen + "/wick_vapor_heat_flux.txt", std::ios::app);
+    std::ofstream q_o_w_output(case_chosen + "/outer_wall_heat_flux.txt", std::ios::app);
+    std::ofstream q_w_x_wall_output(case_chosen + "/wall_wx_heat_flux.txt", std::ios::app);
+    std::ofstream q_w_x_wick_output(case_chosen + "/wick_wx_heat_flux.txt", std::ios::app);
+    std::ofstream q_x_v_wick_output(case_chosen + "/wick_xv_heat_flux.txt", std::ios::app);
+    std::ofstream q_x_v_vapor_output(case_chosen + "/vapor_xv_heat_flux.txt", std::ios::app);
 
-    std::ofstream rho_output(case_chosen + "/rho_vapor.txt", std::ios::app);
+    std::ofstream Q_flux_wall_output(case_chosen + "/outer_wall_heat_flux.txt", std::ios::app);
+    std::ofstream Q_flux_wick_output(case_chosen + "/wall_wick_heat_flux.txt", std::ios::app);
+    std::ofstream Q_flux_vapor_output(case_chosen + "/wick_vapor_heat_flux.txt", std::ios::app);
+    std::ofstream Q_mass_vapor_output(case_chosen + "/outer_wall_heat_flux.txt", std::ios::app);
+    std::ofstream Q_mass_wick_output(case_chosen + "/wall_wick_heat_flux.txt", std::ios::app);
+    
+    std::ofstream saturation_pressure_output(case_chosen + "/saturation_pressure.txt", std::ios::app);
+    std::ofstream sonic_velocity_output(case_chosen + "/sonic_velocity.txt", std::ios::app);
 
     time_output << std::setprecision(global_precision);
 
     v_velocity_output << std::setprecision(global_precision);
     v_pressure_output << std::setprecision(global_precision);
     v_bulk_temperature_output << std::setprecision(global_precision);
+    v_rho_output << std::setprecision(global_precision);
 
     x_velocity_output << std::setprecision(global_precision);
     x_pressure_output << std::setprecision(global_precision);
     x_bulk_temperature_output << std::setprecision(global_precision);
+    x_rho_output << std::setprecision(global_precision);
 
     x_v_temperature_output << std::setprecision(global_precision);
     w_x_temperature_output << std::setprecision(global_precision);
@@ -555,12 +574,21 @@ int main() {
 
     x_v_mass_flux_output << std::setprecision(global_precision);
 
-    o_w_heat_flux_output << std::setprecision(global_precision);
-    w_x_heat_flux_output << std::setprecision(global_precision);
-    x_v_heat_flux_output << std::setprecision(global_precision);
+    q_o_w_output << std::setprecision(global_precision);
+    q_w_x_wall_output << std::setprecision(global_precision);
+    q_w_x_wick_output << std::setprecision(global_precision);
+    q_x_v_wick_output << std::setprecision(global_precision);
+    q_x_v_vapor_output << std::setprecision(global_precision);
 
-    rho_output << std::setprecision(global_precision);
-	
+    Q_flux_wall_output << std::setprecision(global_precision);
+    Q_flux_wick_output << std::setprecision(global_precision);
+    Q_flux_vapor_output << std::setprecision(global_precision);
+    Q_mass_vapor_output << std::setprecision(global_precision);
+    Q_mass_wick_output << std::setprecision(global_precision);
+
+    saturation_pressure_output << std::setprecision(global_precision);
+    sonic_velocity_output << std::setprecision(global_precision);
+
     for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
     p_storage_x[0] = p_storage_x[1];
     p_storage_x[N + 1] = p_storage_x[N];
@@ -621,13 +649,6 @@ int main() {
     std::vector<double> k_turb(N, k0);
     std::vector<double> omega_turb(N, omega0);
     std::vector<double> mu_t(N, 0.0);
-    
-    // Vapor Equation of State update function. Updates density
-    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
-
-        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
-
-    }; eos_update(rho_v, p_v, T_v_bulk);
 
     // Models
     const int rhie_chow_on_off_x = 1;             /// 0: no wick RC correction, 1: wick with RC correction
@@ -1189,7 +1210,7 @@ int main() {
              * First three coefficients are a_w, b_w, c_w
              * Last three coefficients are a_x, b_x, c_x
              */
-            std::array<std::array<double, 6>, N> ABC{};
+            auto ABC = std::make_unique<std::array<double, 6>[] >(N);
 
             for (int i = 0; i < N; ++i) {
 
@@ -1228,8 +1249,8 @@ int main() {
                 const double Re_v = rho_v[i] * std::fabs(u_v[i]) * Dh_v / mu_v;       /// Reynolds number [-]
                 const double Pr_v = cp_v * mu_v / k_v_cond;                                     /// Prandtl number [-]
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v_cond, Dh_v);           /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                const double Psat = vapor_sodium::P_sat(T_x_v_iter[i]);                         /// Saturation pressure [Pa]        
-                const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_x_v_iter[i] * T_x_v_iter[i]));   /// Derivative of the saturation pressure wrt T [Pa/K]   
+                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                         /// Saturation pressure [Pa]        
+                const double dPsat_dT = saturation_pressure[i] * std::log(10.0) * (7740.0 / (T_x_v_iter[i] * T_x_v_iter[i]));   /// Derivative of the saturation pressure wrt T [Pa/K]   
 
                 const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);    /// Useful factor in the coefficients calculation [s / m^2]
 
@@ -1658,19 +1679,19 @@ int main() {
                     for (int i = 1; i < N - 1; i++) {
 
                         const double u_prev_v = u_v[i];
-                        const double sonic_limit = std::sqrt(gamma * Rv * T_v_bulk_iter[i]);
+                        sonic_velocity[i] = std::sqrt(gamma * Rv * T_v_bulk_iter[i]);
 
                         const double calc_velocity = u_v[i] -
                             (p_prime_v[i + 1] - p_prime_v[i - 1]) / (2.0 * dz * bVU[i]);
 
-                        if (calc_velocity < sonic_limit) {
+                        if (calc_velocity < sonic_velocity[i]) {
 
                             u_v[i] = calc_velocity;
 
                         } else {
 
                             //std::cout << "Sonic limit reached, limiting velocity" << "\n";
-                            u_v[i] = sonic_limit;
+                            u_v[i] = sonic_velocity[i];
 
                         }
 
@@ -2026,10 +2047,12 @@ int main() {
                 v_velocity_output << u_v[i] << " ";
                 v_pressure_output << p_v[i] << " ";
                 v_bulk_temperature_output << T_v_bulk[i] << " ";
+                v_rho_output << rho_v[i] << " ";
 
                 x_velocity_output << u_x[i] << " ";
                 x_pressure_output << p_x[i] << " ";
                 x_bulk_temperature_output << T_x_bulk[i] << " ";
+                x_rho_output << rho_x[i] << " ";
 
                 x_v_temperature_output << T_x_v[i] << " ";
                 w_x_temperature_output << T_w_x[i] << " ";
@@ -2038,11 +2061,20 @@ int main() {
 
                 x_v_mass_flux_output << phi_x_v[i] << " ";
 
-                o_w_heat_flux_output << q_o_w[i] << " ";
-                w_x_heat_flux_output << q_w_x_wall[i] << " ";
-                x_v_heat_flux_output << q_w_x_wick[i] << " ";
+                q_o_w_output << q_o_w[i] << " ";
+                q_w_x_wall_output << q_w_x_wall[i] << " ";
+                q_w_x_wick_output << q_w_x_wick[i] << " ";
+                q_x_v_wick_output << q_x_v_wick[i] << " ";
+                q_x_v_vapor_output << q_x_v_vapor[i] << " ";
 
-                rho_output << rho_v[i] << " ";
+                Q_flux_wall_output << Q_flux_wall[i] << " ";
+                Q_flux_wick_output << Q_flux_wick[i] << " ";
+                Q_flux_vapor_output << Q_flux_vapor[i] << " ";
+                Q_mass_vapor_output << Q_mass_vapor[i] << " ";
+                Q_mass_wick_output << Q_mass_wick[i] << " ";
+
+                saturation_pressure_output << saturation_pressure[i] << " ";
+                sonic_velocity_output << sonic_velocity[i] << " ";
             }
 
             time_output << time_total << " ";
@@ -2050,10 +2082,12 @@ int main() {
             v_velocity_output << "\n";
             v_pressure_output << "\n";
             v_bulk_temperature_output << "\n";
+            v_rho_output << "\n";
 
             x_velocity_output << "\n";
             x_pressure_output << "\n";
             x_bulk_temperature_output << "\n";
+            x_rho_output << "\n";
 
             x_v_temperature_output << "\n";
             w_x_temperature_output << "\n";
@@ -2062,19 +2096,30 @@ int main() {
 
             x_v_mass_flux_output << "\n";
 
-            o_w_heat_flux_output << "\n";
-            w_x_heat_flux_output << "\n";
-            x_v_heat_flux_output << "\n";
+            q_o_w_output << "\n";
+            q_w_x_wall_output << "\n";
+            q_w_x_wick_output << "\n";
+            q_x_v_wick_output << "\n";
+            q_x_v_vapor_output << "\n";
 
-            rho_output << "\n";
+            Q_flux_wall_output << "\n";
+            Q_flux_wick_output << "\n";
+            Q_flux_vapor_output << "\n";
+            Q_mass_vapor_output << "\n";
+            Q_mass_wick_output << "\n";
+
+            saturation_pressure_output << "\n";
+            sonic_velocity_output << "\n";
 
             v_velocity_output.flush();
             v_pressure_output.flush();
             v_bulk_temperature_output.flush();
+            v_rho_output.flush();
 
             x_velocity_output.flush();
             x_pressure_output.flush();
             x_bulk_temperature_output.flush();
+            x_rho_output.flush();
 
             x_v_temperature_output.flush();
             w_x_temperature_output.flush();
@@ -2083,11 +2128,20 @@ int main() {
 
             x_v_mass_flux_output.flush();
 
-            o_w_heat_flux_output.flush();
-            w_x_heat_flux_output.flush();
-            x_v_heat_flux_output.flush();
+            q_o_w_output.flush();
+            q_w_x_wall_output.flush();
+            q_w_x_wick_output.flush();
+            q_x_v_wick_output.flush();
+            q_x_v_vapor_output.flush();
 
-            rho_output.flush();
+            Q_flux_wall_output.flush();
+            Q_flux_wick_output.flush();
+            Q_flux_vapor_output.flush();
+            Q_mass_vapor_output.flush();
+            Q_mass_wick_output.flush();
+
+            saturation_pressure_output.flush();
+            sonic_velocity_output.flush();
 
             time_output.flush();
         }
@@ -2100,10 +2154,12 @@ int main() {
     v_velocity_output.close();
     v_pressure_output.close();
     v_bulk_temperature_output.close();
+	v_rho_output.close();
 
     x_velocity_output.close();
     x_pressure_output.close();
     x_bulk_temperature_output.close();
+    x_rho_output.close();
 
     x_v_temperature_output.close();
     w_x_temperature_output.close();
@@ -2112,11 +2168,20 @@ int main() {
 
     x_v_mass_flux_output.close();
 
-    o_w_heat_flux_output.close();
-    w_x_heat_flux_output.close();
-    x_v_heat_flux_output.close();
+    q_o_w_output.close();
+    q_w_x_wall_output.close();
+    q_w_x_wick_output.close();
+    q_x_v_wick_output.close();
+    q_x_v_vapor_output.close();
 
-    rho_output.close();
+    Q_flux_wall_output.close();
+    Q_flux_wick_output.close();
+    Q_flux_vapor_output.close();
+    Q_mass_vapor_output.close();
+    Q_mass_wick_output.close();
+
+    saturation_pressure_output.close();
+    sonic_velocity_output.close();
 
     double end = omp_get_wtime();
     printf("Execution time: %.6f s\n", end - start);
