@@ -22,13 +22,11 @@ The code is implemented in **C++17**, following the structure of **THROHPUT**, *
 
 ```text
 
-+-- coupling.cpp
++-- HPCM.cpp
 +-- results/
 ¦   +-- (data outputs)
 +-- videos/
 ¦   +-- (video outputs)
-+-- make_videos.vbs
-+-- plot_data.vbs
 +-- README.md
 
 ````
@@ -51,7 +49,7 @@ g++ -std=c++17 -O3 coupling.cpp -Iinclude -o coupling
 Run the solver:
 
 ```bash
-./coupling
+./HPCM
 ```
 
 Optional plotting (Python 3.8+):
