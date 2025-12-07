@@ -1972,7 +1972,7 @@ int main() {
                 bVT[i] = 
                     + (std::max(C_r, 0.0) + std::max(-C_l, 0.0)) 
                     + D_l + D_r 
-                    + rho_v[i] * cp_P * dz / dt;            /// [W/(m2 K)]
+                    + rho_v[i] * cp_P * dz / dt;        /// [W/(m2 K)]
 
                 const double pressure_work = (p_v[i] - p_v_old[i]) / dt + dpdz_up;
 

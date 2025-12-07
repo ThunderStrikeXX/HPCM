@@ -76,7 +76,22 @@ for f in [x_file, time_file] + y_files:
 # -------------------- Load data --------------------
 x = safe_loadtxt(x_file)
 time = safe_loadtxt(time_file)
+nT = len(time)
+
 Y = [safe_loadtxt(f) for f in y_files]
+
+
+Y_clean = []
+for arr in Y:
+    if arr.shape[0] > nT:
+        arr = arr[:nT, :]          # taglia righe in eccesso
+    elif arr.shape[0] < nT:
+        pad = np.full((nT - arr.shape[0], arr.shape[1]), np.nan)
+        arr = np.vstack([arr, pad])  # padding se troppo corto
+    Y_clean.append(arr)
+
+Y = Y_clean
+
 
 names = [
     "Vapor velocity",
@@ -225,12 +240,13 @@ def draw_node(i, update_slider=True):
     # curva principale: y(t, x_i)
     line.set_data(time, y[:, i])
 
-    # sovrapposizione sonic speed
     if names[current_idx] == "Vapor velocity":
         y_sonic = Y[names.index("Sonic speed")]
         line2.set_data(time, y_sonic[:, i])
         line2.set_visible(True)
     else:
+        # dati coerenti per evitare errori nel draw
+        line2.set_data(time, np.full_like(time, np.nan))
         line2.set_visible(False)
 
     ax.set_ylim(*robust_ylim(y[:, i]))
