@@ -146,13 +146,18 @@ units = [
 
 # -------------------- Utils --------------------
 def robust_ylim(y):
-    # se è 2D prendi solo tempi dopo il cutoff
     YMIN_CUTOFF = 50
 
     if y.ndim > 1:
-        vals = y[YMIN_CUTOFF:, :].flatten()
+        if y.shape[0] > YMIN_CUTOFF:
+            vals = y[YMIN_CUTOFF:, :].flatten()
+        else:
+            vals = y.flatten()
     else:
         vals = y
+
+    if vals.size == 0:
+        return -1, 1
 
     lo, hi = np.percentile(vals, [1, 99])
     if lo == hi:
