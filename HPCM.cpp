@@ -750,8 +750,6 @@ int main() {
 
 		dt *= std::pow(0.5, halves);
 
-        time_total += dt;
-
         T_o_w_iter = T_o_w_old;
         T_w_bulk_iter = T_w_bulk_old;
         T_w_x_iter = T_w_x_old;
@@ -2077,6 +2075,9 @@ int main() {
             u_v_old = u_v;
             u_x_old = u_x;
             rho_v_old = rho_v;
+
+            // Update total time elapsed
+            time_total += dt;
 
         } else {
             

@@ -8,6 +8,8 @@ videos/
 old/
 docs/
 
+**/*case*/
+
 # User-specific files
 *.rsuser
 *.suo
