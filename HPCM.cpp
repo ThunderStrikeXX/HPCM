@@ -13,8 +13,6 @@
 
 bool warnings = false;
 
-#include "tdma.hpp"
-
 #include "steel.h"
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
@@ -24,6 +22,52 @@ bool warnings = false;
 //                        [VARIOUS ALGORITHMS]
 //
 // =======================================================================
+
+#pragma region solving_algorithms
+/**
+ * @brief Solves a tridiagonal system of linear equations A*x = d using the Thomas Algorithm (TDMA).
+ *
+ * The method consists of two main phases: forward elimination and back substitution,
+ * which is optimized for the sparse tridiagonal structure.
+ *
+ * @param a The sub-diagonal vector (size N, with a[0] being zero/unused).
+ * @param b The main diagonal vector (size N). Must contain non-zero elements.
+ * @param c The super-diagonal vector (size N, with c[N-1] being zero/unused).
+ * @param d The right-hand side vector (size N).
+ * @return std::vector<double> The solution vector 'x' (size N).
+ * * @note This implementation assumes the system is diagonally dominant or otherwise
+ * stable, as it does not include pivoting. The vectors 'a', 'b', 'c', and 'd' must
+ * all have the same size N, corresponding to the size of the system.
+ */
+std::vector<double> solveTridiagonal(const std::vector<double>& a,
+    const std::vector<double>& b,
+    const std::vector<double>& c,
+    const std::vector<double>& d) {
+
+    int n = b.size();
+    std::vector<double> c_star(n, 0.0);
+    std::vector<double> d_star(n, 0.0);
+    std::vector<double> x(n, 0.0);
+
+    c_star[0] = c[0] / b[0];
+    d_star[0] = d[0] / b[0];
+
+    for (int i = 1; i < n; i++) {
+
+        double m = b[i] - a[i] * c_star[i - 1];
+        c_star[i] = c[i] / m;
+        d_star[i] = (d[i] - a[i] * d_star[i - 1]) / m;
+    }
+
+    x[n - 1] = d_star[n - 1];
+
+    for (int i = n - 2; i >= 0; i--)
+        x[i] = d_star[i] - c_star[i] * x[i + 1];
+
+    return x;
+}
+
+#pragma endregion
 
 #pragma region case_loading
 
@@ -753,14 +797,16 @@ int main() {
                  * Variable b [-], used to calculate omega.
                  * Ratio of the overrall speed to the most probable velocity of the vapor.
                  */
-                const double b = std::abs(-phi_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
+                //const double b = std::abs(-phi_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
 
                 /**
                   * Linearization of the omega [-] function to correct the net evaporation/condensation mass flux
                   */
+                /*
                 if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
                 else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
                 else Omega = 2.0 * b * std::sqrt(M_PI);
+                */
 
                 const double k_bulk_w = steel::k(T_w_bulk_iter[i]);                             /// Wall bulk thermal conductivity [W/(m K)]
                 const double k_bulk_x = liquid_sodium::k(T_x_bulk_iter[i]);                     /// Liquid bulk thermal conductivity [W/(m K)]
@@ -2093,7 +2139,7 @@ int main() {
 
                 x_v_mass_flux_output << phi_x_v[i] << " ";
 
-                Q_ow_output << Q_wx[i] << " ";
+                Q_ow_output << Q_ow[i] << " ";
                 Q_wx_output << Q_wx[i] << " ";
                 Q_xw_output << Q_xw[i] << " ";
                 Q_xm_output << Q_xm[i] << " ";
