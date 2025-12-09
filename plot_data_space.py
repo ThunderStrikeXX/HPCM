@@ -52,7 +52,6 @@ targets = [
 
     "wick_vapor_mass_source.txt",
 
-    # --- HEAT SOURCES (NUOVI) ---
     "outer_wall_heat_source.txt",
     "wall_wx_heat_source.txt",
     "wick_wx_heat_source.txt",
@@ -77,7 +76,7 @@ for f in [x_file, time_file] + y_files:
 
 # -------------------- Load data --------------------
 x = safe_loadtxt(x_file)
-time = safe_loadtxt(time_file)          # vettore tempo reale
+time = safe_loadtxt(time_file) 
 Y = [safe_loadtxt(f) for f in y_files]
 
 names = [
@@ -98,14 +97,14 @@ names = [
 
     "Wick-vapor mass source",
 
-    "Outer wall heat-source",
-    "Wall-WX heat-source",
-    "Wick-WX heat-source",
-    "Wick-XV heat-source",
-    "Vapor-XV heat-source",
+    "Outer wall heat-source (flux)",
+    "Wall heat-source from wick (flux)",
+    "Wick heat-source from wall (flux)",
+    "Wick heat-source from vapor (flux)",
+    "Vapor heat-source from wick (flux)",
 
-    "Vapor heat-source mass",
-    "Wick heat-source mass",
+    "Vapor heat-source (mass)",
+    "Wick heat-source (mass)",
 
     "Saturation pressure",
     "Sonic speed"
@@ -136,8 +135,8 @@ units = [
     "[W/m³]",
     "[W/m³]",
 
-    "[kg/(m³·s)]",
-    "[kg/(m³·s)]",
+    "[W/m³]",
+    "[W/m³]",
 
     "[Pa]",
     "[m/s]"
