@@ -167,7 +167,6 @@ double read_last_value(const std::string& filename) {
     return last_value;
 }
 
-
 std::string select_case() {
 
     std::vector<std::string> cases;
@@ -2047,9 +2046,10 @@ int main() {
                 L1 += eps;
             }
 
-            if (L1 < picTolerance)
+            if (L1 < picTolerance){
 				halves = 0;     // Reset halves if Picard converged
                 break;          // Picard converged
+            }
 
             T_o_w_iter = T_o_w;
             T_w_bulk_iter = T_w_bulk;
