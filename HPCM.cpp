@@ -2061,7 +2061,7 @@ int main() {
             #pragma endregion
         }
 
-        if (pic != maxPicard - 1) {
+        if (pic != maxPicard) {
 
             // Update solution
             T_o_w_old = T_o_w;
