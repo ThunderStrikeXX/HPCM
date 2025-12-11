@@ -917,6 +917,17 @@ int main() {
                     q_ow[i] = -(conv + irr);
                 }
 
+                /*
+                const double q_max = 2 * power / (M_PI * L * r_o);
+
+                static std::vector<double> z(N);
+                for (int j = 0; j < N; ++j) z[j] = (j + 0.5) * dz;
+
+                for (int i = 0; i < N; ++i) {
+                    Q_ow[i] = q_max * (1 - 2 * (z[i] / L)) * 2 * r_o / (r_o * r_o - r_i * r_i);
+                }
+                */
+
 				Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    /// Outer wall heat source [W/m3]
 				Q_wx[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            /// Heat source to the wick due to wall-wick heat flux [W/m3]
                 Q_xw[i] = -k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           /// Heat source to the wall due to wall-wick heat flux [W/m3]
