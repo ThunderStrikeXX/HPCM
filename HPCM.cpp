@@ -540,9 +540,6 @@ int main() {
         u_v_old = u_v;
         p_v_old = p_v;
         rho_v_old = rho_v;
-
-
-        /*
         
         const double q_max = 2 * power / (M_PI * L * r_o);
 
@@ -552,8 +549,6 @@ int main() {
         for (int i = 0; i < N; ++i) {
             Q_ow[i] = q_max * (1 - 2 * (z[i] / L)) * 2 * r_o / (r_o * r_o - r_i * r_i);
         } 
-
-        */
 
     } else {
 
@@ -894,6 +889,8 @@ int main() {
 
                 const double zi = z[i];
 
+                /*
+
                 if (zi >= (evaporator_start - delta_h) && zi < evaporator_start) {
                     double x = (zi - (evaporator_start - delta_h)) / delta_h;
                     q_ow[i] = 0.5 * q0 * (1.0 - std::cos(M_PI * x));
@@ -919,16 +916,9 @@ int main() {
                     q_ow[i] = -(conv + irr);
                 }
 
-                /*
-                const double q_max = 2 * power / (M_PI * L * r_o);
+                                static std::vector<double> z(N);
 
-                static std::vector<double> z(N);
-                for (int j = 0; j < N; ++j) z[j] = (j + 0.5) * dz;
-
-                for (int i = 0; i < N; ++i) {
-                    Q_ow[i] = q_max * (1 - 2 * (z[i] / L)) * 2 * r_o / (r_o * r_o - r_i * r_i);
-                }
-                */
+                */                
 
 				Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    /// Outer wall heat source [W/m3]
 				Q_wx[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            /// Heat source to the wick due to wall-wick heat flux [W/m3]
