@@ -99,14 +99,40 @@ namespace vapor_sodium {
     */
     inline double cp(double T) {
 
-        static const std::array<double, 21> Tgrid = { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100,2200,2300,2400 };
-        static const std::array<double, 21> Cpgrid = { 860,1250,1800,2280,2590,2720,2700,2620,2510,2430,2390,2360,2340,2410,2460,2530,2660,2910,3400,4470,8030 };
+        static const std::array<double, 21> Tgrid = { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100,2200,2300,2400,2500 };
+        static const std::array<double, 21> Cpgrid = { 860,1250,1800,2280,2590,2720,2700,2620,2510,2430,2390,2360,2340,2410,2460,2530,2660,2910,3400,4470,8030, 417030 };
 
         // Table also lists 2500 K = 417030; extreme near critical. If needed, extend:
         if (T >= 2500.0) return 417030.0;
 
         return interp_T(Tgrid, Cpgrid, T);
     }
+
+    /**
+    * @brief Specific heat at constant volume from table interpolation [J/(kg*K)]
+    *        Fink & Leibowitz
+    */
+    inline double cv(double T) {
+
+        static const std::array<double, 21> Tgrid =
+        { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,
+          1600,1700,1800,1900,2000,2100,2200,2300,2400, 2500 };
+
+        // valori convertiti in J/kgK (kJ/kgK * 1000)
+        static const std::array<double, 21> Cvgrid =
+        { 490, 840, 1310, 1710, 1930, 1980, 1920, 1810, 1680, 1580, 1510, 1440, 1390, 1380, 1360, 1300, 1300, 1300, 1340, 1760, 17030 };
+
+        // valore tabellato a 2500 K = 17.03 kJ/kgK
+        if (T >= 2500.0) return 17030.0;
+
+        return interp_T(Tgrid, Cvgrid, T);
+    }
+
+    inline double gamma(double T) {
+        double cp_val = cp(T);
+        double cv_val = cv(T);
+        return cp_val / cv_val;
+	}
 
     /**
     * @brief Dynamic viscosity of sodium vapor [Pa·s] as a function of temperature T

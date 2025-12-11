@@ -301,7 +301,6 @@ double new_dt_v(double dz, double dt_old,
 	const std::vector<double>& Qf,
     const std::vector<double>& bVU) {
 
-    const double gamma = 1.32;                          /// Vapor sodium gas constant [-]
     const double Rv = 361.8;                            /// Gas constant for the sodium vapor [J/(kg K)]
     const double CSV_mass = 0.5;                        /// Limit coefficient: mass fraction allowed to change per time step
     const double CSV_flux = 0.5;                        /// Limit coefficient: mass fraction allowed to change per time step
@@ -368,8 +367,7 @@ int main() {
     const double emissivity = 0.5;          /// Wall emissivity [-]
     const double sigma = 5.67e-8;           /// Stefan-Boltzmann constant [W/m^2/K^4]
     const double Rv = 361.8;                /// Gas constant for the sodium vapor [J/(kg K)]
-    const double gamma_vapor = 1.32;        /// TODO: MAKE THIS PROPERTY TEMPERATURE DEPENDENT Ratio between constant pressure specific heat and constant volume specific heat [-] 
-
+    
     // Environmental boundary conditions
     const double h_conv = 10;               /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
     const double power = 119;               /// Power at the evaporator side [W]
@@ -541,6 +539,7 @@ int main() {
         p_v_old = p_v;
         rho_v_old = rho_v;
         
+        /*
         const double q_max = 2 * power / (M_PI * L * r_o);
 
         static std::vector<double> z(N);
@@ -549,6 +548,7 @@ int main() {
         for (int i = 0; i < N; ++i) {
             Q_ow[i] = q_max * (1 - 2 * (z[i] / L)) * 2 * r_o / (r_o * r_o - r_i * r_i);
         } 
+        */
 
     } else {
 
@@ -873,6 +873,8 @@ int main() {
                 T_w_x[i] = ABC[i][0] + ABC[i][1] * r_i + ABC[i][2] * r_i * r_i; /// Temperature at the wall wick interface
                 T_x_v[i] = ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v; /// Temperature at the wick vapor interface
 
+                // ------- Smoothed heat distribution ------
+
                 static std::vector<double> z(N);
                 for (int j = 0; j < N; ++j) z[j] = (j + 0.5) * dz;
 
@@ -888,8 +890,6 @@ int main() {
                 const double condenser_end = L;
 
                 const double zi = z[i];
-
-                /*
 
                 if (zi >= (evaporator_start - delta_h) && zi < evaporator_start) {
                     double x = (zi - (evaporator_start - delta_h)) / delta_h;
@@ -916,9 +916,30 @@ int main() {
                     q_ow[i] = -(conv + irr);
                 }
 
-                                static std::vector<double> z(N);
+                // --------- Step heat distribution ---------
 
-                */                
+                /*
+
+                double conv = h_conv * (T_o_w[i] - T_env);          // [W/m^2]
+                double irr = emissivity * sigma *
+                    (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));   // [W/m^2]
+
+                // Step distribution
+                if (zi >= evaporator_start - delta_h && zi <= evaporator_end + delta_h) {
+                    q_ow[i] = q0;
+                }
+                else if (zi >= condenser_start && zi <= condenser_start + delta_c) {
+                    q_ow[i] = -(conv + irr);
+                }
+                else if (zi > condenser_start + delta_c) {
+                    q_ow[i] = -(conv + irr);
+                }
+                else {
+                    q_ow[i] = 0.0;   // fuori dalle zone
+                }
+
+                */
+
 
 				Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    /// Outer wall heat source [W/m3]
 				Q_wx[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            /// Heat source to the wick due to wall-wick heat flux [W/m3]
@@ -1725,7 +1746,7 @@ int main() {
                     for (int i = 1; i < N - 1; i++) {
 
                         const double u_prev_v = u_v[i];
-                        sonic_velocity[i] = std::sqrt(gamma_vapor * Rv * T_v_bulk_iter[i]);
+                        sonic_velocity[i] = std::sqrt(vapor_sodium::gamma(T_v_bulk_iter[i]) * Rv * T_v_bulk_iter[i]);
 
                         const double calc_velocity = u_v[i] -
                             (p_prime_v[i + 1] - p_prime_v[i - 1]) / (2.0 * dz * bVU[i]);
