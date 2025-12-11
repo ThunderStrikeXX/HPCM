@@ -797,14 +797,16 @@ int main() {
                  * Variable b [-], used to calculate omega.
                  * Ratio of the overrall speed to the most probable velocity of the vapor.
                  */
-                const double b = std::abs(-phi_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
+                //const double b = std::abs(-phi_x_v[i] / (p_v[i] * std::sqrt(2.0 / (Rv * T_v_bulk_iter[i]))));
 
                 /**
                   * Linearization of the omega [-] function to correct the net evaporation/condensation mass flux
                   */
+                /*
                 if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
                 else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
                 else Omega = 2.0 * b * std::sqrt(M_PI);
+                */
 
                 const double k_bulk_w = steel::k(T_w_bulk_iter[i]);                             /// Wall bulk thermal conductivity [W/(m K)]
                 const double k_bulk_x = liquid_sodium::k(T_x_bulk_iter[i]);                     /// Liquid bulk thermal conductivity [W/(m K)]
@@ -2148,7 +2150,7 @@ int main() {
 
                 x_v_mass_flux_output << phi_x_v[i] << " ";
 
-                Q_ow_output << Q_wx[i] << " ";
+                Q_ow_output << Q_ow[i] << " ";
                 Q_wx_output << Q_wx[i] << " ";
                 Q_xw_output << Q_xw[i] << " ";
                 Q_xm_output << Q_xm[i] << " ";
