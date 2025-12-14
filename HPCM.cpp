@@ -410,16 +410,16 @@ int main() {
 	const double picTolerance = 1e-4;   	/// Tolerance for Picard iterations [-]   
 
     // PISO Wick parameters
-    const int tot_outer_iter_x = 2000;      /// Outer iterations per time-step [-]
-    const int tot_inner_iter_x = 100;       /// Inner iterations per outer iteration [-]
-    const double outer_tol_x = 1e-6;        /// Tolerance for the outer iterations (velocity) [-]
-    const double inner_tol_x = 1e-6;        /// Tolerance for the inner iterations (pressure) [-]
+    const int tot_outer_iter_x = 200;      /// Outer iterations per time-step [-]
+    const int tot_inner_iter_x = 50;       /// Inner iterations per outer iteration [-]
+    const double outer_tol_x = 1e-4;        /// Tolerance for the outer iterations (velocity) [-]
+    const double inner_tol_x = 1e-4;        /// Tolerance for the inner iterations (pressure) [-]
 
     // PISO Vapor parameters
-    const int tot_outer_iter_v = 2000;      /// Outer iterations per time-step [-]
-    const int tot_inner_iter_v = 100;       /// Inner iterations per outer iteration [-]
-    const double outer_tol_v = 1e-6;        /// Tolerance for the outer iterations (velocity) [-]
-    const double inner_tol_v = 1e-6;        /// Tolerance for the inner iterations (pressure) [-]
+    const int tot_outer_iter_v = 200;      /// Outer iterations per time-step [-]
+    const int tot_inner_iter_v = 50;       /// Inner iterations per outer iteration [-]
+    const double outer_tol_v = 1e-4;        /// Tolerance for the outer iterations (velocity) [-]
+    const double inner_tol_v = 1e-4;        /// Tolerance for the inner iterations (pressure) [-]
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
