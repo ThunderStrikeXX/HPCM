@@ -447,6 +447,11 @@ int main() {
     std::vector<double> p_v_old;
     std::vector<double> rho_v_old;
 
+	// Wall physical properties
+    std::vector<double> cp_w(N);
+    std::vector<double> rho_w(N);
+    std::vector<double> k_w(N);
+
 	// Select case to load or create a new one
     std::string case_chosen = select_case();
 
@@ -703,6 +708,14 @@ int main() {
 
         for (pic = 0; pic < max_picard; pic++) {
 
+            // Updating all properties
+            for(int i = 0; i < N; ++i) {
+
+                cp_w[i] = steel::cp(T_w_bulk_iter[i]);
+                rho_w[i] = steel::rho(T_w_bulk_iter[i]);
+                k_w[i] = steel::k(T_w_bulk_iter[i]);
+			}
+
             // =======================================================================
             //
             //                   [0. SOLVE INTERFACES AND FLUXES]
@@ -911,37 +924,36 @@ int main() {
             std::vector<double> cTW(N, 0.0);                    // Upper tridiagonal coefficient for wall temperature
             std::vector<double> dTW(N, 0.0);                    // Known vector coefficient for wall temperature
 
-            // BCs for the first node: zero gradient, adiabatic face
-            aTW[0] = 0.0; 
-            bTW[0] = 1.0; 
-            cTW[0] = -1.0; 
-            dTW[0] = 0.0;
-        
-            // BCs for the last node: zero gradient, adiabatic face
-            aTW[N - 1] = -1.0; 
-            bTW[N - 1] = 1.0; 
-            cTW[N - 1] = 0.0; 
-            dTW[N - 1] = 0.0;
-
 			// Loop to assembly the linear system for the wall bulk temperature
             for (int i = 1; i < N - 1; ++i) {
 
                 // Physical properties
-                const double cp = steel::cp(T_w_bulk_iter[i]);
-                const double rho = steel::rho(T_w_bulk_iter[i]);
+                const double cp = cp_w[i];
+                const double rho = rho_w[i];
 
-                const double k_P = steel::k(T_w_bulk_iter[i]);
-                const double k_L = steel::k(T_w_bulk_iter[i - 1]);
-                const double k_R = steel::k(T_w_bulk_iter[i + 1]);
+                const double k_l = 0.5 * (k_w[i - 1] + k_w[i]);
+                const double k_r = 0.5 * (k_w[i + 1] + k_w[i]);
 
-                aTW[i] = - k_L / (rho * cp * dz * dz);
-                bTW[i] = 1 / dt + (k_L + k_R) / (rho * cp * dz * dz);
-                cTW[i] = - k_R / (rho * cp * dz * dz);
+                aTW[i] = - k_l / (rho * cp * dz * dz);
+                bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
+                cTW[i] = - k_r / (rho * cp * dz * dz);
                 dTW[i] = 
                     + T_w_bulk_old[i] / dt 
 					+ Q_ow[i] / (cp * rho)      // Positive if heat is added to the wall
                     + Q_xw[i] / (cp * rho);     // Positive if heat is added to the wall
             }
+
+            // BCs for the first node: zero gradient, adiabatic face
+            aTW[0] = 0.0;
+            bTW[0] = 1.0;
+            cTW[0] = -1.0;
+            dTW[0] = 0.0;
+
+            // BCs for the last node: zero gradient, adiabatic face
+            aTW[N - 1] = -1.0;
+            bTW[N - 1] = 1.0;
+            cTW[N - 1] = 0.0;
+            dTW[N - 1] = 0.0;
 
             // Vector of final wall bulk temperatures
             T_w_bulk = tdma::solve(aTW, bTW, cTW, dTW);        
