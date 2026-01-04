@@ -355,8 +355,9 @@ int main() {
 	int halves = 0;                         // Number of halvings of the time step
 
 	// Picard iteration parameters
-	const double maxPicard = 50;            // Maximum number of Picard iterations per time step [-]
-	const double picTolerance = 1e-4;   	// Tolerance for Picard iterations [-]   
+	const double max_picard = 50;            // Maximum number of Picard iterations per time step [-]
+	const double pic_tolerance = 1e-4;   	// Tolerance for Picard iterations [-]   
+    std::vector<double> pic_error(6, 0.0);  // L1 error for picard convergence
 
     // PISO Wick parameters
     const int tot_outer_iter_x = 20;        // Outer iterations per time-step [-]
@@ -700,7 +701,7 @@ int main() {
 
 		int pic = 0;        // Outside to check if convergence is reached
 
-        for (pic = 0; pic < maxPicard; pic++) {
+        for (pic = 0; pic < max_picard; pic++) {
 
             // =======================================================================
             //
@@ -1910,53 +1911,76 @@ int main() {
 
             #pragma region picard
 
-            // Calculate Picard error
-            double L1 = 0.0;
+			// Picard error calculation
+
+            double Aold, Anew, denom, eps;
+            
+            pic_error[0] = 0.0;
+            pic_error[1] = 0.0;
+            pic_error[2] = 0.0;
+            pic_error[3] = 0.0;
+			pic_error[4] = 0.0;
+			pic_error[5] = 0.0;
+
             for (int i = 0; i < N; ++i) {
 
-				double Aold = T_v_bulk_iter[i];
-                double Anew = T_v_bulk[i];
-				double denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-				double eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-				L1 += eps;
+				Aold = T_v_bulk_iter[i];
+                Anew = T_v_bulk[i];
+				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+				pic_error[0] += eps;
 
 				Aold = T_x_bulk_iter[i];
 				Anew = T_x_bulk[i];
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-
-				L1 += eps;
+                pic_error[1] += eps;
 
 				Aold = T_w_bulk_iter[i];
 				Anew = T_w_bulk[i];
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-				L1 += eps;
+                pic_error[2] += eps;
 
                 Aold = T_o_w_iter[i];
                 Anew = T_o_w[i];
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
+                pic_error[3] += eps;
 
                 Aold = T_w_x_iter[i];
                 Anew = T_w_x[i];
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
+                pic_error[4] += eps;
 
                 Aold = T_x_v_iter[i];
                 Anew = T_x_v[i];
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
+                pic_error[5] += eps;
             }
 
-            if (L1 < picTolerance){
+            // Picard error normalization
+            pic_error[0] /= N;
+            pic_error[1] /= N;
+            pic_error[2] /= N;
+            pic_error[3] /= N;
+            pic_error[4] /= N;
+            pic_error[5] /= N;
+
+            if (pic_error[0] < 1e-4 &&
+                pic_error[1] < 1e-4 &&
+                pic_error[2] < 1e-4 &&
+                pic_error[3] < 1e-4 &&
+                pic_error[4] < 1e-4 &&
+                pic_error[5] < 1e-4) {
+
 				halves = 0;     // Reset halves if Picard converged
                 break;          // Picard converged
             }
 
+            // Iter = new
             T_o_w_iter = T_o_w;
             T_w_bulk_iter = T_w_bulk;
             T_w_x_iter = T_w_x;
@@ -1967,17 +1991,16 @@ int main() {
             #pragma endregion
         }
 
-        if (pic != maxPicard) {
+		// Convergence reached
+        if (pic != max_picard) {
 
-            // Update solution
+            // Update old values
             T_o_w_old = T_o_w;
             T_w_bulk_old = T_w_bulk;
             T_w_x_old = T_w_x;
             T_x_bulk_old = T_x_bulk;
             T_x_v_old = T_x_v;
             T_v_bulk_old = T_v_bulk;
-
-            // Store old values for time derivative
             p_v_old = p_v;
             p_x_old = p_x;
             u_v_old = u_v;
@@ -1987,6 +2010,7 @@ int main() {
             // Update total time elapsed
             time_total += dt;
 
+		// Convergence not reached (max Picard iterations reached)
         } else {
             
             // Rollback to previous time step
@@ -1996,15 +2020,14 @@ int main() {
             T_x_bulk = T_x_bulk_old;
             T_x_v = T_x_v_old;
             T_v_bulk = T_v_bulk_old;
-
             u_x = u_x_old;
             p_x = p_x_old;
-
             u_v = u_v_old;
             p_v = p_v_old;
             rho_v = rho_v_old;
 
-            halves += 1;      // Reduce time step if max Picard iterations reached
+            halves += 1;        // Reduce time step if max Picard iterations reached
+			n -= 1;             // Repeat current time step
         }
 
         // =======================================================================
@@ -2156,7 +2179,7 @@ int main() {
     sonic_velocity_output.close();
 
     double end = omp_get_wtime();
-    printf("Execution time: %.6f s\n", end - start);
+    std::cout << "Execution time: " << end - start;
 
     return 0;
 }
