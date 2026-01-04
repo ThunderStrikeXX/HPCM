@@ -658,18 +658,18 @@ int main() {
     const int SST_model_turbulence_on_off = 0;    // 0: no vapor turbulence, 1: vapor with turbulence
 
     // Initialization of the vapor velocity tridiagonal coefficients
-    std::vector<double> aXU(N, 0.0),                                        // Lower tridiagonal coefficient for wick velocity
-    std::vector<double> bXU(N, liquid_sodium::rho(T_x_bulk[0]) * dz / dt 
-        + 2 * liquid_sodium::mu(T_x_bulk[0]) / dz),                         // Central tridiagonal coefficient for wick velocity
-    std::vector<double> cXU(N, 0.0),                                        // Upper tridiagonal coefficient for wick velocity
+    std::vector<double> aXU(N, 0.0);                                        // Lower tridiagonal coefficient for wick velocity
+    std::vector<double> bXU(N, liquid_sodium::rho(T_x_bulk[0]) * dz / dt
+        + 2 * liquid_sodium::mu(T_x_bulk[0]) / dz);                         // Central tridiagonal coefficient for wick velocity
+    std::vector<double> cXU(N, 0.0);                                        // Upper tridiagonal coefficient for wick velocity
     std::vector<double> dXU(N, 0.0);                                        // Known vector coefficient for wick velocity
 
 	// Initialization of the vapor velocity tridiagonal coefficients
     std::vector<double>  aVU(N, 0.0);                                       // Lower tridiagonal coefficient for vapor velocity
-    std::vector<double> bVU(N, 
+    std::vector<double> bVU(N,
         2 * (4.0 / 3.0 * vapor_sodium::mu(T_v_bulk[0]) / dz)
-        + dz / dt * rho_v[0]),                                              // Central tridiagonal coefficient for vapor velocity
-    std::vector<double> cVU(N, 0.0),                                        // Upper tridiagonal coefficient for vapor velocity
+        + dz / dt * rho_v[0]);                                              // Central tridiagonal coefficient for vapor velocity
+    std::vector<double> cVU(N, 0.0);                                        // Upper tridiagonal coefficient for vapor velocity
     std::vector<double> dVU(N, 0.0);                                        // Known vector for vapor velocity
 
     #pragma endregion
