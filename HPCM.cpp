@@ -285,6 +285,10 @@ int main() {
 	std::vector<double> saturation_pressure(N, 0.0);    // Saturation pressure field [Pa]
 	std::vector<double> sonic_velocity(N, 0.0);         // Sonic velocity field [m/s]
 
+	std::vector<double> Q_tot_w(N, 0.0);            // Total heat flux in the wall [W/m3]
+	std::vector<double> Q_tot_x(N, 0.0);            // Total heat flux in the wick [W/m3]
+	std::vector<double> Q_tot_v(N, 0.0);            // Total heat flux in the vapor [W/m3]
+
     // Old values declaration
     std::vector<double> T_o_w_old;
     std::vector<double> T_w_bulk_old;
@@ -573,9 +577,9 @@ int main() {
     // Time stepping loop
     for (int n = 0; n < nSteps; ++n) { 
 
-        double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_ow);
-        double dt_cand_x = new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_wx);
-        double dt_cand_v = new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_xm, bVU);
+        double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_tot_w);
+        double dt_cand_x = new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_tot_x);
+        double dt_cand_v = new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_tot_v, bVU);
 
         dt_code = std::min(std::min(dt_cand_w, dt_cand_x), std::min(dt_cand_x, dt_cand_v));
 
@@ -826,6 +830,8 @@ int main() {
 
                 const double k_l = 0.5 * (k_w[i - 1] + k_w[i]);
                 const double k_r = 0.5 * (k_w[i + 1] + k_w[i]);
+
+                Q_tot_w[i] = Q_ow[i] + Q_xw[i];
 
                 aTW[i] = - k_l / (rho * cp * dz * dz);
                 bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
@@ -1278,19 +1284,21 @@ int main() {
                     const double C_l = (Fl * cp_l);
                     const double C_r = (Fr * cp_r);
 
+                    Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_wick[i];
+
                     aXT[i] =
-                        -D_l
+                        - D_l
                         - std::max(C_l, 0.0);       // [W/(m2 K)]
                     cXT[i] =
-                        -D_r
+                        - D_r
                         - std::max(-C_r, 0.0);      // [W/(m2 K)]
                     bXT[i] =
-                        +std::max(C_r, 0.0)
+                        + std::max(C_r, 0.0)
                         + std::max(-C_l, 0.0)
                         + D_l + D_r
                         + rho_P * cp_P * dz / dt;   // [W/(m2 K)]
                     dXT[i] =
-                        +rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
+                        + rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
                         + Q_wx[i] * dz              // Positive if heat is added to the wick
                         + Q_mx[i] * dz              // Positive if heat is added to the wick
                         + Q_mass_wick[i] * dz;      // [W/m2]       
@@ -1510,6 +1518,8 @@ int main() {
                     const double viscous_dissipation =
                         4.0 / 3.0 * 0.25 * mu_v[i] * ((u_v[i + 1] - u_v[i]) * (u_v[i + 1] - u_v[i])
                             + (u_v[i] + u_v[i - 1]) * (u_v[i] + u_v[i - 1])) / dz;
+
+                    Q_tot_v[i] = dp_dt / dz + dpdz_up / dz + viscous_dissipation + Q_xm[i] + Q_mass_vapor[i];
 
                     aVT[i] =
                         - D_l
