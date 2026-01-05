@@ -11,11 +11,6 @@
 #include <filesystem>
 #include <string>
 
-#ifndef ADAPTIVE_DT_H
-#define ADAPTIVE_DT_H
-
-#include <vector>
-
 #include "steel.h"
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
@@ -49,5 +44,3 @@ double new_dt_v(
     const std::vector<double>& Qf,
     const std::vector<double>& bVU
 );
-
-#endif // ADAPTIVE_DT_H
