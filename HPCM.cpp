@@ -201,7 +201,7 @@ int main() {
     // Time-stepping parameters
     double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
-    const int   nSteps = 1e20;              // Number of timesteps [-]
+    const int   tot_iter = 1e20;              // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
 	double      dt_code = dt_user;          // Time step used in the code [s]
 	int         halves = 0;                 // Number of halvings of the time step
@@ -268,11 +268,15 @@ int main() {
     }; eos_update(rho_v, p_v, T_v_bulk);
 
     // Heat fluxes at the interfaces
-	std::vector<double> Q_ow(N, 0.0);       // Outer wall heat source [W/m3]
-    std::vector<double> Q_wx(N, 0.0);       // Wall heat source due to fluxes [W/m3]
-    std::vector<double> Q_xw(N, 0.0);       // Wick heat source due to fluxes [W/m3]
-    std::vector<double> Q_xm(N, 0.0);       // Vapor heat source due to fluxes[W/m3]
-	std::vector<double> Q_mx(N, 0.0);       // Wick heat source due to fluxes [W/m3]
+	std::vector<double> Q_ow(N, 0.0);           // Outer wall heat source [W/m3]
+    std::vector<double> Q_wx(N, 0.0);           // Wall heat source due to fluxes [W/m3]
+    std::vector<double> Q_xw(N, 0.0);           // Wick heat source due to fluxes [W/m3]
+    std::vector<double> Q_xm(N, 0.0);           // Vapor heat source due to fluxes[W/m3]
+	std::vector<double> Q_mx(N, 0.0);           // Wick heat source due to fluxes [W/m3]
+
+    std::vector<double> Q_tot_w(N, 0.0);        // Total heat flux in the wall [W/m3]
+    std::vector<double> Q_tot_x(N, 0.0);        // Total heat flux in the wick [W/m3]
+    std::vector<double> Q_tot_v(N, 0.0);        // Total heat flux in the vapor [W/m3]
 
     std::vector<double> Q_mass_vapor(N, 0.0);    // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
     std::vector<double> Q_mass_wick(N, 0.0);     // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the wick
@@ -284,10 +288,6 @@ int main() {
 
 	std::vector<double> saturation_pressure(N, 0.0);    // Saturation pressure field [Pa]
 	std::vector<double> sonic_velocity(N, 0.0);         // Sonic velocity field [m/s]
-
-	std::vector<double> Q_tot_w(N, 0.0);            // Total heat flux in the wall [W/m3]
-	std::vector<double> Q_tot_x(N, 0.0);            // Total heat flux in the wick [W/m3]
-	std::vector<double> Q_tot_v(N, 0.0);            // Total heat flux in the vapor [W/m3]
 
     // Old values declaration
     std::vector<double> T_o_w_old;
@@ -569,24 +569,22 @@ int main() {
 
     #pragma endregion
 
-    // Print number of working threads
-    std::cout << "Threads: " << omp_get_max_threads() << "\n";
-
-    double start = omp_get_wtime();
+    std::cout << "Threads: " << omp_get_max_threads() << "\n";  // Print number of working threads
+	double start = omp_get_wtime();                             // Start time measurement
 
     // Time stepping loop
-    for (int n = 0; n < nSteps; ++n) { 
+    for (int n = 0; n < tot_iter; ++n) { 
 
+        // Timestep calculation
         double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_tot_w);
         double dt_cand_x = new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_tot_x);
         double dt_cand_v = new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_tot_v, bVU);
 
         dt_code = std::min(std::min(dt_cand_w, dt_cand_x), std::min(dt_cand_x, dt_cand_v));
+		dt = std::min(dt_user, dt_code);    // Choosing the minimum between user and calculated timestep
+		dt *= std::pow(0.5, halves);        // Halving the timestep if Picard failed
 
-        dt = std::min(dt_user, dt_code);
-
-		dt *= std::pow(0.5, halves);
-
+		// Iter = old (for Picard loops)
         T_o_w_iter = T_o_w_old;
         T_w_bulk_iter = T_w_bulk_old;
         T_w_x_iter = T_w_x_old;
