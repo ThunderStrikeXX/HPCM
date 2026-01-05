@@ -428,6 +428,8 @@ int main() {
 
     // Steam outputs
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
+    std::ofstream dt_output(case_chosen + "/dt.txt", std::ios::app);
+    std::ofstream simulation_time_output(case_chosen + "/simulation_time.txt", std::ios::app);
 
     std::ofstream v_velocity_output(case_chosen + "/vapor_velocity.txt", std::ios::app);
     std::ofstream v_pressure_output(case_chosen + "/vapor_pressure.txt", std::ios::app);
@@ -459,6 +461,8 @@ int main() {
     std::ofstream sonic_velocity_output(case_chosen + "/sonic_velocity.txt", std::ios::app);
 
     time_output << std::setprecision(global_precision);
+    dt_output << std::setprecision(global_precision);
+    simulation_time_output << std::setprecision(global_precision);
 
     v_velocity_output << std::setprecision(global_precision);
     v_pressure_output << std::setprecision(global_precision);
@@ -574,6 +578,8 @@ int main() {
 
     // Time stepping loop
     for (int n = 0; n < tot_iter; ++n) { 
+
+        auto t0 = std::chrono::high_resolution_clock::now();
 
         // Timestep calculation
         double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_tot_w);
@@ -2070,7 +2076,12 @@ int main() {
                 sonic_velocity_output << sonic_velocity[i] << " ";
             }
 
+            auto t1 = std::chrono::high_resolution_clock::now();
+            double simulation_time = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
             time_output << time_total << " ";
+            dt_output << dt << " ";
+            simulation_time_output << simulation_time << " ";
 
             v_velocity_output << "\n";
             v_pressure_output << "\n";
@@ -2131,12 +2142,16 @@ int main() {
             sonic_velocity_output.flush();
 
             time_output.flush();
+            simulation_time_output.flush();
+            dt_output.flush();
         }
 
         #pragma endregion
     }
 
     time_output.close();
+    simulation_time_output.close();
+    dt_output.close();
 
     v_velocity_output.close();
     v_pressure_output.close();
