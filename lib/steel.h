@@ -1,3 +1,15 @@
+#pragma once
+#include <vector>
+#include <cmath>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <omp.h>
+#include <array>
+#include <algorithm>
+#include <cstddef>
+#include <filesystem>
+#include <string>
 /**
  * @brief Provides material properties for steel.
  *

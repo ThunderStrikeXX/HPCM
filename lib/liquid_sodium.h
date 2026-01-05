@@ -1,3 +1,16 @@
+#pragma once
+#include <vector>
+#include <cmath>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <omp.h>
+#include <array>
+#include <algorithm>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+
 /**
  * @brief Provides thermophysical properties for Liquid Sodium (Na).
  *
@@ -22,7 +35,6 @@ namespace liquid_sodium {
     */
     inline double rho(double T) {
 
-        if (T < Tsolid && warnings == true) std::cout << "Warning, temperature " << T << " is below solidification temperature (" << Tsolid << ")!";
         return 219.0 + 275.32 * (1.0 - T / Tcrit) + 511.58 * pow(1.0 - T / Tcrit, 0.5);
     }
 
@@ -32,7 +44,6 @@ namespace liquid_sodium {
     */
     inline double k(double T) {
 
-        if (T < Tsolid && warnings == true) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         return 124.67 - 0.11381 * T + 5.5226e-5 * T * T - 1.1842e-8 * T * T * T;
     }
 
@@ -42,7 +53,6 @@ namespace liquid_sodium {
     */
     inline double cp(double T) {
 
-        if (T < Tsolid && warnings == true) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         double dXT = T - 273.15;
         return 1436.72 - 0.58 * dXT + 4.627e-4 * dXT * dXT;
     }
@@ -53,7 +63,6 @@ namespace liquid_sodium {
     */
     inline double mu(double T) {
 
-        if (T < Tsolid && warnings == true) std::cout << "Warning, temperature " << T << " is below solidification temperature!";
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
     }
 

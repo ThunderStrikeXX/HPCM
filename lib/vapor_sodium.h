@@ -1,4 +1,16 @@
-﻿/**
+﻿#pragma once
+#include <vector>
+#include <cmath>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <omp.h>
+#include <array>
+#include <algorithm>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+/**
  * @brief Provides thermophysical and transport properties for Sodium Vapor.
  *
  * This namespace contains constant data and functions to calculate key properties
@@ -221,14 +233,6 @@ namespace vapor_sodium {
 
         // Extrapolation handling
         if (Tlow || Thigh || Plow || Phigh) {
-            if (Tlow && warnings == true)
-                std::cerr << "[Warning] Sodium vapor k: T=" << T << " < " << Tmin << " K. Using sqrt(T) extrapolation.\n";
-            if (Thigh && warnings == true)
-                std::cerr << "[Warning] Sodium vapor k: T=" << T << " > " << Tmax << " K. Using sqrt(T) extrapolation.\n";
-            if ((Plow || Phigh) && warnings == true)
-                std::cerr << "[Warning] Sodium vapor k: P outside ["
-                << Pmin << "," << Pmax << "] Pa. Using constant-P approximation.\n";
-
             double Tref = (Tlow ? Tmin : (Thigh ? Tmax : Tc));
             double k_ref = k_interp;
             double k_extrap = k_ref * std::sqrt(T / Tref);
