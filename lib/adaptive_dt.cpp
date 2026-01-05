@@ -7,22 +7,23 @@
 // WALL REGION
 // ============================================================================
 
+// Calculates maximum timestep to prevent DT > CSW in the wall
 double new_dt_w(
     double dz,
     double dt_old,
     const std::vector<double>& T,
     const std::vector<double>& St)
 {
-    const double CSW   = 0.5;
-    const double epsS  = 1e-12;
-    const double theta = 0.9;
-    const double rdown = 0.2;
-    const double dt_min = 1e-12;
-    const double dt_max = 1e-3;
+    const double CSW   = 0.5;           // Maximum DT tolerated per timestep [K]
+    const double epsS  = 1e-12;         // Lower heat source boundary [W/m3]
+    const double theta = 0.9;           // Factor to apply a safety margin [-] 
+    const double rdown = 0.2;           // Factor to prevent excessive timestep reduction [-]
+    const double dt_min = 1e-8;         // Minimum timestep tolerated [s]
+    const double dt_max = 1;            // Maximum timestep tolerated [s]
 
-    const int N = static_cast<int>(St.size());
+    const int N = static_cast<int>(St.size());  // Number of nodes [-]
 
-    double dt_cand = dt_max;
+    double dt_cand = dt_max;        
 
     for (int i = 0; i < N; ++i) {
         double dt_s =
@@ -45,6 +46,7 @@ double new_dt_w(
 // WICK REGION
 // ============================================================================
 
+// Calculates maximum timestep to prevent Drho > CSX_mass and DT > CSX_flux in the wick
 double new_dt_x(
     double dz,
     double dt_old,
@@ -53,16 +55,16 @@ double new_dt_x(
     const std::vector<double>& Sm,
     const std::vector<double>& Qf)
 {
-    const double CSX_mass = 0.5;
-    const double CSX_flux = 0.5;
-    const double epsS  = 1e-12;
-    const double epsT  = 1e-12;
-    const double theta = 0.9;
-    const double rdown = 0.2;
-    const double dt_min = 1e-12;
-    const double dt_max = 1e-3;
+    const double CSX_mass = 0.5;        // Maximum Drho tolerated per timestep [kg/m3]
+    const double CSX_flux = 0.5;        // Maximum DT tolerated per timestep [K]
+    const double epsS  = 1e-12;         // Lower mass source boundary [kg/m3s]
+    const double epsT  = 1e-12;         // Lower heat source boundary [W/m3]
+    const double theta = 0.9;           // Factor to apply a safety margin [-] 
+    const double rdown = 0.2;           // Factor to prevent excessive timestep reduction [-]
+    const double dt_min = 1e-8;         // Minimum timestep tolerated [s]
+    const double dt_max = 1;            // Maximum timestep tolerated [s]
 
-    const int N = static_cast<int>(u.size());
+    const int N = static_cast<int>(u.size());   // Number of nodes [-]
 
     double dt_cand = dt_max;
 
@@ -94,6 +96,8 @@ double new_dt_x(
 // VAPOR REGION
 // ============================================================================
 
+// Calculates maximum timestep to prevent Drho > CSV_mass and DT > CSV_flux 
+// and the compressibility limit in the vapor
 double new_dt_v(
     double dz,
     double dt_old,
@@ -104,24 +108,24 @@ double new_dt_v(
     const std::vector<double>& Qf,
     const std::vector<double>& bVU)
 {
-    const double Rv = 361.8;
+	const double Rv = 361.5;                // Gas constant for the sodium vapor [J/(kgK)]
 
-    const double CSV_mass = 0.5;
-    const double CSV_flux = 0.5;
-    const double CP  = 10.0;
+    const double CSV_mass = 0.5;            // Maximum Drho tolerated per timestep [kg/m3]  
+    const double CSV_flux = 0.5;            // Maximum DT tolerated per timestep [K]
+    const double CP  = 10.0;                // Maximum DP tolerated per timestep [Pa]
 
-    const double epsS  = 1e-12;
-    const double epsT  = 1e-12;
-    const double theta = 0.9;
-    const double rdown = 0.2;
+    const double epsS  = 1e-12;             // Lower mass source boundary [kg/m3s]
+    const double epsT  = 1e-12;             // Lower heat source boundary [W/m3]
+    const double theta = 0.9;               // Factor to apply a safety margin [-] 
+    const double rdown = 0.2;               // Factor to prevent excessive timestep reduction [-]
 
-    const double dt_min = 1e-12;
-    const double dt_max = 1e3;
+    const double dt_min = 1e-8;             // Minimum timestep tolerated [s]
+    const double dt_max = 1;                // Maximum timestep tolerated [s]
 
-    const int N = static_cast<int>(u.size());
+	const int N = static_cast<int>(u.size());   // Number of nodes [-]
 
     auto invb = [&](int i) {
-        return 1.0 / std::max(bVU[i], 1e-30);
+		return 1.0 / std::max(bVU[i], 1e-30);   // Momentum equation coefficient inverse [m2s/kg]
     };
 
     double dt_cand = dt_max;

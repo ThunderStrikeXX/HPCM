@@ -199,26 +199,27 @@ int main() {
     const double r_v = 0.01075;                                 // Vapor-wick interface radius [m]
 
     // Time-stepping parameters
-    double dt_user = 1e-4;                  // Initial time step [s] (then it is updated according to the limits)
-	double dt = dt_user;                    // Current time step [s]
-    const int nSteps = 1e20;                // Number of timesteps [-]
-    double time_total = 0.0;                // Total simulation time [s]
-	double dt_code = dt_user;               // Time step used in the code [s]
-	int halves = 0;                         // Number of halvings of the time step
+    double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
+	double      dt = dt_user;               // Current time step [s]
+    const int   nSteps = 1e20;              // Number of timesteps [-]
+    double      time_total = 0.0;           // Total simulation time [s]
+	double      dt_code = dt_user;          // Time step used in the code [s]
+	int         halves = 0;                 // Number of halvings of the time step
 
 	// Picard iteration parameters
-	const double max_picard = 50;            // Maximum number of Picard iterations per time step [-]
+	const double max_picard = 50;           // Maximum number of Picard iterations per time step [-]
 	const double pic_tolerance = 1e-4;   	// Tolerance for Picard iterations [-]   
     std::vector<double> pic_error(6, 0.0);  // L1 error for picard convergence
+    int pic = 0;                            // Outside to check if convergence is reached
 
     // PISO Wick parameters
-    const int tot_outer_iter_x = 5;        // Outer iterations per time-step [-]
+    const int tot_outer_iter_x = 5;         // Outer iterations per time-step [-]
     const int tot_inner_iter_x = 10;        // Inner iterations per outer iteration [-]
     const double outer_tol_x = 1e-6;        // Tolerance for the outer iterations (velocity) [-]
     const double inner_tol_x = 1e-6;        // Tolerance for the inner iterations (pressure) [-]
 
     // PISO Vapor parameters
-    const int tot_outer_iter_v = 5;        // Outer iterations per time-step [-]
+    const int tot_outer_iter_v = 5;         // Outer iterations per time-step [-]
     const int tot_inner_iter_v = 10;        // Inner iterations per outer iteration [-]
     const double outer_tol_v = 1e-6;        // Tolerance for the outer iterations (velocity) [-]
     const double inner_tol_v = 1e-6;        // Tolerance for the inner iterations (pressure) [-]
@@ -588,8 +589,6 @@ int main() {
         T_x_bulk_iter = T_x_bulk_old;
         T_x_v_iter = T_x_v_old;
         T_v_bulk_iter = T_v_bulk_old;
-
-		int pic = 0;        // Outside to check if convergence is reached
 
         for (pic = 0; pic < max_picard; pic++) {
 
