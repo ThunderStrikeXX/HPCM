@@ -201,7 +201,7 @@ int main() {
     // Time-stepping parameters
     double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
-    const int   tot_iter = 1e20;              // Number of timesteps [-]
+    const int   tot_iter = 1e21;              // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
 	double      dt_code = dt_user;          // Time step used in the code [s]
 	int         halves = 0;                 // Number of halvings of the time step
