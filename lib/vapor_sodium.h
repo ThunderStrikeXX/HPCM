@@ -229,7 +229,7 @@ namespace vapor_sodium {
         double k,
         double Dh
     ) {
-        if (Re <= 0.0 || Pr <= 0.0)
+        if (Re < 0.0 || Pr < 0.0)
             throw std::invalid_argument("Error: Re or Pr <= 0");
 
         // -----------------------------

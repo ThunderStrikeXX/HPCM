@@ -201,7 +201,7 @@ int main() {
     // Time-stepping parameters
     double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
-    const int   tot_iter = 1e21;              // Number of timesteps [-]
+    const long long tot_iter = 1e15;              // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
 	double      dt_code = dt_user;          // Time step used in the code [s]
 	int         halves = 0;                 // Number of halvings of the time step
@@ -449,10 +449,10 @@ int main() {
     std::ofstream x_v_mass_flux_output(case_chosen + "/wick_vapor_mass_source.txt", std::ios::app);
 
     std::ofstream Q_ow_output(case_chosen + "/outer_wall_heat_source.txt", std::ios::app);
-    std::ofstream Q_wx_output(case_chosen + "/wall_wx_heat_source.txt", std::ios::app);
-    std::ofstream Q_xw_output(case_chosen + "/wick_wx_heat_source.txt", std::ios::app);
-    std::ofstream Q_xm_output(case_chosen + "/wick_xv_heat_source.txt", std::ios::app);
-    std::ofstream Q_mx_output(case_chosen + "/vapor_xv_heat_source.txt", std::ios::app);
+    std::ofstream Q_wx_output(case_chosen + "/wick_wx_heat_source.txt", std::ios::app);
+    std::ofstream Q_xw_output(case_chosen + "/wall_wx_heat_source.txt", std::ios::app);
+    std::ofstream Q_xm_output(case_chosen + "/vapor_xv_heat_source.txt", std::ios::app);
+    std::ofstream Q_mx_output(case_chosen + "/wick_xv_heat_source.txt", std::ios::app);
 
     std::ofstream Q_mass_vapor_output(case_chosen + "/vapor_heat_source_mass.txt", std::ios::app);
     std::ofstream Q_mass_wick_output(case_chosen + "/wick_heat_source_mass.txt", std::ios::app);
@@ -540,7 +540,7 @@ int main() {
     std::vector<double> dXU(N, 0.0);                                        // Known vector coefficient for wick velocity
 
 	// Initialization of the vapor velocity tridiagonal coefficients
-    std::vector<double>  aVU(N, 0.0);                                                   // Lower tridiagonal coefficient for vapor velocity
+    std::vector<double> aVU(N, 0.0);                                                   // Lower tridiagonal coefficient for vapor velocity
     std::vector<double> bVU(N, 2 * (4.0 / 3.0 * mu_v[0] / dz) + dz / dt * rho_v[0]);    // Central tridiagonal coefficient for vapor velocity
     std::vector<double> cVU(N, 0.0);                                                    // Upper tridiagonal coefficient for vapor velocity
     std::vector<double> dVU(N, 0.0);                                                    // Known vector for vapor velocity
@@ -801,7 +801,8 @@ int main() {
 				Q_wx[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            // Heat source to the wick due to wall-wick heat flux [W/m3]
                 Q_xw[i] = -k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           // Heat source to the wall due to wall-wick heat flux [W/m3]
 				Q_xm[i] = H_xm * (ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v - T_v_bulk_iter[i]) * 2.0 / r_v;  // Heat source to the vapor due to wick-vapor heat flux [W/m3])
-				Q_mx[i] = -k_int_x * (ABC[i][4] + 2.0 * ABC[i][5] * r_v) * 2.0  * r_v / (r_i * r_i - r_v * r_v);        // Heat source to the wick due to wick-vapor heat flux [W/m3]
+                Q_mx[i] = -H_xm * (ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v - T_v_bulk_iter[i]) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
+                    /*-k_int_x * (ABC[i][4] + 2.0 * ABC[i][5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v)*/;           // Heat source to the wick due to wick-vapor heat flux [W/m3]
 
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
