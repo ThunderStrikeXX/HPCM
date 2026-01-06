@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @brief Provides material properties for steel.
  *
