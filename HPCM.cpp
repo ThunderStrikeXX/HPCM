@@ -10,143 +10,15 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include <limits>
+#include <cstdint>
 
 #include "tdma.h"
 #include "steel.h"
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
 #include "adaptive_dt.h"
-
-#pragma region case_loading
-
-std::vector<double> read_second_last_row(const std::string& filename, int N) {
-
-    std::ifstream f(filename);
-    std::string line, prev, last;
-
-    // prev = riga precedente, last = riga corrente
-    while (std::getline(f, line)) {
-        prev = last;
-        last = line;
-    }
-
-    // Se il file ha meno di due righe
-    if (prev.empty()) return std::vector<double>(N, 0.0);
-
-    std::vector<double> out;
-    out.reserve(N);
-
-    std::string token;
-    for (char c : prev) {
-        if (c == ' ' || c == '\t') {
-            if (!token.empty()) {
-                out.push_back(std::stod(token));
-                token.clear();
-            }
-        }
-        else {
-            token.push_back(c);
-        }
-    }
-    if (!token.empty()) out.push_back(std::stod(token));
-
-    if (out.size() != N) out.resize(N, 0.0);
-    return out;
-}
-
-
-std::vector<double> read_last_row(const std::string& filename, int N) {
-
-    std::ifstream f(filename);
-    std::string line, last;
-
-    while (std::getline(f, line)) last = line;
-    if (last.empty()) return std::vector<double>(N, 0.0);
-
-    std::vector<double> out;
-    out.reserve(N);
-
-    std::string token;
-    for (char c : last) {
-        if (c == ' ' || c == '\t') {
-            if (!token.empty()) {
-                out.push_back(std::stod(token));
-                token.clear();
-            }
-        }
-        else {
-            token.push_back(c);
-        }
-    }
-    if (!token.empty()) out.push_back(std::stod(token));
-
-    if (out.size() != N) out.resize(N, 0.0);
-    return out;
-}
-
-double read_last_value(const std::string& filename) {
-
-    std::ifstream f(filename);
-    std::string line, last;
-
-    // Prende l'ultima riga
-    while (std::getline(f, line)) last = line;
-    if (last.empty()) return 0.0;
-
-    // Scansiona la riga e legge l'ultimo token numerico
-    std::string token;
-    double last_value = 0.0;
-
-    for (char c : last) {
-        if (c == ' ' || c == '\t') {
-            if (!token.empty()) {
-                last_value = std::stod(token);
-                token.clear();
-            }
-        }
-        else {
-            token.push_back(c);
-        }
-    }
-
-    // Ultimo token se presente
-    if (!token.empty()) last_value = std::stod(token);
-
-    return last_value;
-}
-
-std::string select_case() {
-
-    std::vector<std::string> cases;
-
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-        if (entry.is_directory()) {
-            const std::string name = entry.path().filename().string();
-            if (name.rfind("case_", 0) == 0) cases.push_back(name);
-        }
-    }
-
-    if (cases.empty()) return "";
-
-    std::cout << "Cases found:\n";
-    for (size_t i = 0; i < cases.size(); ++i) {
-        std::cout << i << ": " << cases[i] << "\n";
-    }
-
-    std::cout << "Press ENTER for a new case. Input the number and press ENTER to load a case: ";
-
-    std::string s;
-    std::getline(std::cin, s);
-
-    if (s.empty()) return "";
-
-    int idx = std::stoi(s);
-    if (idx < 0 || idx >= static_cast<int>(cases.size())) return "";
-
-    return cases[idx];
-}
-
-#pragma endregion
+#include "io_utils.h"
 
 int main() {
 
@@ -201,13 +73,13 @@ int main() {
     // Time-stepping parameters
     double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
-    const long long tot_iter = 1e15;              // Number of timesteps [-]
+    const int64_t tot_iter = 1'000'000'000'000LL;          // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
 	double      dt_code = dt_user;          // Time step used in the code [s]
 	int         halves = 0;                 // Number of halvings of the time step
 
 	// Picard iteration parameters
-	const double max_picard = 50;           // Maximum number of Picard iterations per time step [-]
+	const double max_picard = 200;           // Maximum number of Picard iterations per time step [-]
 	const double pic_tolerance = 1e-4;   	// Tolerance for Picard iterations [-]   
     std::vector<double> pic_error(6, 0.0);  // L1 error for picard convergence
     int pic = 0;                            // Outside to check if convergence is reached
@@ -801,8 +673,8 @@ int main() {
 				Q_wx[i] = k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            // Heat source to the wick due to wall-wick heat flux [W/m3]
                 Q_xw[i] = -k_int_w * (ABC[i][1] + 2.0 * ABC[i][2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           // Heat source to the wall due to wall-wick heat flux [W/m3]
 				Q_xm[i] = H_xm * (ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v - T_v_bulk_iter[i]) * 2.0 / r_v;  // Heat source to the vapor due to wick-vapor heat flux [W/m3])
-                Q_mx[i] = -H_xm * (ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v - T_v_bulk_iter[i]) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
-                    /*-k_int_x * (ABC[i][4] + 2.0 * ABC[i][5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v)*/;           // Heat source to the wick due to wick-vapor heat flux [W/m3]
+                Q_mx[i] = /*-H_xm * (ABC[i][3] + ABC[i][4] * r_v + ABC[i][5] * r_v * r_v - T_v_bulk_iter[i]) * 2.0 * r_v / (r_i * r_i - r_v * r_v);*/
+                    -k_int_x * (ABC[i][4] + 2.0 * ABC[i][5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);           // Heat source to the wick due to wick-vapor heat flux [W/m3]
 
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
@@ -2042,7 +1914,7 @@ int main() {
 
         #pragma region output
 
-        const int output_every = 1000;
+        const int output_every = 5000;
 
         if(n % output_every == 0){
             for (int i = 0; i < N; ++i) {
