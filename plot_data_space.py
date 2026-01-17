@@ -174,7 +174,7 @@ def index_to_time(i):
 # -------------------- Figure --------------------
 fig, ax = plt.subplots(figsize=(11, 6))
 plt.subplots_adjust(left=0.08, bottom=0.25, right=0.60)
-line, = ax.plot([], [], lw=2)
+line, = ax.plot([], [], lw=2, marker='o', markersize=4)
 line2, = ax.plot([], [], lw=1, linestyle='--')
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")

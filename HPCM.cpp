@@ -54,7 +54,7 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 20;                                          // Number of axial nodes [-]
+    const int N = 40;                                          // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
@@ -511,10 +511,12 @@ int main() {
                 q_ow[i] = Q_ow[i] * (r_o * r_o - r_i * r_i) / (2 * r_o);  // Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
 
                 // Mass flux from the wick to the vapor [kg/(m2 s)]
-                /*phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
+                /*
+                phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
                     sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
-                    (std::sqrt(2 * M_PI * Rv));*/
-
+                    (std::sqrt(2 * M_PI * Rv));
+                */
+                
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) - sigma_c * Omega * p_v[i]) 
                     / std::sqrt(2 * M_PI * Rv * T_x_v[i]);
 
