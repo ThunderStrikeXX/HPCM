@@ -54,7 +54,7 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 40;                                          // Number of axial nodes [-]
+    const int N = 20;                                           // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
@@ -417,6 +417,47 @@ int main() {
     std::vector<double> cVU(N, 0.0);                                                    // Upper tridiagonal coefficient for vapor velocity
     std::vector<double> dVU(N, 0.0);                                                    // Known vector for vapor velocity
 
+    std::vector<double> aTW(N, 0.0);                    // Lower tridiagonal coefficient for wall temperature
+    std::vector<double> bTW(N, 0.0);                    // Central tridiagonal coefficient for wall temperature
+    std::vector<double> cTW(N, 0.0);                    // Upper tridiagonal coefficient for wall temperature
+    std::vector<double> dTW(N, 0.0);                    // Known vector coefficient for wall temperature
+
+    // Tridiagonal coefficients for the pressure correction
+    std::vector<double> aXP(N, 0.0);
+    std::vector<double> bXP(N, 0.0);
+    std::vector<double> cXP(N, 0.0);
+    std::vector<double> dXP(N, 0.0);
+
+    // Tridiagonal coefficients for the wick temperature
+    std::vector<double> aXT(N, 0.0);
+    std::vector<double> bXT(N, 0.0);
+    std::vector<double> cXT(N, 0.0);
+    std::vector<double> dXT(N, 0.0);
+
+    // Energy equation for T (implicit), upwind convection, central diffusion
+    std::vector<double> aVT(N, 0.0);
+    std::vector<double> bVT(N, 0.0);
+    std::vector<double> cVT(N, 0.0);
+    std::vector<double> dVT(N, 0.0);
+
+    // Tridiagonal coefficients for the pressure correction
+    std::vector<double> aVP(N, 0.0);
+    std::vector<double> bVP(N, 0.0);
+    std::vector<double> cVP(N, 0.0);
+    std::vector<double> dVP(N, 0.0);
+
+    // Tridiagonal coefficients for k
+    std::vector<double> aK(N, 0.0),
+        bK(N, 0.0),
+        cK(N, 0.0),
+        dK(N, 0.0);
+
+    // Tridiagonal coefficients for omega
+    std::vector<double> aW(N, 0.0),
+        bW(N, 0.0),
+        cW(N, 0.0),
+        dW(N, 0.0);
+
 	// Residuals for wick loops
     double wick_momentum_residual = 1.0;
     double wick_temperature_residual = 1.0;
@@ -449,7 +490,7 @@ int main() {
 	double start = omp_get_wtime();                             // Start time measurement
 
     // Time stepping loop
-    for (int n = 0; n < tot_iter; ++n) { 
+    for (int n = 0; n < 5000000; ++n) { 
 
         auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -470,24 +511,26 @@ int main() {
         T_x_v_iter = T_x_v_old;
         T_v_bulk_iter = T_v_bulk_old;
 
+        
+
         for (pic = 0; pic < max_picard; pic++) {
 
             // Updating all properties
-            for(int i = 0; i < N; ++i) {
+            for (int i = 0; i < N; ++i) {
 
                 cp_w[i] = steel::cp(T_w_bulk_iter[i]);
                 rho_w[i] = steel::rho(T_w_bulk_iter[i]);
                 k_w[i] = steel::k(T_w_bulk_iter[i]);
 
-				rho_x[i] = liquid_sodium::rho(T_x_bulk_iter[i]);
+                rho_x[i] = liquid_sodium::rho(T_x_bulk_iter[i]);
                 mu_x[i] = liquid_sodium::mu(T_x_bulk_iter[i]);
                 cp_x[i] = liquid_sodium::cp(T_x_bulk_iter[i]);
-				k_x[i] = liquid_sodium::k(T_x_bulk_iter[i]);
+                k_x[i] = liquid_sodium::k(T_x_bulk_iter[i]);
 
                 mu_v[i] = vapor_sodium::mu(T_v_bulk_iter[i]);
                 cp_v[i] = vapor_sodium::cp(T_v_bulk_iter[i]);
                 k_v[i] = vapor_sodium::k(T_v_bulk_iter[i], p_v[i]);
-			}
+            }
 
             // =======================================================================
             //
@@ -689,57 +732,6 @@ int main() {
 
             // =======================================================================
             //
-            //                           [1. SOLVE WALL]
-            //
-            // =======================================================================
-
-            #pragma region wall
-
-            std::vector<double> aTW(N, 0.0);                    // Lower tridiagonal coefficient for wall temperature
-            std::vector<double> bTW(N, 0.0);                    // Central tridiagonal coefficient for wall temperature
-            std::vector<double> cTW(N, 0.0);                    // Upper tridiagonal coefficient for wall temperature
-            std::vector<double> dTW(N, 0.0);                    // Known vector coefficient for wall temperature
-
-			// Loop to assembly the linear system for the wall bulk temperature
-            for (int i = 1; i < N - 1; ++i) {
-
-                // Physical properties
-                const double cp = cp_w[i];
-                const double rho = rho_w[i];
-
-                const double k_l = 0.5 * (k_w[i - 1] + k_w[i]);
-                const double k_r = 0.5 * (k_w[i + 1] + k_w[i]);
-
-                Q_tot_w[i] = Q_ow[i] + Q_xw[i];
-
-                aTW[i] = - k_l / (rho * cp * dz * dz);
-                bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
-                cTW[i] = - k_r / (rho * cp * dz * dz);
-                dTW[i] = 
-                    + T_w_bulk_old[i] / dt 
-					+ Q_ow[i] / (cp * rho)      // Positive if heat is added to the wall
-                    + Q_xw[i] / (cp * rho);     // Positive if heat is added to the wall
-            }
-
-            // BCs for the first node: zero gradient, adiabatic face
-            aTW[0] = 0.0;
-            bTW[0] = 1.0;
-            cTW[0] = -1.0;
-            dTW[0] = 0.0;
-
-            // BCs for the last node: zero gradient, adiabatic face
-            aTW[N - 1] = -1.0;
-            bTW[N - 1] = 1.0;
-            cTW[N - 1] = 0.0;
-            dTW[N - 1] = 0.0;
-
-            // Vector of final wall bulk temperatures
-            T_w_bulk = tdma::solve(aTW, bTW, cTW, dTW);        
-
-            #pragma endregion
-
-            // =======================================================================
-            //
             //                           [2. SOLVE WICK]
             //
             // =======================================================================
@@ -854,12 +846,6 @@ int main() {
                     // -------------------------------------------------------
 
                     #pragma region continuity_satisfactor
-
-                    // Tridiagonal coefficients for the pressure correction
-                    std::vector<double> aXP(N, 0.0);
-                    std::vector<double> bXP(N, 0.0);
-                    std::vector<double> cXP(N, 0.0);
-                    std::vector<double> dXP(N, 0.0);
 
                     std::vector<double> p_prime_x(N, 0.0);    // Wick correction pressure field [Pa]
 
@@ -1111,12 +1097,6 @@ int main() {
 
                 #pragma region temperature_calculator
 
-                // Tridiagonal coefficients for the wick temperature
-                std::vector<double> aXT(N, 0.0);
-                std::vector<double> bXT(N, 0.0);
-                std::vector<double> cXT(N, 0.0);
-                std::vector<double> dXT(N, 0.0);
-
                 // Loop to assembly the linear system for the wick bulk temperature
                 for (int i = 1; i < N - 1; i++) {
 
@@ -1335,12 +1315,6 @@ int main() {
 
                 #pragma region temperature_calculator
 
-                // Energy equation for T (implicit), upwind convection, central diffusion
-                std::vector<double> aVT(N, 0.0);
-                std::vector<double> bVT(N, 0.0);
-                std::vector<double> cVT(N, 0.0);
-                std::vector<double> dVT(N, 0.0);
-
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
@@ -1456,12 +1430,6 @@ int main() {
                     // -------------------------------------------------------
 
                     #pragma region continuity_satisfactor
-
-                    // Tridiagonal coefficients for the pressure correction
-                    std::vector<double> aVP(N, 0.0);
-                    std::vector<double> bVP(N, 0.0);
-                    std::vector<double> cVP(N, 0.0);
-                    std::vector<double> dVP(N, 0.0);
 
                     std::vector<double> p_prime_v(N, 0.0);    // Vapor correction pressure field [Pa]
 
@@ -1677,18 +1645,6 @@ int main() {
                 const double beta = 0.075;          // Dissipation coefficient for ω [-]
                 const double alpha = 5.0 / 9.0;     // Blending coefficient [-]
 
-                // Tridiagonal coefficients for k
-                std::vector<double> aK(N, 0.0), 
-                                        bK(N, 0.0), 
-                                        cK(N, 0.0), 
-                                        dK(N, 0.0);
-
-                // Tridiagonal coefficients for omega
-                std::vector<double> aW(N, 0.0), 
-                                        bW(N, 0.0), 
-                                        cW(N, 0.0), 
-                                        dW(N, 0.0);
-
                 std::vector<double> dudz(N, 0.0);       // Velocity gradient du/dz [1/s]
                 std::vector<double> Pk(N, 0.0);         // Turbulence production rate term [m2/s3]
 
@@ -1806,6 +1762,7 @@ int main() {
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[1] += eps;
 
+                /*
 				Aold = T_w_bulk_iter[i];
 				Anew = T_w_bulk[i];
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
@@ -1829,6 +1786,7 @@ int main() {
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[5] += eps;
+                */
             }
 
             // Picard error normalization
@@ -1840,11 +1798,11 @@ int main() {
             pic_error[5] /= N;
 
             if (pic_error[0] < 1e-4 &&
-                pic_error[1] < 1e-4 &&
+                pic_error[1] < 1e-4 /* &&
                 pic_error[2] < 1e-4 &&
                 pic_error[3] < 1e-4 &&
                 pic_error[4] < 1e-4 &&
-                pic_error[5] < 1e-4) {
+                pic_error[5] < 1e-4*/) {
 
 				halves = 0;     // Reset halves if Picard converged
                 break;          // Picard converged
@@ -1899,6 +1857,52 @@ int main() {
             halves += 1;        // Reduce time step if max Picard iterations reached
 			n -= 1;             // Repeat current time step
         }
+
+        // =======================================================================
+        //
+        //                           [1. SOLVE WALL]
+        //
+        // =======================================================================
+
+        #pragma region wall
+
+        // Loop to assembly the linear system for the wall bulk temperature
+        for (int i = 1; i < N - 1; ++i) {
+
+            // Physical properties
+            const double cp = cp_w[i];
+            const double rho = rho_w[i];
+
+            const double k_l = 0.5 * (k_w[i - 1] + k_w[i]);
+            const double k_r = 0.5 * (k_w[i + 1] + k_w[i]);
+
+            Q_tot_w[i] = Q_ow[i] + Q_xw[i];
+
+            aTW[i] = -k_l / (rho * cp * dz * dz);
+            bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
+            cTW[i] = -k_r / (rho * cp * dz * dz);
+            dTW[i] =
+                +T_w_bulk_old[i] / dt
+                + Q_ow[i] / (cp * rho)      // Positive if heat is added to the wall
+                + Q_xw[i] / (cp * rho);     // Positive if heat is added to the wall
+        }
+
+        // BCs for the first node: zero gradient, adiabatic face
+        aTW[0] = 0.0;
+        bTW[0] = 1.0;
+        cTW[0] = -1.0;
+        dTW[0] = 0.0;
+
+        // BCs for the last node: zero gradient, adiabatic face
+        aTW[N - 1] = -1.0;
+        bTW[N - 1] = 1.0;
+        cTW[N - 1] = 0.0;
+        dTW[N - 1] = 0.0;
+
+        // Vector of final wall bulk temperatures
+        T_w_bulk = tdma::solve(aTW, bTW, cTW, dTW);
+
+        #pragma endregion
 
         // =======================================================================
         //
