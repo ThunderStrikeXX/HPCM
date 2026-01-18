@@ -23,20 +23,18 @@
 int main() {
 
     // =======================================================================
-    //
     //                       [CONSTANTS AND VARIABLES]
-    //
     // =======================================================================
 
     #pragma region constants_and_variables
 
     // Mathematical constants
-    const double M_PI = 3.14159265358979323846;
+    const double M_PI = 3.141592;           // Pi [-]
 
     // Physical properties
     const double emissivity = 0.5;          // Wall emissivity [-]
-    const double sigma = 5.67e-8;           // Stefan-Boltzmann constant [W/m^2/K^4]
-    const double Rv = 361.8;                // Gas constant for the sodium vapor [J/(kg K)]
+    const double sigma = 5.67e-8;           // Stefan-Boltzmann constant [W/m2K4]
+    const double Rv = 361.8;                // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
     const double h_conv = 10;               // Convective heat transfer coefficient for external heat removal [W/m^2/K]
@@ -50,7 +48,7 @@ int main() {
 	double Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
-    const double K = 1e-10;                 // Permeability [m^2]
+    const double K = 1e-10;                 // Permeability [m2]
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
@@ -61,11 +59,11 @@ int main() {
 	const double evaporator_end = 0.073;                        // Evaporator end [m]
 	const double condenser_length = 0.292;                      // Condenser length [m]
     const double evaporator_nodes = 
-        std::floor((evaporator_end - evaporator_start) / dz);   // Number of evaporator nodes
+        std::floor((evaporator_end - evaporator_start) / dz);   // Number of evaporator nodes [-]
     const double condenser_nodes = 
-        std::ceil(condenser_length / dz);                       // Number of condenser nodes
+        std::ceil(condenser_length / dz);                       // Number of condenser nodes [-]
     const double adiabatic_nodes = 
-        N - (evaporator_nodes + condenser_nodes);               // Number of adiabatic nodes
+        N - (evaporator_nodes + condenser_nodes);               // Number of adiabatic nodes [-]
     const double r_o = 0.01335;                                 // Outer wall radius [m]
     const double r_i = 0.0112;                                  // Wall-wick interface radius [m]
     const double r_v = 0.01075;                                 // Vapor-wick interface radius [m]
@@ -80,7 +78,7 @@ int main() {
     // Time-stepping parameters
     double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
-    const int64_t tot_iter = 1'000'000'000'000LL;          // Number of timesteps [-]
+    int         tot_iter = 5000000;         // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
 	double      dt_code = dt_user;          // Time step used in the code [s]
 	int         halves = 0;                 // Number of halvings of the time step
@@ -102,13 +100,6 @@ int main() {
     const int tot_inner_iter_v = 10;        // Inner iterations per outer iteration [-]
     const double outer_tol_v = 1e-6;        // Tolerance for the outer iterations (velocity) [-]
     const double inner_tol_v = 1e-6;        // Tolerance for the inner iterations (pressure) [-]
-
-    // Mesh z positions
-    std::vector<double> mesh(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh[i] = i * dz;
-
-    // Output precision
-    const int global_precision = 8;
 
     // Constant temperature for initialization
     const double T_init = 800.0;
@@ -297,6 +288,16 @@ int main() {
     p_storage_v[0] = p_storage_v[1];
     p_storage_v[N + 1] = p_storage_v[N];
 
+    // Mesh z positions
+    std::vector<double> mesh(N, 0.0);
+    for (int i = 0; i < N; ++i) mesh[i] = i * dz;
+
+    // Output precision
+    const int global_precision = 8;
+
+    // Sampling frequency
+    const int output_every = 5000;
+
     // Steam outputs
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
     std::ofstream dt_output(case_chosen + "/dt.txt", std::ios::app);
@@ -372,6 +373,9 @@ int main() {
     std::vector<double> T_x_v_iter(N, 0.0);
     std::vector<double> T_v_bulk_iter(N, 0.0);
 
+    std::vector<double> q_ow(N);
+    std::vector<double> ABC(6 * N);
+
     // Wick BCs
     const double u_inlet_x = 0.0;                               // Wick inlet velocity [m/s]
     const double u_outlet_x = 0.0;                              // Wick outlet velocity [m/s]
@@ -404,28 +408,35 @@ int main() {
     const int rhie_chow_on_off_v = 1;             // 0: no vapor RC correction, 1: vapor with RC correction
     const int SST_model_turbulence_on_off = 0;    // 0: no vapor turbulence, 1: vapor with turbulence
 
-    // Initialization of the vapor velocity tridiagonal coefficients
-    std::vector<double> aXU(N, 0.0);                                        // Lower tridiagonal coefficient for wick velocity
-    std::vector<double> bXU(N, rho_x[0] * dz / dt + 2 * mu_x[0] / dz);      // Central tridiagonal coefficient for wick velocity                     
-    std::vector<double> cXU(N, 0.0);                                        // Upper tridiagonal coefficient for wick velocity
-    std::vector<double> dXU(N, 0.0);                                        // Known vector coefficient for wick velocity
+    // Tridiagonal coefficients for the wick velocity predictor
+    std::vector<double> aXU(N, 0.0);                                      
+    std::vector<double> bXU(N, rho_x[0] * dz / dt + 2 * mu_x[0] / dz);             
+    std::vector<double> cXU(N, 0.0);                                       
+    std::vector<double> dXU(N, 0.0);                                    
 
-	// Initialization of the vapor velocity tridiagonal coefficients
-    std::vector<double> aVU(N, 0.0);                                                   // Lower tridiagonal coefficient for vapor velocity
-    std::vector<double> bVU(N, 2 * (4.0 / 3.0 * mu_v[0] / dz) + dz / dt * rho_v[0]);    // Central tridiagonal coefficient for vapor velocity
-    std::vector<double> cVU(N, 0.0);                                                    // Upper tridiagonal coefficient for vapor velocity
-    std::vector<double> dVU(N, 0.0);                                                    // Known vector for vapor velocity
+	// Tridiagonal coefficients for the vapor velocity predictor
+    std::vector<double> aVU(N, 0.0);                                                  
+    std::vector<double> bVU(N, 2 * (4.0 / 3.0 * mu_v[0] / dz) + dz / dt * rho_v[0]);
+    std::vector<double> cVU(N, 0.0);                                                   
+    std::vector<double> dVU(N, 0.0);                                                    
 
-    std::vector<double> aTW(N, 0.0);                    // Lower tridiagonal coefficient for wall temperature
-    std::vector<double> bTW(N, 0.0);                    // Central tridiagonal coefficient for wall temperature
-    std::vector<double> cTW(N, 0.0);                    // Upper tridiagonal coefficient for wall temperature
-    std::vector<double> dTW(N, 0.0);                    // Known vector coefficient for wall temperature
+    // Tridiagonal coefficients for the wall temperature
+    std::vector<double> aTW(N, 0.0);
+    std::vector<double> bTW(N, 0.0);
+    std::vector<double> cTW(N, 0.0);
+    std::vector<double> dTW(N, 0.0);
 
-    // Tridiagonal coefficients for the pressure correction
+    // Tridiagonal coefficients for the wick pressure correction
     std::vector<double> aXP(N, 0.0);
     std::vector<double> bXP(N, 0.0);
     std::vector<double> cXP(N, 0.0);
     std::vector<double> dXP(N, 0.0);
+
+    // Tridiagonal coefficients for the vapor pressure correction
+    std::vector<double> aVP(N, 0.0);
+    std::vector<double> bVP(N, 0.0);
+    std::vector<double> cVP(N, 0.0);
+    std::vector<double> dVP(N, 0.0);
 
     // Tridiagonal coefficients for the wick temperature
     std::vector<double> aXT(N, 0.0);
@@ -433,29 +444,23 @@ int main() {
     std::vector<double> cXT(N, 0.0);
     std::vector<double> dXT(N, 0.0);
 
-    // Energy equation for T (implicit), upwind convection, central diffusion
+    // Tridiagonal coefficients for the vapor temperature
     std::vector<double> aVT(N, 0.0);
     std::vector<double> bVT(N, 0.0);
     std::vector<double> cVT(N, 0.0);
     std::vector<double> dVT(N, 0.0);
 
-    // Tridiagonal coefficients for the pressure correction
-    std::vector<double> aVP(N, 0.0);
-    std::vector<double> bVP(N, 0.0);
-    std::vector<double> cVP(N, 0.0);
-    std::vector<double> dVP(N, 0.0);
+    // Tridiagonal coefficients for the vapor k turbulent value
+    std::vector<double> aK(N, 0.0);
+    std::vector<double> bK(N, 0.0);
+    std::vector<double> cK(N, 0.0);
+    std::vector<double> dK(N, 0.0);
 
-    // Tridiagonal coefficients for k
-    std::vector<double> aK(N, 0.0),
-        bK(N, 0.0),
-        cK(N, 0.0),
-        dK(N, 0.0);
-
-    // Tridiagonal coefficients for omega
-    std::vector<double> aW(N, 0.0),
-        bW(N, 0.0),
-        cW(N, 0.0),
-        dW(N, 0.0);
+    // Tridiagonal coefficients for the vapor omega turbulent value
+    std::vector<double> aW(N, 0.0);
+    std::vector<double> bW(N, 0.0);
+    std::vector<double> cW(N, 0.0);
+    std::vector<double> dW(N, 0.0);
 
 	// Residuals for wick loops
     double wick_momentum_residual = 1.0;
@@ -480,23 +485,25 @@ int main() {
     double u_error_v = 0.0;
 	double rho_error_v = 0.0;
 
+    // Previous values for residuals calculations
     std::vector<double> T_prev_x(N);
     std::vector<double> T_prev_v(N);
 
+    // TDMA solver
     tdma::Solver tdma_solver(N);
-
-    std::vector<double> q_ow(N);
-
-    std::vector<double> ABC(6 * N);
 
     #pragma endregion
 
-    std::cout << "Threads: " << omp_get_max_threads() << "\n";  // Print number of working threads
-	double start = omp_get_wtime();                             // Start time measurement
+    // Print number of working threads
+    std::cout << "Threads: " << omp_get_max_threads() << "\n";  
+
+    // Start computational time measurement
+	double start = omp_get_wtime();                             
 
     // Time stepping loop
-    for (int n = 0; n < 5000000; ++n) { 
+    for (int n = 0; n < tot_iter; ++n) {
 
+        // Start computational time iteration
         auto t0 = std::chrono::high_resolution_clock::now();
 
         // Timestep calculation
@@ -897,7 +904,7 @@ int main() {
                     #pragma endregion
 
                     // -------------------------------------------------------
-					// VELCOITY CORRECTOR: v = v - (grad p') / b
+					// VELOCITY CORRECTOR: v = v - (grad p') / b
                     // -------------------------------------------------------
 
                     #pragma region velocity_corrector
@@ -1880,8 +1887,6 @@ int main() {
         // =======================================================================
 
         #pragma region output
-
-        const int output_every = 5000;
 
         if(n % output_every == 0){
             for (int i = 0; i < N; ++i) {
