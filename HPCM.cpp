@@ -84,8 +84,8 @@ int main() {
 	int         halves = 0;                 // Number of halvings of the time step
 
 	// Picard iteration parameters
-	const double max_picard = 200;           // Maximum number of Picard iterations per time step [-]
-	const double pic_tolerance = 1e-4;   	// Tolerance for Picard iterations [-]   
+	const double max_picard = 100;          // Maximum number of Picard iterations per time step [-]
+	const double pic_tolerance = 1e-3;   	// Tolerance for Picard iterations [-]   
     std::vector<double> pic_error(6, 0.0);  // L1 error for picard convergence
     int pic = 0;                            // Outside to check if convergence is reached
 
@@ -1719,6 +1719,8 @@ int main() {
 
             for (int i = 0; i < N; ++i) {
 
+                /*
+
 				Aold = T_v_bulk_iter[i];
                 Anew = T_v_bulk[i];
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
@@ -1731,12 +1733,13 @@ int main() {
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[1] += eps;
 
-                /*
 				Aold = T_w_bulk_iter[i];
 				Anew = T_w_bulk[i];
 				denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
 				eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[2] += eps;
+
+                */
 
                 Aold = T_o_w_iter[i];
                 Anew = T_o_w[i];
@@ -1755,7 +1758,7 @@ int main() {
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[5] += eps;
-                */
+
             }
 
             // Picard error normalization
@@ -1766,12 +1769,12 @@ int main() {
             pic_error[4] /= N;
             pic_error[5] /= N;
 
-            if (pic_error[0] < 1e-4 &&
-                pic_error[1] < 1e-4 /* &&
-                pic_error[2] < 1e-4 &&
-                pic_error[3] < 1e-4 &&
-                pic_error[4] < 1e-4 &&
-                pic_error[5] < 1e-4*/) {
+            if (/* pic_error[0] < 1e-4 &&
+                pic_error[1] < 1e-4  &&
+                pic_error[2] < 1e-4 &&*/
+                pic_error[3] < 1e-2 &&
+                pic_error[4] < 1e-2 &&
+                pic_error[5] < 1e-2) {
 
 				halves = 0;     // Reset halves if Picard converged
                 break;          // Picard converged
