@@ -484,6 +484,8 @@ int main() {
     std::vector<double> T_prev_x(N);
     std::vector<double> T_prev_v(N);
 
+    tdma::Solver tdma_solver(N);
+
     #pragma endregion
 
     std::cout << "Threads: " << omp_get_max_threads() << "\n";  // Print number of working threads
@@ -511,26 +513,24 @@ int main() {
         T_x_v_iter = T_x_v_old;
         T_v_bulk_iter = T_v_bulk_old;
 
-        
+        // Updating all properties
+        for (int i = 0; i < N; ++i) {
+
+            cp_w[i] = steel::cp(T_w_bulk_iter[i]);
+            rho_w[i] = steel::rho(T_w_bulk_iter[i]);
+            k_w[i] = steel::k(T_w_bulk_iter[i]);
+
+            rho_x[i] = liquid_sodium::rho(T_x_bulk_iter[i]);
+            mu_x[i] = liquid_sodium::mu(T_x_bulk_iter[i]);
+            cp_x[i] = liquid_sodium::cp(T_x_bulk_iter[i]);
+            k_x[i] = liquid_sodium::k(T_x_bulk_iter[i]);
+
+            mu_v[i] = vapor_sodium::mu(T_v_bulk_iter[i]);
+            cp_v[i] = vapor_sodium::cp(T_v_bulk_iter[i]);
+            k_v[i] = vapor_sodium::k(T_v_bulk_iter[i], p_v[i]);
+        }
 
         for (pic = 0; pic < max_picard; pic++) {
-
-            // Updating all properties
-            for (int i = 0; i < N; ++i) {
-
-                cp_w[i] = steel::cp(T_w_bulk_iter[i]);
-                rho_w[i] = steel::rho(T_w_bulk_iter[i]);
-                k_w[i] = steel::k(T_w_bulk_iter[i]);
-
-                rho_x[i] = liquid_sodium::rho(T_x_bulk_iter[i]);
-                mu_x[i] = liquid_sodium::mu(T_x_bulk_iter[i]);
-                cp_x[i] = liquid_sodium::cp(T_x_bulk_iter[i]);
-                k_x[i] = liquid_sodium::k(T_x_bulk_iter[i]);
-
-                mu_v[i] = vapor_sodium::mu(T_v_bulk_iter[i]);
-                cp_v[i] = vapor_sodium::cp(T_v_bulk_iter[i]);
-                k_v[i] = vapor_sodium::k(T_v_bulk_iter[i], p_v[i]);
-            }
 
             // =======================================================================
             //
@@ -828,7 +828,7 @@ int main() {
 			    cXU[N - 1] = 0.0;
                 dXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last) * u_outlet_x;
 
-                u_x = tdma::solve(aXU, bXU, cXU, dXU);
+                tdma_solver.solve(aXU, bXU, cXU, dXU, u_x);
 
                 #pragma endregion
 
@@ -904,7 +904,7 @@ int main() {
 				    cXP[N - 1] = 0.0;
                     dXP[N - 1] = 0.0;
 
-                    p_prime_x = tdma::solve(aXP, bXP, cXP, dXP);
+                    tdma_solver.solve(aXP, bXP, cXP, dXP, p_prime_x);
 
                     #pragma endregion
 
@@ -1176,7 +1176,8 @@ int main() {
                 dXT[N - 1] = 0.0;
 
                 T_prev_x = T_x_bulk;
-                T_x_bulk = tdma::solve(aXT, bXT, cXT, dXT);
+
+                tdma_solver.solve(aXT, bXT, cXT, dXT, T_x_bulk);
 
                 // -------------------------------
                 // TEMPERATURE RESIDUAL
@@ -1305,7 +1306,7 @@ int main() {
 			    cVU[N - 1] = 0.0;
                 dVU[N - 1] = bVU[N - 1] * u_outlet_v;
 
-                u_v = tdma::solve(aVU, bVU, cVU, dVU);
+                tdma_solver.solve(aVU, bVU, cVU, dVU, u_v);
 
                 #pragma endregion
 
@@ -1412,7 +1413,8 @@ int main() {
                 dVT[N - 1] = 0.0;
 
                 T_prev_v = T_v_bulk;
-                T_v_bulk = tdma::solve(aVT, bVT, cVT, dVT);
+
+                tdma_solver.solve(aVT, bVT, cVT, dVT, T_v_bulk);
 
                 #pragma endregion
 
@@ -1498,7 +1500,7 @@ int main() {
 				    cVP[N - 1] = 0.0;
                     dVP[N - 1] = 0.0;
 
-                    p_prime_v = tdma::solve(aVP, bVP, cVP, dVP);
+                    tdma_solver.solve(aVP, bVP, cVP, dVP, p_prime_v);
 
                     #pragma endregion
 
@@ -1680,7 +1682,7 @@ int main() {
                 bK[N - 1] = 1.0; 
                 dK[N - 1] = k_turb[N - 1];
 
-                k_turb = tdma::solve(aK, bK, cK, dK);
+                tdma_solver.solve(aK, bK, cK, dK, k_turb);
 
                 /**
                  * @brief Assemble coefficients for the ω-equation (specific dissipation rate) in 1D.
@@ -1708,7 +1710,7 @@ int main() {
                 bW[N - 1] = 1.0; 
                 dW[N - 1] = omega_turb[N - 1];
 
-                omega_turb = tdma::solve(aW, bW, cW, dW);
+                tdma_solver.solve(aW, bW, cW, dW, omega_turb);
 
                 /**
                   * @brief Update turbulent viscosity using k/ω and apply limiter.
@@ -1899,8 +1901,7 @@ int main() {
         cTW[N - 1] = 0.0;
         dTW[N - 1] = 0.0;
 
-        // Vector of final wall bulk temperatures
-        T_w_bulk = tdma::solve(aTW, bTW, cTW, dTW);
+        tdma_solver.solve(aTW, bTW, cTW, dTW, T_w_bulk);
 
         #pragma endregion
 
