@@ -37,7 +37,7 @@ int main() {
     const double Rv = 361.5;                // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const double h_conv = 10;               // Convective heat transfer coefficient for external heat removal [W/m^2/K]
+    const double h_conv = 1;               // Convective heat transfer coefficient for external heat removal [W/m^2/K]
     const double power = 119;               // Power at the evaporator side [W]
     const double T_env = 280.0;             // External environmental temperature [K]
 
@@ -76,7 +76,7 @@ int main() {
     const double E2x = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double      dt_user = 1e-4;             // Initial time step [s] (then it is updated according to the limits)
+    double      dt_user = 1e-1;             // Initial time step [s] (then it is updated according to the limits)
 	double      dt = dt_user;               // Current time step [s]
     int         tot_iter = 5000000;         // Number of timesteps [-]
     double      time_total = 0.0;           // Total simulation time [s]
@@ -508,8 +508,13 @@ int main() {
     // Start computational time measurement
 	double start = omp_get_wtime();                             
 
+    int n = 0;
+    const double time_simulation = 2000;
+
     // Time stepping loop
-    for (int n = 0; n < tot_iter; ++n) {
+    while (time_total < time_simulation) {
+
+        n++;
 
         // Start computational time iteration
         auto t0 = std::chrono::high_resolution_clock::now();
