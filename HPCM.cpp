@@ -34,7 +34,7 @@ int main() {
     // Physical properties
     const double emissivity = 0.5;          // Wall emissivity [-]
     const double sigma = 5.67e-8;           // Stefan-Boltzmann constant [W/m2K4]
-    const double Rv = 361.8;                // Gas constant for the sodium vapor [J/(kgK)]
+    const double Rv = 361.5;                // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
     const double h_conv = 10;               // Convective heat transfer coefficient for external heat removal [W/m^2/K]
@@ -90,16 +90,18 @@ int main() {
     int pic = 0;                            // Outside to check if convergence is reached
 
     // PISO Wick parameters
-    const int tot_outer_iter_x = 5;         // Outer iterations per time-step [-]
-    const int tot_inner_iter_x = 10;        // Inner iterations per outer iteration [-]
-    const double outer_tol_x = 1e-6;        // Tolerance for the outer iterations (velocity) [-]
-    const double inner_tol_x = 1e-6;        // Tolerance for the inner iterations (pressure) [-]
+    const int tot_simple_iter_x = 5;                // Outer iterations per time-step [-]
+    const int tot_piso_iter_x = 10;                 // Inner iterations per outer iteration [-]
+    const double momentum_tol_x = 1e-6;             // Tolerance for the momentum equation [-]
+    const double continuity_tol_x = 1e-6;           // Tolerance for the continuity equation [-]
+    const double temperature_tol_x = 1e-2;          // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_outer_iter_v = 5;         // Outer iterations per time-step [-]
-    const int tot_inner_iter_v = 10;        // Inner iterations per outer iteration [-]
-    const double outer_tol_v = 1e-6;        // Tolerance for the outer iterations (velocity) [-]
-    const double inner_tol_v = 1e-6;        // Tolerance for the inner iterations (pressure) [-]
+    const int tot_simple_iter_v = 5;                // Outer iterations per time-step [-]
+    const int tot_piso_iter_v = 10;                 // Inner iterations per outer iteration [-]
+    const double momentum_tol_v = 1e-6;             // Tolerance for the outer iterations (velocity) [-]
+    const double continuity_tol_v = 1e-6;           // Tolerance for the inner iterations (pressure) [-]
+    const double temperature_tol_v = 1e-2;          // Tolerance for the energy equation [-]
 
     // Constant temperature for initialization
     const double T_init = 800.0;
@@ -189,6 +191,12 @@ int main() {
     std::vector<double> cp_v(N);
     std::vector<double> k_v(N);
     std::vector<double> k_v_int(N);
+
+    std::vector<double> p_prime_x(N, 0.0);    // Wick correction pressure field [Pa]
+    std::vector<double> p_prime_v(N, 0.0);    // Vapor correction pressure field [Pa]
+
+    std::vector<double> dudz(N, 0.0);       // Velocity gradient du/dz [1/s]
+    std::vector<double> Pk(N, 0.0);         // Turbulence production rate term [m2/s3]
 
     double h_xv_v;          // Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     double h_vx_x;          // Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -293,10 +301,10 @@ int main() {
     for (int i = 0; i < N; ++i) mesh[i] = i * dz;
 
     // Output precision
-    const int global_precision = 8;
+    const int output_precision = 4;
 
     // Sampling frequency
-    const int output_every = 5000;
+    const int sampling_frequency = 5000;
 
     // Steam outputs
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
@@ -332,38 +340,38 @@ int main() {
     std::ofstream saturation_pressure_output(case_chosen + "/saturation_pressure.txt", std::ios::app);
     std::ofstream sonic_velocity_output(case_chosen + "/sonic_velocity.txt", std::ios::app);
 
-    time_output << std::setprecision(global_precision);
-    dt_output << std::setprecision(global_precision);
-    simulation_time_output << std::setprecision(global_precision);
+    time_output << std::setprecision(output_precision);
+    dt_output << std::setprecision(output_precision);
+    simulation_time_output << std::setprecision(output_precision);
 
-    v_velocity_output << std::setprecision(global_precision);
-    v_pressure_output << std::setprecision(global_precision);
-    v_bulk_temperature_output << std::setprecision(global_precision);
-    v_rho_output << std::setprecision(global_precision);
+    v_velocity_output << std::setprecision(output_precision);
+    v_pressure_output << std::setprecision(output_precision);
+    v_bulk_temperature_output << std::setprecision(output_precision);
+    v_rho_output << std::setprecision(output_precision);
 
-    x_velocity_output << std::setprecision(global_precision);
-    x_pressure_output << std::setprecision(global_precision);
-    x_bulk_temperature_output << std::setprecision(global_precision);
-    x_rho_output << std::setprecision(global_precision);
+    x_velocity_output << std::setprecision(output_precision);
+    x_pressure_output << std::setprecision(output_precision);
+    x_bulk_temperature_output << std::setprecision(output_precision);
+    x_rho_output << std::setprecision(output_precision);
 
-    x_v_temperature_output << std::setprecision(global_precision);
-    w_x_temperature_output << std::setprecision(global_precision);
-    o_w_temperature_output << std::setprecision(global_precision);
-    w_bulk_temperature_output << std::setprecision(global_precision);
+    x_v_temperature_output << std::setprecision(output_precision);
+    w_x_temperature_output << std::setprecision(output_precision);
+    o_w_temperature_output << std::setprecision(output_precision);
+    w_bulk_temperature_output << std::setprecision(output_precision);
 
-    x_v_mass_flux_output << std::setprecision(global_precision);
+    x_v_mass_flux_output << std::setprecision(output_precision);
 
-    Q_ow_output << std::setprecision(global_precision);
-    Q_wx_output << std::setprecision(global_precision);
-    Q_xw_output << std::setprecision(global_precision);
-    Q_xm_output << std::setprecision(global_precision);
-    Q_mx_output << std::setprecision(global_precision);
+    Q_ow_output << std::setprecision(output_precision);
+    Q_wx_output << std::setprecision(output_precision);
+    Q_xw_output << std::setprecision(output_precision);
+    Q_xm_output << std::setprecision(output_precision);
+    Q_mx_output << std::setprecision(output_precision);
 
-    Q_mass_vapor_output << std::setprecision(global_precision);
-    Q_mass_wick_output << std::setprecision(global_precision);
+    Q_mass_vapor_output << std::setprecision(output_precision);
+    Q_mass_wick_output << std::setprecision(output_precision);
 
-    saturation_pressure_output << std::setprecision(global_precision);
-    sonic_velocity_output << std::setprecision(global_precision);
+    saturation_pressure_output << std::setprecision(output_precision);
+    sonic_velocity_output << std::setprecision(output_precision);
 
     // Iter values (only for Picard loops)
     std::vector<double> T_o_w_iter(N, 0.0);
@@ -463,23 +471,23 @@ int main() {
     std::vector<double> dW(N, 0.0);
 
 	// Residuals for wick loops
-    double wick_momentum_residual = 1.0;
-    double wick_temperature_residual = 1.0;
-	double wick_continuity_residual = 1.0;
+    double momentum_res_x = 1.0;
+    double temperature_res_x = 1.0;
+	double continuity_res_x = 1.0;
 
-    int outer_iter_x = 0;
-    int inner_iter_x = 0;
+    int simple_iter_x = 0;
+    int piso_iter_x = 0;
 
     double p_error_x = 0.0;
 	double u_error_x = 0.0;
 
     // Residuals for vapor loops
-    double vapor_momentum_residual = 1.0;
-    double vapor_temperature_residual = 1.0;
-    double vapor_continuity_residual = 1.0;
+    double momentum_res_v = 1.0;
+    double temperature_res_v = 1.0;
+    double continuity_res_v = 1.0;
 
-    int outer_iter_v = 0;
-    int inner_iter_v = 0;
+    int simple_iter_v = 0;
+    int piso_iter_v = 0;
 
     double p_error_v = 0.0;
     double u_error_v = 0.0;
@@ -713,13 +721,13 @@ int main() {
 
             u_error_x = 1.0;
 
-            wick_momentum_residual = 1.0;
-            wick_temperature_residual = 1.0;
+            momentum_res_x = 1.0;
+            temperature_res_x = 1.0;
 
-            outer_iter_x = 0;
+            simple_iter_x = 0;
 
 			// Outer iterations for the wick momentum equations
-            while (outer_iter_x < tot_outer_iter_x && (wick_momentum_residual > outer_tol_x || wick_temperature_residual > outer_tol_x)) {
+            while (simple_iter_x < tot_simple_iter_x && (momentum_res_x > momentum_tol_x || temperature_res_x > temperature_tol_x)) {
 
 				// -----------------------------------------------------------
 				// MOMENTUM PREDICTOR: gets u*
@@ -802,11 +810,11 @@ int main() {
                 // Inner iterations variables reset
                 p_error_x = 1.0;
 
-				wick_continuity_residual = 1.0;
-                inner_iter_x = 0;
+				continuity_res_x = 1.0;
+                piso_iter_x = 0;
 
 				// Inner wick iterations for the continuity equation
-                while (inner_iter_x < tot_inner_iter_x && wick_continuity_residual > inner_tol_x) {
+                while (piso_iter_x < tot_piso_iter_x && continuity_res_x > continuity_tol_x) {
 
                     // -------------------------------------------------------
 					// CONTINUITY SATISFACTOR: gets p'
@@ -814,7 +822,6 @@ int main() {
 
                     #pragma region continuity_satisfactor
 
-                    std::vector<double> p_prime_x(N, 0.0);    // Wick correction pressure field [Pa]
 
 					// Loop to assemble the linear system for the pressure correction
                     for (int i = 1; i < N - 1; i++) {
@@ -950,7 +957,7 @@ int main() {
 
                     const double cont_ref = std::max({ phi_ref, Sm_ref, 1e-30 });
 
-                    wick_continuity_residual = 0.0;
+                    continuity_res_x = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
 
@@ -976,14 +983,14 @@ int main() {
 
                         const double mass_flux = - Gamma_xv_wick[i] * dz;           // [kg/(m2s)]
 
-                        wick_continuity_residual =
-                            std::max(wick_continuity_residual,
+                        continuity_res_x =
+                            std::max(continuity_res_x,
                                 std::abs(mass_flux - mass_imbalance) / cont_ref);
                     }
 
                     #pragma endregion
 
-                    inner_iter_x++;
+                    piso_iter_x++;
                 }
 
                 // -------------------------------------------------------
@@ -1009,7 +1016,7 @@ int main() {
 
                 }
 
-                wick_momentum_residual = 0.0;
+                momentum_res_x = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
 
@@ -1052,8 +1059,8 @@ int main() {
                     const double R =
                         accum + conv - diff + press;
 
-                    wick_momentum_residual =
-                        std::max(wick_momentum_residual, std::abs(R) / F_ref);
+                    momentum_res_x =
+                        std::max(momentum_res_x, std::abs(R) / F_ref);
                 }
 
                 #pragma endregion
@@ -1149,19 +1156,19 @@ int main() {
                 // -------------------------------
                 // TEMPERATURE RESIDUAL
                 // -------------------------------
-                wick_temperature_residual = 0.0;
+                temperature_res_x = 0.0;
 
                 for (int i = 0; i < N; ++i) {
 
-                    wick_temperature_residual = std::max(
-                        wick_temperature_residual,
+                    temperature_res_x = std::max(
+                        temperature_res_x,
                         std::abs(T_x_bulk[i] - T_prev_x[i])
                     );
                 }
 
                 #pragma endregion
 
-                outer_iter_x++;  
+                simple_iter_x++;  
             }
             
             #pragma endregion
@@ -1178,14 +1185,14 @@ int main() {
             p_v[N - 1] = p_outlet_v;
 
             // Initializing convergence metrics
-            vapor_momentum_residual = 1.0;
-            vapor_temperature_residual = 1.0;
+            momentum_res_v = 1.0;
+            temperature_res_v = 1.0;
 
             // Outer iterations variables reset
-            outer_iter_v = 0;
+            simple_iter_v = 0;
 
 			// Outer iterations for the vapor momentum equations
-            while (outer_iter_v < tot_outer_iter_v && (vapor_momentum_residual > outer_tol_v || vapor_temperature_residual > outer_tol_v)) {
+            while (simple_iter_v < tot_simple_iter_v && (momentum_res_v > momentum_tol_v || temperature_res_v > momentum_tol_v)) {
 
 				// -----------------------------------------------------------
 				// MOMENTUM PREDICTOR: gets u*
@@ -1386,21 +1393,19 @@ int main() {
                 #pragma endregion
 
                 // Initializing convergence metrics
-                vapor_continuity_residual = 1.0;
+                continuity_res_v = 1.0;
 
                 // Inner iterations variables reset
-                inner_iter_v = 0;
+                piso_iter_v = 0;
 
 				// Inner iterations for the vapor continuity equation
-                while (inner_iter_v < tot_inner_iter_v && vapor_continuity_residual > inner_tol_v) {
+                while (piso_iter_v < tot_piso_iter_v && (continuity_res_v > continuity_tol_v || temperature_res_v > temperature_tol_v)) {
 
                     // -------------------------------------------------------
 					// CONTINUITY SATISFACTOR: gets p'
                     // -------------------------------------------------------
 
                     #pragma region continuity_satisfactor
-
-                    std::vector<double> p_prime_v(N, 0.0);    // Vapor correction pressure field [Pa]
 
                     for (int i = 1; i < N - 1; ++i) {
 
@@ -1551,15 +1556,15 @@ int main() {
 
                     #pragma region continuity_residual_calculation
 
-                    vapor_continuity_residual = 0.0;
+                    continuity_res_v = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
-                        vapor_continuity_residual = std::max(vapor_continuity_residual, std::fabs(dVP[i]));
+                        continuity_res_v = std::max(continuity_res_v, std::fabs(dVP[i]));
                     }
 
                     #pragma endregion
 
-                    inner_iter_v++;
+                    piso_iter_v++;
                 }
 
                 // -------------------------------------------------------
@@ -1568,10 +1573,10 @@ int main() {
 
                 #pragma region momentum_residual_calculation
 
-                vapor_momentum_residual = 0.0;
+                momentum_res_v = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
-                    vapor_momentum_residual = std::max(vapor_momentum_residual, std::fabs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
+                    momentum_res_v = std::max(momentum_res_v, std::fabs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
                 }
 
                 #pragma endregion
@@ -1582,15 +1587,15 @@ int main() {
 
                 #pragma region temperature_residual_calculation
 
-                vapor_temperature_residual = 0.0;
+                temperature_res_v = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
-                    vapor_temperature_residual = std::max(vapor_temperature_residual, std::fabs(T_v_bulk[i] - T_prev_v[i]));
+                    temperature_res_v = std::max(temperature_res_v, std::fabs(T_v_bulk[i] - T_prev_v[i]));
                 }
 
                 #pragma endregion
 
-                outer_iter_v++;
+                simple_iter_v++;
             }
 
             // =======================================================================
@@ -1613,9 +1618,6 @@ int main() {
                 const double beta_star = 0.09;      // Production limiter coefficient [-]
                 const double beta = 0.075;          // Dissipation coefficient for ω [-]
                 const double alpha = 5.0 / 9.0;     // Blending coefficient [-]
-
-                std::vector<double> dudz(N, 0.0);       // Velocity gradient du/dz [1/s]
-                std::vector<double> Pk(N, 0.0);         // Turbulence production rate term [m2/s3]
 
                 // Compute velocity gradient and turbulence production term
                 for (int i = 1; i < N - 1; i++) {
@@ -1891,7 +1893,7 @@ int main() {
 
         #pragma region output
 
-        if(n % output_every == 0){
+        if(n % sampling_frequency == 0){
             for (int i = 0; i < N; ++i) {
 
                 v_velocity_output << u_v[i] << " ";
