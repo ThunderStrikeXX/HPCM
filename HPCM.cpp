@@ -373,7 +373,7 @@ int main() {
         }
 
         std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
-        mesh_output << std::setprecision(8);
+        mesh_output << std::setprecision(output_precision);
 
         for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
 
@@ -446,6 +446,7 @@ int main() {
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
     std::ofstream dt_output(case_chosen + "/dt.txt", std::ios::app);
     std::ofstream simulation_time_output(case_chosen + "/simulation_time.txt", std::ios::app);
+    std::ofstream clock_time_output(case_chosen + "/clock_time.txt", std::ios::app);
 
     std::ofstream v_velocity_output(case_chosen + "/vapor_velocity.txt", std::ios::app);
     std::ofstream v_pressure_output(case_chosen + "/vapor_pressure.txt", std::ios::app);
@@ -476,9 +477,14 @@ int main() {
     std::ofstream saturation_pressure_output(case_chosen + "/saturation_pressure.txt", std::ios::app);
     std::ofstream sonic_velocity_output(case_chosen + "/sonic_velocity.txt", std::ios::app);
 
+    std::ofstream total_heat_source_wall_output(case_chosen + "/total_heat_source_wall.txt", std::ios::app);
+    std::ofstream total_heat_source_wick_output(case_chosen + "/total_heat_source_wick.txt", std::ios::app);
+    std::ofstream total_heat_source_vapor_output(case_chosen + "/total_heat_source_vapor.txt", std::ios::app);
+
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
     simulation_time_output << std::setprecision(output_precision);
+    clock_time_output << std::setprecision(output_precision);
 
     v_velocity_output << std::setprecision(output_precision);
     v_pressure_output << std::setprecision(output_precision);
@@ -508,6 +514,10 @@ int main() {
 
     saturation_pressure_output << std::setprecision(output_precision);
     sonic_velocity_output << std::setprecision(output_precision);
+
+    total_heat_source_wall_output << std::setprecision(output_precision);
+    total_heat_source_wick_output << std::setprecision(output_precision);
+    total_heat_source_vapor_output << std::setprecision(output_precision);
 
     #pragma endregion
 
@@ -1868,12 +1878,33 @@ int main() {
                 sonic_velocity_output << sonic_velocity[i] << " ";
             }
 
-            auto t1 = std::chrono::high_resolution_clock::now();
-            double simulation_time = std::chrono::duration<double, std::milli>(t1 - t0).count();
+            // Time between timesteps [ms]
+            auto t_end_timestep = std::chrono::high_resolution_clock::now();
+            double simulation_time = std::chrono::duration<double, std::milli>(t_end_timestep - t0).count();
+
+            // Time from the start of the simulation
+            double t_clock = omp_get_wtime();
+            double clock_time = t_clock - start;
 
             time_output << time_total << " ";
             dt_output << dt << " ";
             simulation_time_output << simulation_time << " ";
+            clock_time_output << clock_time << " ";
+
+            double total_heat_source_wall = 0.0;
+            double total_heat_source_wick = 0.0;
+            double total_heat_source_vapor = 0.0;
+
+            for (int i = 1; i < N - 1; ++i) {
+
+                total_heat_source_wall += Q_tot_w[i];
+                total_heat_source_wick += Q_tot_x[i];
+                total_heat_source_vapor += Q_tot_v[i];
+            }
+
+            total_heat_source_wall_output << total_heat_source_wall << " ";
+            total_heat_source_wick_output << total_heat_source_wick << " ";
+            total_heat_source_vapor_output << total_heat_source_vapor << " ";
 
             v_velocity_output << "\n";
             v_pressure_output << "\n";
@@ -1936,6 +1967,11 @@ int main() {
             time_output.flush();
             simulation_time_output.flush();
             dt_output.flush();
+            clock_time_output.flush();
+
+            total_heat_source_wall_output.flush();
+            total_heat_source_wick_output.flush();
+            total_heat_source_vapor_output.flush();
         }
 
         #pragma endregion
@@ -1973,6 +2009,10 @@ int main() {
 
     saturation_pressure_output.close();
     sonic_velocity_output.close();
+
+    total_heat_source_wall_output.close();
+    total_heat_source_wick_output.close();
+    total_heat_source_vapor_output.close();
 
     double end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
