@@ -511,12 +511,12 @@ int main() {
             //                             [INTERFACES]
             // =======================================================================
 
-            #pragma region parabolic_profiles 
+            #pragma region interfaces 
 
             for (int i = 0; i < N; ++i) {
 
                 // Physical properties
-                const double Re_v = rho_v[i] * std::fabs(u_v[i]) * Dh_v / mu_v[i];      // Reynolds number [-]
+                const double Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];       // Reynolds number [-]
                 const double Pr_v = cp_v[i] * mu_v[i] / k_v[i];                         // Prandtl number [-]
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa]        
@@ -623,36 +623,27 @@ int main() {
             #pragma endregion
 
             // =======================================================================
-            //
             //                                [WICK]
-            //
             // =======================================================================
 
             #pragma region wick
 
-            /**
-             * Pressure coupling hypotheses: the meniscus in the last cell of the domain is 
-             * considered flat, so the pressure of the wick is equal to the pressure of the vapor
-             */
+            // Pressure coupling hypotheses
             p_outlet_x = p_v[N - 1];
 
-            u_error_x = 1.0;
-
+            // Momentum and energy residual initialization to access outer loop
             momentum_res_x = 1.0;
             temperature_res_x = 1.0;
 
+            // Outer iterations reset
             simple_iter_x = 0;
 
-			// Outer iterations for the wick momentum equations
-            while (simple_iter_x < tot_simple_iter_x && (momentum_res_x > momentum_tol_x || temperature_res_x > temperature_tol_x)) {
+			// Outer "PISO" iterations
+            while ((simple_iter_x < tot_simple_iter_x) && (momentum_res_x > momentum_tol_x || temperature_res_x > temperature_tol_x)) {
 
-				// -----------------------------------------------------------
-				// MOMENTUM PREDICTOR: gets u*
-				// ----------------------------------------------------------
-
+				// ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
-                // Parallelizing here does not save time
                 for (int i = 1; i < N - 1; i++) {
 
 				    // Physical properties
@@ -724,271 +715,9 @@ int main() {
 
                 #pragma endregion
 
-                // Inner iterations variables reset
-                p_error_x = 1.0;
-
-				continuity_res_x = 1.0;
-                piso_iter_x = 0;
-
-				// Inner wick iterations for the continuity equation
-                while (piso_iter_x < tot_piso_iter_x && continuity_res_x > continuity_tol_x) {
-
-                    // -------------------------------------------------------
-					// CONTINUITY SATISFACTOR: gets p'
-                    // -------------------------------------------------------
-
-                    #pragma region continuity_satisfactor
-
-
-					// Loop to assemble the linear system for the pressure correction
-                    for (int i = 1; i < N - 1; i++) {
-
-					    // Physical properties
-                        const double rho_P = rho_x[i];
-                        const double rho_L = rho_x[i - 1];
-                        const double rho_R = rho_x[i + 1];
-
-                        const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
-                        const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
-
-                        const double rc_l = -avgInvbLU_L / 4.0 *
-                            (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]);    // [m/s]
-                        const double rc_r = -avgInvbLU_R / 4.0 *
-                            (p_padded_x[i - 1] - 3.0 * p_padded_x[i] + 3.0 * p_padded_x[i + 1] - p_padded_x[i + 2]);    // [m/s]
-
-                        const double u_l_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc_l;    // [m/s]
-                        const double u_r_face = 0.5 * (u_x[i] + u_x[i + 1]) + rhie_chow_on_off_x * rc_r;    // [m/s]
-
-                        const double rho_left_uw = (u_l_face >= 0.0) ? rho_L : rho_P;
-                        const double rho_right_uw = (u_r_face >= 0.0) ? rho_P : rho_R;
-
-                        const double F_l = rho_left_uw * u_l_face;      // [kg/(m2s)]
-                        const double F_r = rho_right_uw * u_r_face;     // [kg/(m2s)]
-
-                        const double mass_imbalance = (F_r - F_l);      // [kg/(m2s)]
-
-                        const double mass_flux = - Gamma_xv_wick[i] * dz; // [kg/(m2s)]
-
-                        const double rho_l_cd = 0.5 * (rho_L + rho_P); // [kg/m3]
-                        const double rho_r_cd = 0.5 * (rho_P + rho_R); // [kg/m3]
-
-                        const double E_l = rho_l_cd * avgInvbLU_L / dz; // [s/m]
-                        const double E_r = rho_r_cd * avgInvbLU_R / dz; // [s/m]
-
-                        aXP[i] = -E_l;              // [s/m]
-                        cXP[i] = -E_r;              // [s/m]
-                        bXP[i] = E_l + E_r;         // [s/m]
-                        dXP[i] = 
-                            + mass_flux 
-                            - mass_imbalance;       // [kg/(m^2 s)]
-                    }
-
-                    // BCs for the correction of pressure: zero gradient at first node
-				    aXP[0] = 0.0;
-                    bXP[0] = 1.0; 
-                    cXP[0] = -1.0; 
-                    dXP[0] = 0.0;
-
-                    // BCs for the correction of pressure: zero at first node
-                    aXP[N - 1] = 0.0;
-                    bXP[N - 1] = 1.0; 
-				    cXP[N - 1] = 0.0;
-                    dXP[N - 1] = 0.0;
-
-                    tdma_solver.solve(aXP, bXP, cXP, dXP, p_prime_x);
-
-                    #pragma endregion
-
-                    // -------------------------------------------------------
-					// PRESSURE CORRECTOR: p = p + p'
-                    // -------------------------------------------------------
-
-                    #pragma region pressure_corrector
-
-                    /**
-                      * @brief Corrects the pressure with p'
-                      */
-                    p_error_x = 0.0;
-
-                    for (int i = 0; i < N; i++) {
-
-                        double p_prev_x = p_x[i];
-                        p_x[i] += p_prime_x[i];         // Note that PISO does not require an under-relaxation factor
-                        p_storage_x[i + 1] = p_x[i];
-
-                        p_error_x = std::max(p_error_x, std::fabs(p_x[i] - p_prev_x));
-                    }
-
-                    p_x[0] = p_x[1];
-                    p_storage_x[0] = p_storage_x[1];
-
-                    p_x[N - 1] = p_outlet_x;
-                    p_storage_x[N + 1] = p_outlet_x;
-
-                    #pragma endregion
-
-                    // -------------------------------------------------------
-					// VELOCITY CORRECTOR: v = v - (grad p') / b
-                    // -------------------------------------------------------
-
-                    #pragma region velocity_corrector
-
-                    /**
-                      * @brief Corrects the velocity with p'
-                      */
-                    u_error_x = 0.0;
-
-                    for (int i = 1; i < N - 1; i++) {
-
-                        double u_prev = u_x[i];
-                        u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
-
-                        u_error_x = std::max(u_error_x, std::fabs(u_x[i] - u_prev));
-                    }
-
-                    #pragma endregion
-
-                    // -------------------------------------------------------
-                    // CONTINUITY RESIDUAL CALCULATION
-                    // -------------------------------------------------------
-
-                    #pragma region continuity_residual_calculation
-
-                    double phi_ref = 0.0;
-                    double Sm_ref = 0.0;
-
-                    for (int i = 1; i < N - 1; ++i) {
-
-                        const double u_l_face = 0.5 * (u_x[i - 1] + u_x[i]);
-                        const double u_r_face = 0.5 * (u_x[i] + u_x[i + 1]);
-
-                        // Upwind densities at faces
-                        const double rho_left_uw = (u_l_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
-                        const double rho_right_uw = (u_r_face >= 0.0) ? rho_x[i] : rho_x[i + 1];
-
-                        phi_ref = std::max(phi_ref, rho_left_uw * std::abs(u_l_face));
-                        phi_ref = std::max(phi_ref, rho_right_uw * std::abs(u_r_face));
-
-                        Sm_ref = std::max(Sm_ref, std::abs(Gamma_xv_wick[i] * dz));
-                    }
-
-                    const double cont_ref = std::max({ phi_ref, Sm_ref, 1e-30 });
-
-                    continuity_res_x = 0.0;
-
-                    for (int i = 1; i < N - 1; ++i) {
-
-                        const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
-                        const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
-
-                        const double rc_l = -avgInvbLU_L / 4.0 *
-                            (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]);    // [m/s]
-                        const double rc_r = -avgInvbLU_R / 4.0 *
-                            (p_padded_x[i - 1] - 3.0 * p_padded_x[i] + 3.0 * p_padded_x[i + 1] - p_padded_x[i + 2]);    // [m/s]
-
-                        const double u_l_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc_l;    // [m/s]
-                        const double u_r_face = 0.5 * (u_x[i] + u_x[i + 1]) + rhie_chow_on_off_x * rc_r;    // [m/s]
-
-                        // Upwind densities at faces
-                        const double rho_left_uw = (u_l_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
-                        const double rho_right_uw = (u_r_face >= 0.0) ? rho_x[i] : rho_x[i + 1];
-
-                        const double F_l = rho_left_uw * u_l_face;      // [kg/(m2s)]
-                        const double F_r = rho_right_uw * u_r_face;     // [kg/(m2s)]
-
-                        const double mass_imbalance = (F_r - F_l);  // [kg/(m2s)]
-
-                        const double mass_flux = - Gamma_xv_wick[i] * dz;           // [kg/(m2s)]
-
-                        continuity_res_x =
-                            std::max(continuity_res_x,
-                                std::abs(mass_flux - mass_imbalance) / cont_ref);
-                    }
-
-                    #pragma endregion
-
-                    piso_iter_x++;
-                }
-
-                // -------------------------------------------------------
-                // MOMENTUM RESIDUAL CALCULATION
-                // -------------------------------------------------------
-
-                #pragma region momentum_residual_calculation
-
-                double U_ref = 0.0;
-                double F_ref = 0.0;
-
-                for (int i = 0; i < N; ++i) {
-
-                    U_ref = std::max(U_ref, std::abs(u_x[i]));
-                }
-
-                for (int i = 0; i < N; ++i) {
-                    const double F_inertia = rho_x[i] * U_ref * U_ref;
-                    const double F_unsteady = rho_x[i] * U_ref * dz / dt;
-                    const double F_viscous = mu_x[i] * U_ref / dz;
-
-                    F_ref = std::max({ F_inertia, F_unsteady, F_viscous, 1e-30 });
-
-                }
-
-                momentum_res_x = 0.0;
-
-                for (int i = 1; i < N - 1; ++i) {
-
-                    const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
-                    const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
-
-                    const double rc_l = -avgInvbLU_L / 4.0 *
-                        (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]);    // [m/s]
-                    const double rc_r = -avgInvbLU_R / 4.0 *
-                        (p_padded_x[i - 1] - 3.0 * p_padded_x[i] + 3.0 * p_padded_x[i + 1] - p_padded_x[i + 2]);    // [m/s]
-
-                    const double D_l = 0.5 * (mu_x[i - 1] + mu_x[i]) / dz;
-                    const double D_r = 0.5 * (mu_x[i] + mu_x[i + 1]) / dz;
-
-                    const double u_l_face =
-                        0.5 * (u_x[i - 1] + u_x[i]) + rc_l * rhie_chow_on_off_x;
-                    const double u_r_face =
-                        0.5 * (u_x[i] + u_x[i + 1]) + rc_r * rhie_chow_on_off_x;
-
-                    // Upwind densities at faces
-                    const double rho_left_uw = (u_l_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
-                    const double rho_right_uw = (u_r_face >= 0.0) ? rho_x[i] : rho_x[i + 1];
-
-                    const double F_l = rho_left_uw * u_l_face;      // [kg/(m2s)]
-                    const double F_r = rho_right_uw * u_r_face;     // [kg/(m2s)]
-
-                    const double accum =
-                        rho_x[i] * dz / dt * (u_x[i] - u_x_old[i]);
-
-                    const double conv =
-                        F_r * u_r_face - F_l * u_l_face;
-
-                    const double diff =
-                        D_r * (u_x[i + 1] - u_x[i])
-                        - D_l * (u_x[i] - u_x[i - 1]);
-
-                    const double press =
-                        0.5 * (p_x[i + 1] - p_x[i - 1]);
-
-                    const double R =
-                        accum + conv - diff + press;
-
-                    momentum_res_x =
-                        std::max(momentum_res_x, std::abs(R) / F_ref);
-                }
-
-                #pragma endregion
-
-                // -------------------------------------------------------
-                // TEMPERATURE CALCULATION: gets T
-                // -------------------------------------------------------
-
+                // =========== TEMPERATURE CALCULATOR
                 #pragma region temperature_calculator
 
-                // Loop to assembly the linear system for the wick bulk temperature
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
@@ -1037,18 +766,18 @@ int main() {
                     Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_wick[i];
 
                     aXT[i] =
-                        - D_l
+                        -D_l
                         - std::max(C_l, 0.0);       // [W/(m2 K)]
                     cXT[i] =
-                        - D_r
+                        -D_r
                         - std::max(-C_r, 0.0);      // [W/(m2 K)]
                     bXT[i] =
-                        + std::max(C_r, 0.0)
+                        +std::max(C_r, 0.0)
                         + std::max(-C_l, 0.0)
                         + D_l + D_r
                         + rho_P * cp_P * dz / dt;   // [W/(m2 K)]
                     dXT[i] =
-                        + rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
+                        +rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
                         + Q_wx[i] * dz              // Positive if heat is added to the wick
                         + Q_mx[i] * dz              // Positive if heat is added to the wick
                         + Q_mass_wick[i] * dz;      // [W/m2]       
@@ -1070,51 +799,186 @@ int main() {
 
                 tdma_solver.solve(aXT, bXT, cXT, dXT, T_x_bulk);
 
-                // -------------------------------
-                // TEMPERATURE RESIDUAL
-                // -------------------------------
+                #pragma endregion
+
+                // =========== TEMPERATURE RESIDUAL CALCULATOR
+                #pragma region temperature_residual_calculator
                 temperature_res_x = 0.0;
 
                 for (int i = 0; i < N; ++i) {
 
                     temperature_res_x = std::max(
                         temperature_res_x,
-                        std::abs(T_x_bulk[i] - T_prev_x[i])
+                        std::abs(T_x_bulk[i] - T_prev_x[i]) / T_prev_x[i]
                     );
                 }
 
                 #pragma endregion
 
-                simple_iter_x++;  
+                // Continuity residual initialization to access inner loop
+                continuity_res_x = 1.0;
+
+                // Inner iterations reset
+                piso_iter_x = 0;
+
+				// Inner "SIMPLE" iterations
+                while ((piso_iter_x < tot_piso_iter_x) && (continuity_res_x > continuity_tol_x)) {
+
+                    // =========== CONTINUITY SATIFACTOR
+                    #pragma region continuity_satisfactor
+
+					// Loop to assemble the linear system for the pressure correction
+                    for (int i = 1; i < N - 1; i++) {
+
+					    // Physical properties
+                        const double rho_P = rho_x[i];
+                        const double rho_L = rho_x[i - 1];
+                        const double rho_R = rho_x[i + 1];
+
+                        const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
+                        const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
+
+                        const double rc_l = -avgInvbLU_L / 4.0 *
+                            (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]);    // [m/s]
+                        const double rc_r = -avgInvbLU_R / 4.0 *
+                            (p_padded_x[i - 1] - 3.0 * p_padded_x[i] + 3.0 * p_padded_x[i + 1] - p_padded_x[i + 2]);    // [m/s]
+
+                        const double u_l_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc_l;    // [m/s]
+                        const double u_r_face = 0.5 * (u_x[i] + u_x[i + 1]) + rhie_chow_on_off_x * rc_r;    // [m/s]
+
+                        const double rho_left_uw = (u_l_face >= 0.0) ? rho_L : rho_P;
+                        const double rho_right_uw = (u_r_face >= 0.0) ? rho_P : rho_R;
+
+                        const double F_l = rho_left_uw * u_l_face;          // [kg/(m2s)]
+                        const double F_r = rho_right_uw * u_r_face;         // [kg/(m2s)]
+
+                        const double mass_imbalance = (F_r - F_l);          // [kg/(m2s)]
+
+                        const double mass_flux = - Gamma_xv_wick[i] * dz;   // [kg/(m2s)]
+
+                        const double rho_l_cd = 0.5 * (rho_L + rho_P);      // [kg/m3]
+                        const double rho_r_cd = 0.5 * (rho_P + rho_R);      // [kg/m3]
+
+                        const double E_l = rho_l_cd * avgInvbLU_L / dz;     // [s/m]
+                        const double E_r = rho_r_cd * avgInvbLU_R / dz;     // [s/m]
+
+                        aXP[i] = -E_l;              // [s/m]
+                        cXP[i] = -E_r;              // [s/m]
+                        bXP[i] = E_l + E_r;         // [s/m]
+                        dXP[i] = 
+                            + mass_flux 
+                            - mass_imbalance;       // [kg/(m^2 s)]
+                    }
+
+                    // BCs for the correction of pressure: zero gradient at first node
+				    aXP[0] = 0.0;
+                    bXP[0] = 1.0; 
+                    cXP[0] = -1.0; 
+                    dXP[0] = 0.0;
+
+                    // BCs for the correction of pressure: zero at first node
+                    aXP[N - 1] = 0.0;
+                    bXP[N - 1] = 1.0; 
+				    cXP[N - 1] = 0.0;
+                    dXP[N - 1] = 0.0;
+
+                    tdma_solver.solve(aXP, bXP, cXP, dXP, p_prime_x);
+
+                    #pragma endregion
+
+                    // =========== PRESSURE CORRECTOR
+                    #pragma region pressure_corrector
+
+                    // Initialization maximum pressure variation
+                    p_error_x = 0.0;
+
+                    for (int i = 0; i < N; i++) {
+
+                        double p_prev_x = p_x[i];
+                        p_x[i] += p_prime_x[i];         // PIMPLE does not require an under-relaxation factor
+                        p_storage_x[i + 1] = p_x[i];
+
+                        p_error_x = std::max(p_error_x, std::abs(p_x[i] - p_prev_x));
+                    }
+
+                    // Enforcing boundary conditions
+                    p_x[0] = p_x[1];
+                    p_storage_x[0] = p_storage_x[1];
+
+                    p_x[N - 1] = p_outlet_x;
+                    p_storage_x[N + 1] = p_outlet_x;
+
+                    #pragma endregion
+
+                    // =========== VELOCITY CORRECTOR
+                    #pragma region velocity_corrector
+
+                    // Initialization maximum pressure variation
+                    u_error_x = 0.0;
+
+                    for (int i = 1; i < N - 1; i++) {
+
+                        double u_prev = u_x[i];
+                        u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
+
+                        u_error_x = std::max(u_error_x, std::abs(u_x[i] - u_prev));
+                    }
+
+                    #pragma endregion
+
+                    // =========== CONTINUITY RESIDUAL CALCULATOR
+                    #pragma region continuity_residual_calculator
+
+                    continuity_res_x = 0.0;
+
+                    for (int i = 1; i < N - 1; ++i) {
+
+                        continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
+                    }
+
+                    #pragma endregion
+
+                    piso_iter_x++;
+                }
+
+                // =========== MOMENTUM RESIDUAL CALCULATOR
+                #pragma region momentum_residual_calculator
+
+                momentum_res_x = 0.0;
+
+                for (int i = 1; i < N - 1; ++i) {
+                    momentum_res_x = std::max(momentum_res_x, std::abs(aXU[i] * u_x[i - 1] + bXU[i] * u_x[i] + cXU[i] * u_x[i + 1] - dXU[i]));
+                }
+
+                momentum_res_x /= N;
+
+                #pragma endregion
+
+                simple_iter_x++;
             }
-            
+                
             #pragma endregion
 
             // =======================================================================
-            //
             //                                [VAPOR]
-            //
             // =======================================================================
 
             #pragma region vapor
 
-            // Wick vapor coupling hypotheses
+            // Pressure coupling hypotheses
             p_v[N - 1] = p_outlet_v;
 
-            // Initializing convergence metrics
+            // Momentum and energy residual initialization to access outer loop
             momentum_res_v = 1.0;
             temperature_res_v = 1.0;
 
-            // Outer iterations variables reset
+            // Outer iterations reset
             simple_iter_v = 0;
 
-			// Outer iterations for the vapor momentum equations
-            while (simple_iter_v < tot_simple_iter_v && (momentum_res_v > momentum_tol_v || temperature_res_v > momentum_tol_v)) {
+            // Outer "PISO" iterations
+            while ((simple_iter_v < tot_simple_iter_v) && (momentum_res_v > momentum_tol_v || temperature_res_v > temperature_tol_v)) {
 
-				// -----------------------------------------------------------
-				// MOMENTUM PREDICTOR: gets u*
-				// ----------------------------------------------------------
-
+                // ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
                 for (int i = 1; i < N - 1; i++) {
@@ -1168,7 +1032,7 @@ int main() {
                         + F * dz;                           // [kg/(m2 s)]
                     dVU[i] = 
                         - 0.5 * (p_v[i + 1] - p_v[i - 1])
-                        + rho_P_old * u_v_old[i] * dz / dt;         // [kg/(m s2)]
+                        + rho_P_old * u_v_old[i] * dz / dt; // [kg/(m s2)]
                 }
 
                 /// Diffusion coefficients for the first and last node to define BCs
@@ -1201,10 +1065,7 @@ int main() {
 
                 #pragma endregion
 
-				// -------------------------------------------------------------
-                // TEMPERATURE SOLVER: gets T
-				// -------------------------------------------------------------
-
+                // ==========  TEMPERATURE CALCULATOR 
                 #pragma region temperature_calculator
 
                 for (int i = 1; i < N - 1; i++) {
@@ -1305,19 +1166,31 @@ int main() {
 
                 #pragma endregion
 
-                // Initializing convergence metrics
+                // =========== TEMPERATURE RESIDUAL CALCULATOR
+                #pragma region temperature_residual_calculator
+
+                temperature_res_v = 0.0;
+
+                for (int i = 0; i < N; ++i) {
+
+                    temperature_res_v = std::max(
+                        temperature_res_v,
+                        std::abs(T_v_bulk[i] - T_prev_v[i]) / T_prev_v[i]
+                    );
+                }
+
+                #pragma endregion
+
+                // Continuity residual initialization to access inner loop
                 continuity_res_v = 1.0;
 
-                // Inner iterations variables reset
+                // Inner iterations reset
                 piso_iter_v = 0;
 
 				// Inner iterations for the vapor continuity equation
-                while (piso_iter_v < tot_piso_iter_v && (continuity_res_v > continuity_tol_v || temperature_res_v > temperature_tol_v)) {
+                while ((piso_iter_v < tot_piso_iter_v) && (continuity_res_v > continuity_tol_v)) {
 
-                    // -------------------------------------------------------
-					// CONTINUITY SATISFACTOR: gets p'
-                    // -------------------------------------------------------
-
+                    // =========== CONTINUITY SATIFACTOR
                     #pragma region continuity_satisfactor
 
                     for (int i = 1; i < N - 1; ++i) {
@@ -1389,10 +1262,7 @@ int main() {
 
                     #pragma endregion
 
-                    // -------------------------------------------------------
-                    // PRESSURE CORRECTOR
-                    // -------------------------------------------------------
-
+                    // =========== PRESSURE CORRECTOR
                     #pragma region pressure_corrector
 
                     p_error_v = 0.0;
@@ -1400,12 +1270,13 @@ int main() {
                     for (int i = 0; i < N; i++) {
 
                         double p_prev = p_v[i];
-                        p_v[i] += p_prime_v[i];        // Note that PISO does not require an under-relaxation factor
+                        p_v[i] += p_prime_v[i];        // PISO does not require an under-relaxation factor
                         p_storage_v[i + 1] = p_v[i];
 
-                        p_error_v = std::max(p_error_v, std::fabs(p_v[i] - p_prev));
+                        p_error_v = std::max(p_error_v, std::abs(p_v[i] - p_prev));
                     }
 
+                    // Enforcing boundary conditions
                     p_v[0] = p_v[1];
                     p_storage_v[0] = p_storage_v[1];
 
@@ -1414,15 +1285,13 @@ int main() {
 
                     #pragma endregion
 
-                    // -------------------------------------------------------
-                    // VELOCITY CORRECTOR
-                    // -------------------------------------------------------
-
+                    // =========== VELOCITY CORRECTOR
                     #pragma region velocity_corrector
 
                     u_error_v = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
+
                         double u_prev = u_v[i];
 
                         sonic_velocity[i] = std::sqrt(vapor_sodium::gamma(T_v_bulk[i]) * Rv * T_v_bulk[i]);
@@ -1430,27 +1299,15 @@ int main() {
                         const double calc_velocity = u_v[i] -
                             (p_prime_v[i + 1] - p_prime_v[i - 1]) / (2.0 * bVU[i]);
 
-                        if (calc_velocity < sonic_velocity[i]) {
+                        if (calc_velocity < sonic_velocity[i]) u_v[i] = calc_velocity;
+                        else u_v[i] = sonic_velocity[i];
 
-                            u_v[i] = calc_velocity;
-
-                        }
-                        else {
-
-                            //std::cout << "Sonic limit reached, limiting velocity" << "\n";
-                            u_v[i] = sonic_velocity[i];
-
-                        }
-
-                        u_error_v = std::max(u_error_v, std::fabs(u_v[i] - u_prev));
+                        u_error_v = std::max(u_error_v, std::abs(u_v[i] - u_prev));
                     }
 
                     #pragma endregion
 
-                    // -------------------------------------------------------
-                    // DENSITY CORRECTOR
-                    // -------------------------------------------------------
-
+                    // =========== DENSITY CORRECTOR
                     #pragma region density_corrector
 
                     rho_error_v = 0.0;
@@ -1458,21 +1315,19 @@ int main() {
                     for (int i = 0; i < N; ++i) {
                         double rho_prev = rho_v[i];
                         rho_v[i] += p_prime_v[i] / (Rv * T_v_bulk[i]);
-                        rho_error_v = std::max(rho_error_v, std::fabs(rho_v[i] - rho_prev));
+                        rho_error_v = std::max(rho_error_v, std::abs(rho_v[i] - rho_prev));
                     }
 
                     #pragma endregion
 
-                    // -------------------------------------------------------
-                    // CONTINUITY RESIDUAL CALCULATION
-                    // -------------------------------------------------------
-
-                    #pragma region continuity_residual_calculation
+                    // =========== CONTINUITY RESIDUAL CALCULATOR
+                    #pragma region continuity_residual_calculator
 
                     continuity_res_v = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
-                        continuity_res_v = std::max(continuity_res_v, std::fabs(dVP[i]));
+
+                        continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
                     }
 
                     #pragma endregion
@@ -1480,30 +1335,24 @@ int main() {
                     piso_iter_v++;
                 }
 
-                // -------------------------------------------------------
-                // MOMENTUM RESIDUAL CALCULATION
-                // -------------------------------------------------------
-
-                #pragma region momentum_residual_calculation
+                // =========== MOMENTUM RESIDUAL CALCULATOR
+                #pragma region momentum_residual_calculator
 
                 momentum_res_v = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
-                    momentum_res_v = std::max(momentum_res_v, std::fabs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
+                    momentum_res_v = std::max(momentum_res_v, std::abs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
                 }
 
                 #pragma endregion
 
-                // -------------------------------------------------------
-                // TEMPERATURE RESIDUAL CALCULATION
-                // -------------------------------------------------------
-
-                #pragma region temperature_residual_calculation
+                // =========== TEMPERATURE RESIDUAL CALCULATOR
+                #pragma region temperature_residual_calculator
 
                 temperature_res_v = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
-                    temperature_res_v = std::max(temperature_res_v, std::fabs(T_v_bulk[i] - T_prev_v[i]));
+                    temperature_res_v = std::max(temperature_res_v, std::abs(T_v_bulk[i] - T_prev_v[i]));
                 }
 
                 #pragma endregion
@@ -1511,17 +1360,13 @@ int main() {
                 simple_iter_v++;
             }
 
-            #pragma endregion
-
             // Update density with new p,T
             eos_update(rho_v, p_v, T_v_bulk);
 
             #pragma endregion
 
             // =======================================================================
-            //
             //                               [PICARD]
-            //
             // =======================================================================
 
             #pragma region picard
@@ -1617,9 +1462,7 @@ int main() {
         }
 
         // =======================================================================
-        //
-        //                                [WALL]
-        //
+        //                               [WALL]
         // =======================================================================
 
         #pragma region wall
@@ -1662,9 +1505,7 @@ int main() {
         #pragma endregion
 
         // =======================================================================
-        //
-        //                             [5. OUTPUT]
-        //
+        //                               [OUTPUT]
         // =======================================================================
 
         #pragma region output
