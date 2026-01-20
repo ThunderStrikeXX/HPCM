@@ -283,7 +283,6 @@
   <ItemGroup>
     <ClCompile Include="HPCM.cpp" />
     <ClCompile Include="lib\adaptive_dt.cpp" />
-    <ClCompile Include="lib\io_utils.cpp" />
     <ClCompile Include="lib\tdma.cpp" />
   </ItemGroup>
   <ItemGroup>

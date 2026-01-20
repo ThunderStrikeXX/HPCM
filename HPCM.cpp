@@ -18,7 +18,6 @@
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
 #include "adaptive_dt.h"
-#include "io_utils.h"
 
 int main() {
 
@@ -349,7 +348,7 @@ int main() {
         new_case++;
     }
 
-    std::cout << "Running case " << case_chosen;
+    std::cout << "Running case " << case_chosen << "\n";
 
     std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
     mesh_output << std::setprecision(output_precision);
