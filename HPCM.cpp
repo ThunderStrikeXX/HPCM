@@ -341,7 +341,7 @@ int main() {
     // Create result folder
     int new_case = 0;
     while (true) {
-        std::string case_chosen = "case_" + std::to_string(new_case);
+        case_chosen = "case_" + std::to_string(new_case);
         if (!std::filesystem::exists(case_chosen)) {
             std::filesystem::create_directory(case_chosen);
             break;
@@ -508,9 +508,7 @@ int main() {
         for (pic = 0; pic < max_picard; pic++) {
 
             // =======================================================================
-            //
             //                             [INTERFACES]
-            //
             // =======================================================================
 
             #pragma region parabolic_profiles 
