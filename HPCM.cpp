@@ -89,7 +89,7 @@ int main() {
     double          dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	double          dt = dt_user;                   // Current time step [s]
     double          time_total = 0.0;               // Total simulation time [s]
-    const double    time_simulation = 100;          // Simulation total number [s]
+    const double    time_simulation = 2000;          // Simulation total number [s]
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
