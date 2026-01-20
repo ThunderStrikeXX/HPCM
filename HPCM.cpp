@@ -94,7 +94,6 @@ int main() {
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
 
-
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
 	const double pic_tolerance = 1e-3;   	        // Tolerance for Picard iterations [-]   
@@ -375,7 +374,7 @@ int main() {
         std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
         mesh_output << std::setprecision(output_precision);
 
-        for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
+        for (int i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
 
         mesh_output.flush();
         mesh_output.close();
@@ -595,7 +594,7 @@ int main() {
                 */
                 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) - sigma_c * Omega * p_v[i]) 
-                    / std::sqrt(2 * M_PI * Rv * T_x_v[i]);
+                    / std::sqrt(2 * M_PI * Rv * T_x_v[i]);                                          
 
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);
@@ -1826,7 +1825,7 @@ int main() {
             bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
             cTW[i] = -k_r / (rho * cp * dz * dz);
             dTW[i] =
-                +T_w_bulk_old[i] / dt
+                + T_w_bulk_old[i] / dt
                 + Q_ow[i] / (cp * rho)      // Positive if heat is added to the wall
                 + Q_xw[i] / (cp * rho);     // Positive if heat is added to the wall
         }
