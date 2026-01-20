@@ -17,18 +17,36 @@ def safe_loadtxt(filename, fill_value=-1e9):
     return np.loadtxt(StringIO(''.join(lines)))
 
 root = os.getcwd()
-cases = [d for d in os.listdir(root) if os.path.isdir(d) and "case" in d]
+cases = []
 
-if len(cases) == 0:
+# case_* nella cartella corrente
+for d in os.listdir(root):
+    full = os.path.join(root, d)
+    if os.path.isdir(full) and d.startswith("case_"):
+        cases.append(full)
+
+# case_* dentro sottocartelle cases_*
+for d in os.listdir(root):
+    parent = os.path.join(root, d)
+    if os.path.isdir(parent) and d.startswith("cases_"):
+        for sub in os.listdir(parent):
+            full = os.path.join(parent, sub)
+            if os.path.isdir(full) and sub.startswith("case_"):
+                cases.append(full)
+
+cases = sorted(cases)
+
+if not cases:
     print("No case folders found")
     sys.exit(1)
 
 print("Available cases:")
 for i, c in enumerate(cases):
-    print(i, c)
+    print(f"{i}: {os.path.relpath(c, root)}")
 
 idx = int(input("Select case index: "))
 case = cases[idx]
+
 
 # -------------------- Files --------------------
 x_file = os.path.join(case, "mesh.txt")
