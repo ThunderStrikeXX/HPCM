@@ -240,26 +240,6 @@ int main() {
     // Models
     const int rhie_chow_on_off_x = 1;             // 0: no wick RC correction, 1: wick with RC correction
     const int rhie_chow_on_off_v = 1;             // 0: no vapor RC correction, 1: vapor with RC correction
-    const int SST_model_turbulence_on_off = 0;    // 0: no vapor turbulence, 1: vapor with turbulence
-
-    // Turbulence constants for sodium vapor (SST model)
-    const double Pr_t = 0.01;                                   // Prandtl turbulent number for sodium vapor [-]
-    const double I = 0.05;                                      // Turbulence intensity [-]
-    const double L_t = 0.07 * L;                                // Turbulence length scale [m]
-    const double k0 = 1.5 * pow(I * u_inlet_v, 2);              // Initial turbulent kinetic energy [m^2/s^2]
-    const double omega0 = sqrt(k0) / (0.09 * L_t);              // Initial specific dissipation rate [1/s]
-    const double sigma_k = 0.85;                                // k-equation turbulent Prandtl number [-]
-    const double sigma_omega = 0.5;                             // ω-equation turbulent Prandtl number [-]
-    const double beta_star = 0.09;                              // β* constant for SST model [-]
-    const double beta = 0.075;                                  // β constant for turbulence model [-]
-    const double alpha = 5.0 / 9.0;                             // α blending coefficient for SST model [-]
-
-    // Turbulence fields for sodium vapor
-    std::vector<double> k_turb(N, k0);
-    std::vector<double> omega_turb(N, omega0);
-    std::vector<double> mu_t(N, 0.0);
-    std::vector<double> dudz(N, 0.0);                           // Velocity gradient du/dz [1/s]
-    std::vector<double> Pk(N, 0.0);                             // Turbulence production rate term [m2/s3]
 
     // Tridiagonal coefficients for the wick velocity predictor
     std::vector<double> aXU(N, 0.0);                                      
@@ -607,7 +587,6 @@ int main() {
                 const double k_x_v = liquid_sodium::k(T_x_v[i]);                        // Wick-vapor interface thermal conductivity [W/(m K)]  
                 const double k_v_x = vapor_sodium::k(T_x_v[i], p_v[i]);                 // Vapor-wick interface thermal conductivity [W/(m K)]
                 const double k_v_cond = vapor_sodium::k(T_v_bulk[i], p_v[i]);           // Vapor thermal conductivity [W/(m K)]
-                const double k_v_eff = k_v_cond + mu_t[i] * cp_v / Pr_t;                // Effective vapor thermal conductivity [W/(m K)]
                 const double mu_v = vapor_sodium::mu(T_v_bulk[i]);                      // Vapor dynamic viscosity [Pa*s]
                 const double Dh_v = 2.0 * r_v;                                          // Hydraulic diameter of the vapor core [m]
                 const double Re_v = rho_v[i] * std::fabs(u_v[i]) * Dh_v / mu_v;         // Reynolds number [-]
@@ -615,8 +594,6 @@ int main() {
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v_cond, Dh_v);   // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa]        
                 const double H_xmdPsat_dT = saturation_pressure[i] * std::log(10.0) * (7740.0 / (T_x_v_iter[i] * T_x_v_iter[i]));   // Derivative of the saturation pressure wrt T [Pa/K]   
-
-                const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);    // Useful factor in the coefficients calculation [s / m^2]
 
 				// Definition of enthalpies depending on the phase change direction
                 if (phi_x_v[i] > 0.0) {
@@ -1312,12 +1289,8 @@ int main() {
 
                     const double mu_P = vapor_sodium::mu(T_v_bulk[i]);
 
-                    const double keff_P = k_cond_P + SST_model_turbulence_on_off * (mu_t[i] * cp_P / Pr_t);
-                    const double keff_L = k_cond_L + SST_model_turbulence_on_off * (mu_t[i - 1] * cp_L / Pr_t);
-                    const double keff_R = k_cond_R + SST_model_turbulence_on_off * (mu_t[i + 1] * cp_R / Pr_t);
-
-                    const double D_l = 0.5 * (keff_P + keff_L) / dz;
-                    const double D_r = 0.5 * (keff_P + keff_R) / dz;
+                    const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
+                    const double D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
                     const double avgInvbVU_v = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);     // [m2s/kg]
                     const double avgInvbVU_R = 0.5 * (1.0 / bVU[i + 1] + 1.0 / bVU[i]);     // [m2s/kg]
@@ -1599,101 +1572,6 @@ int main() {
                 #pragma endregion
 
                 simple_iter_v++;
-            }
-
-            // =======================================================================
-            //
-            //                        [TURBULENCE MODELIZATION]
-            //
-            // =======================================================================
-
-            #pragma region turbulence_SST
-
-            // TODO: check discretization scheme.
-
-            /**
-              * @brief Models the effects of turbulence on thermal conductivity and dynamic viscosity
-              */
-            if (SST_model_turbulence_on_off == 1) {
-
-                const double sigma_k = 0.85;        // Diffusion coefficient for k [-]
-                const double sigma_omega = 0.5;     // Diffusion coefficient for ω [-]
-                const double beta_star = 0.09;      // Production limiter coefficient [-]
-                const double beta = 0.075;          // Dissipation coefficient for ω [-]
-                const double alpha = 5.0 / 9.0;     // Blending coefficient [-]
-
-                // Compute velocity gradient and turbulence production term
-                for (int i = 1; i < N - 1; i++) {
-                    dudz[i] = (u_v[i + 1] - u_v[i - 1]) / (2.0 * dz);
-                    Pk[i] = mu_t[i] * pow(dudz[i], 2.0);
-                }
-
-                /**
-                 * @brief Assemble coefficients for the k-equation (turbulent kinetic energy) in 1D.
-                 */
-                for (int i = 1; i < N - 1; i++) {
-
-                    double mu = vapor_sodium::mu(T_v_bulk[i]);
-                    double mu_eff = mu + mu_t[i];
-                    double Dw = mu_eff / (sigma_k * dz * dz);
-                    double De = mu_eff / (sigma_k * dz * dz);
-
-                    aK[i] = -Dw;
-                    cK[i] = -De;
-                    bK[i] = rho_v[i] / dt + Dw + De + beta_star * rho_v[i] * omega_turb[i];
-                    dK[i] = rho_v[i] / dt * k_turb[i] + Pk[i];
-                }
-
-                // k BCs, constant value at the inlet
-                bK[0] = 1.0; 
-                cK[0] = 0.0; 
-                dK[0] = k_turb[0];
-
-                // k BCs, constant value at the outlet
-                aK[N - 1] = 0.0; 
-                bK[N - 1] = 1.0; 
-                dK[N - 1] = k_turb[N - 1];
-
-                tdma_solver.solve(aK, bK, cK, dK, k_turb);
-
-                /**
-                 * @brief Assemble coefficients for the ω-equation (specific dissipation rate) in 1D.
-                 */
-                for (int i = 1; i < N - 1; i++) {
-
-                    double mu = vapor_sodium::mu(T_v_bulk[i]);
-                    double mu_eff = mu + mu_t[i];
-                    double Dw = mu_eff / (sigma_omega * dz * dz);
-                    double De = mu_eff / (sigma_omega * dz * dz);
-
-                    aW[i] = -Dw;
-                    cW[i] = -De;
-                    bW[i] = rho_v[i] / dt + Dw + De + beta * rho_v[i] * omega_turb[i];
-                    dW[i] = rho_v[i] / dt * omega_turb[i] + alpha * (omega_turb[i] / k_turb[i]) * Pk[i];
-                }
-
-                // w BCs, constant value at the inlet
-                bW[0] = 1.0;  
-                cW[0] = 0.0;
-                dW[0] = omega_turb[0];
-
-                // w BCs, constant value at the outlet
-                aW[N - 1] = 0.0; 
-                bW[N - 1] = 1.0; 
-                dW[N - 1] = omega_turb[N - 1];
-
-                tdma_solver.solve(aW, bW, cW, dW, omega_turb);
-
-                /**
-                  * @brief Update turbulent viscosity using k/ω and apply limiter.
-                  */
-                for (int i = 0; i < N; i++) {
-
-                    double mu = vapor_sodium::mu(T_v_bulk[i]);
-                    double denom = std::max(omega_turb[i], 1e-6);
-                    mu_t[i] = rho_v[i] * k_turb[i] / denom;
-                    mu_t[i] = std::min(mu_t[i], 1000.0 * mu); // Update with limiter
-                }
             }
 
             #pragma endregion
