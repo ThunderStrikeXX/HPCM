@@ -336,90 +336,43 @@ int main() {
     const int output_precision = 4;                 // Output precision
     const int sampling_frequency = 5000;            // Sampling frequency
 
-    // Select case to load or create a new one
-    std::string case_chosen = select_case();
-    if (case_chosen.empty()) {
+    std::string case_chosen = "case_0";
 
-        // Create result folder
-        int new_case = 0;
-        while (true) {
-            case_chosen = "case_" + std::to_string(new_case);
-            if (!std::filesystem::exists(case_chosen)) {
-                std::filesystem::create_directory(case_chosen);
-                break;
-            }
-            new_case++;
+    // Create result folder
+    int new_case = 0;
+    while (true) {
+        std::string case_chosen = "case_" + std::to_string(new_case);
+        if (!std::filesystem::exists(case_chosen)) {
+            std::filesystem::create_directory(case_chosen);
+            break;
         }
-
-        std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
-        mesh_output << std::setprecision(output_precision);
-
-        for (int i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
-
-        mesh_output.flush();
-        mesh_output.close();
-
-        // Old values
-        T_o_w_old = T_o_w;
-        T_w_bulk_old = T_w_bulk;
-        T_w_x_old = T_w_x;
-        T_x_bulk_old = T_x_bulk;
-        T_x_v_old = T_x_v;
-        T_v_bulk_old = T_v_bulk;
-
-        u_x_old = u_x;
-        p_x_old = p_x;
-
-        u_v_old = u_v;
-        p_v_old = p_v;
-        rho_v_old = rho_v;
-
-    } else {
-
-        // Load state variables
-        u_v = read_last_row(case_chosen + "/vapor_velocity.txt", N);
-        p_v = read_last_row(case_chosen + "/vapor_pressure.txt", N);
-        T_v_bulk = read_last_row(case_chosen + "/vapor_bulk_temperature.txt", N);
-        rho_v = read_last_row(case_chosen + "/rho_vapor.txt", N);
-
-        u_x = read_last_row(case_chosen + "/wick_velocity.txt", N);
-        p_x = read_last_row(case_chosen + "/wick_pressure.txt", N);
-        T_x_bulk = read_last_row(case_chosen + "/wick_bulk_temperature.txt", N);
-        rho_x = read_last_row(case_chosen + "/rho_wick.txt", N);
-
-        T_x_v = read_last_row(case_chosen + "/wick_vapor_interface_temperature.txt", N);
-        T_w_x = read_last_row(case_chosen + "/wall_wick_interface_temperature.txt", N);
-        T_o_w = read_last_row(case_chosen + "/outer_wall_temperature.txt", N);
-        T_w_bulk = read_last_row(case_chosen + "/wall_bulk_temperature.txt", N);
-
-        phi_x_v = read_last_row(case_chosen + "/wick_vapor_mass_source.txt", N);
-
-        Q_ow = read_last_row(case_chosen + "/outer_wall_heat_flux.txt", N);
-        Q_wx = read_last_row(case_chosen + "/wall_heat_source_flux.txt", N);
-        Q_xw = read_last_row(case_chosen + "/wick_heat_source_flux.txt", N);
-        Q_xm = read_last_row(case_chosen + "/vapor_heat_source_flux.txt", N);
-        Q_mx = read_last_row(case_chosen + "/vapor_heat_source_flux.txt", N);
-
-        Q_mass_vapor = read_last_row(case_chosen + "/vapor_heat_source_mass.txt", N);
-        Q_mass_wick = read_last_row(case_chosen + "/wick_heat_source_mass.txt", N);
-
-        time_total = read_last_value(case_chosen + "/time.txt");
-
-        // Old values
-        T_o_w_old = read_second_last_row(case_chosen + "/outer_wall_temperature.txt", N);
-        T_w_bulk_old = read_second_last_row(case_chosen + "/wall_bulk_temperature.txt", N);
-        T_w_x_old = read_second_last_row(case_chosen + "/wall_wick_interface_temperature.txt", N);
-        T_x_bulk_old = read_second_last_row(case_chosen + "/wick_bulk_temperature.txt", N);
-        T_x_v_old = read_second_last_row(case_chosen + "/wick_vapor_interface_temperature.txt", N);
-        T_v_bulk_old = read_second_last_row(case_chosen + "/vapor_bulk_temperature.txt", N);
-
-        u_x_old = read_second_last_row(case_chosen + "/wick_velocity.txt", N);
-        p_x_old = read_second_last_row(case_chosen + "/wick_pressure.txt", N);
-
-        u_v_old = read_second_last_row(case_chosen + "/vapor_velocity.txt", N);
-        p_v_old = read_second_last_row(case_chosen + "/vapor_pressure.txt", N);
-        rho_v_old = read_second_last_row(case_chosen + "/rho_vapor.txt", N);
+        new_case++;
     }
+
+    std::cout << "Running case " << case_chosen;
+
+    std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
+    mesh_output << std::setprecision(output_precision);
+
+    for (int i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
+
+    mesh_output.flush();
+    mesh_output.close();
+
+    // Old values
+    T_o_w_old = T_o_w;
+    T_w_bulk_old = T_w_bulk;
+    T_w_x_old = T_w_x;
+    T_x_bulk_old = T_x_bulk;
+    T_x_v_old = T_x_v;
+    T_v_bulk_old = T_v_bulk;
+
+    u_x_old = u_x;
+    p_x_old = p_x;
+
+    u_v_old = u_v;
+    p_v_old = p_v;
+    rho_v_old = rho_v;
 
     // Steam outputs
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
