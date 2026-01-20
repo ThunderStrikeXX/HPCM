@@ -51,7 +51,7 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 100;                                           // Number of axial nodes [-]
+    const int N = 20;                                           // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
@@ -93,6 +93,7 @@ int main() {
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
+    double          accelerator = 10;              // Adaptive timestep multiplier [-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
@@ -416,6 +417,14 @@ int main() {
     std::ofstream total_mass_source_wick_output(case_chosen + "/total_mass_source_wick.txt", std::ios::app);
     std::ofstream total_mass_source_vapor_output(case_chosen + "/total_mass_source_vapor.txt", std::ios::app);
 
+    std::ofstream momentum_res_x_output(case_chosen + "/momentum_res_x.txt", std::ios::app);
+    std::ofstream continuity_res_x_output(case_chosen + "/continuity_res_x.txt", std::ios::app);
+    std::ofstream temperature_res_x_output(case_chosen + "/temperature_res_x.txt", std::ios::app);
+
+    std::ofstream momentum_res_v_output(case_chosen + "/momentum_res_v.txt", std::ios::app);
+    std::ofstream continuity_res_v_output(case_chosen + "/continuity_res_v.txt", std::ios::app);
+    std::ofstream temperature_res_v_output(case_chosen + "/temperature_res_v.txt", std::ios::app);
+
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
     simulation_time_output << std::setprecision(output_precision);
@@ -457,6 +466,14 @@ int main() {
     total_mass_source_wick_output << std::setprecision(output_precision);
     total_mass_source_vapor_output << std::setprecision(output_precision);
 
+    momentum_res_x_output << std::setprecision(output_precision);
+    continuity_res_x_output << std::setprecision(output_precision);
+    temperature_res_x_output << std::setprecision(output_precision);
+
+    momentum_res_v_output << std::setprecision(output_precision);
+    continuity_res_v_output << std::setprecision(output_precision);
+    temperature_res_v_output << std::setprecision(output_precision);
+
     #pragma endregion
 
     // Print number of working threads
@@ -481,6 +498,7 @@ int main() {
         dt_code = std::min(std::min(dt_cand_w, dt_cand_x), std::min(dt_cand_x, dt_cand_v));
 		dt = std::min(dt_user, dt_code);    // Choosing the minimum between user and calculated timestep
 		dt *= std::pow(0.5, halves);        // Halving the timestep if Picard failed
+        dt *= accelerator;                  // Accelerator multiplier
 
 		// Iter = old (for Picard loops)
         T_o_w_iter = T_o_w_old;
@@ -1580,6 +1598,14 @@ int main() {
             total_mass_source_wick_output << total_mass_source_wick << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
 
+            momentum_res_x_output << momentum_res_x << " ";
+            continuity_res_x_output << continuity_res_x << " ";
+            temperature_res_x_output << temperature_res_x << " ";
+
+            momentum_res_v_output << momentum_res_v << " ";
+            continuity_res_v_output << continuity_res_v << " ";
+            temperature_res_v_output << temperature_res_v << " ";
+
             v_velocity_output << "\n";
             v_pressure_output << "\n";
             v_bulk_temperature_output << "\n";
@@ -1649,6 +1675,14 @@ int main() {
 
             total_mass_source_wick_output.flush();
             total_mass_source_vapor_output.flush();
+
+            momentum_res_x_output.flush();
+            continuity_res_x_output.flush();
+            temperature_res_x_output.flush();
+
+            momentum_res_v_output.flush();
+            continuity_res_v_output.flush();
+            temperature_res_v_output.flush();
         }
 
         #pragma endregion
@@ -1693,6 +1727,14 @@ int main() {
 
     total_mass_source_wick_output.close();
     total_mass_source_vapor_output.close();
+
+    momentum_res_x_output.close();
+    continuity_res_x_output.close();
+    temperature_res_x_output.close();
+
+    momentum_res_v_output.close();
+    continuity_res_v_output.close();
+    temperature_res_v_output.close();
 
     double end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
