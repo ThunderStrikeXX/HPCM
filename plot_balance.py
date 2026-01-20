@@ -35,6 +35,8 @@ targets = [
     "total_heat_source_wall.txt",
     "total_heat_source_wick.txt",
     "total_heat_source_vapor.txt",
+    "total_mass_source_wick.txt",
+    "total_mass_source_vapor.txt",
 ]
 
 y_files = [os.path.join(case, f) for f in targets]
@@ -56,9 +58,17 @@ names = [
     "Total wall heat source",
     "Total wick heat source",
     "Total vapor heat source",
+    "Total wick mass source",
+    "Total vapor mass source",
 ]
 
-units = ["[W]", "[W]", "[W]"]
+units = [
+    "[W/m3]",
+    "[W/m3]",
+    "[W/m3]",
+    "[kg/m3s]",
+    "[kg/m3s]",
+]
 
 # -------------------- Utils --------------------
 def robust_ylim(y):
@@ -83,7 +93,7 @@ button_height = 0.08
 
 panel_left = 0.78
 panel_top = 0.80
-row_gap = 0.12
+row_gap = 0.10
 
 for i, name in enumerate(names):
     y_pos = panel_top - i * row_gap

@@ -481,6 +481,9 @@ int main() {
     std::ofstream total_heat_source_wick_output(case_chosen + "/total_heat_source_wick.txt", std::ios::app);
     std::ofstream total_heat_source_vapor_output(case_chosen + "/total_heat_source_vapor.txt", std::ios::app);
 
+    std::ofstream total_mass_source_wick_output(case_chosen + "total_mass_source_wick.txt", std::ios::app);
+    std::ofstream total_mass_source_vapor_output(case_chosen + "total_mass_source_vapor.txt", std::ios::app);
+
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
     simulation_time_output << std::setprecision(output_precision);
@@ -518,6 +521,9 @@ int main() {
     total_heat_source_wall_output << std::setprecision(output_precision);
     total_heat_source_wick_output << std::setprecision(output_precision);
     total_heat_source_vapor_output << std::setprecision(output_precision);
+
+    total_mass_source_wick_output << std::setprecision(output_precision);
+    total_mass_source_vapor_output << std::setprecision(output_precision);
 
     #pragma endregion
 
@@ -582,11 +588,11 @@ int main() {
                 q_ow[i] = Q_ow[i] * (r_o * r_o - r_i * r_i) / (2 * r_o);  // Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
 
                 // Mass flux from the wick to the vapor [kg/(m2 s)]
-                                /*
+                /*
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
                     sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                     (std::sqrt(2 * M_PI * Rv));
-                                    */
+                */
                 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) - sigma_c * Omega * p_v[i]) 
                     / std::sqrt(2 * M_PI * Rv * T_x_v[i]);
@@ -1450,7 +1456,7 @@ int main() {
                             ;                                   /// [s/m]
 
                         bVP[i] =
-                            +E_l + E_r
+                            + E_l + E_r
                             + std::max(C_r, 0.0)
                             + std::max(-C_l, 0.0)
                             + psi_i * dz / dt;                  /// [s/m]
@@ -1899,16 +1905,25 @@ int main() {
             double total_heat_source_wick = 0.0;
             double total_heat_source_vapor = 0.0;
 
+            double total_mass_source_wick = 0.0;
+            double total_mass_source_vapor = 0.0;
+
             for (int i = 1; i < N - 1; ++i) {
 
                 total_heat_source_wall += Q_tot_w[i];
                 total_heat_source_wick += Q_tot_x[i];
                 total_heat_source_vapor += Q_tot_v[i];
+
+                total_mass_source_wick += Gamma_xv_wick[i];
+                total_mass_source_vapor += Gamma_xv_vapor[i];
             }
 
             total_heat_source_wall_output << total_heat_source_wall << " ";
             total_heat_source_wick_output << total_heat_source_wick << " ";
             total_heat_source_vapor_output << total_heat_source_vapor << " ";
+
+            total_mass_source_wick_output << total_mass_source_wick << " ";
+            total_mass_source_vapor_output << total_mass_source_vapor << " ";
 
             v_velocity_output << "\n";
             v_pressure_output << "\n";
@@ -1976,6 +1991,9 @@ int main() {
             total_heat_source_wall_output.flush();
             total_heat_source_wick_output.flush();
             total_heat_source_vapor_output.flush();
+
+            total_mass_source_wick_output.flush();
+            total_mass_source_vapor_output.flush();
         }
 
         #pragma endregion
@@ -2017,6 +2035,9 @@ int main() {
     total_heat_source_wall_output.close();
     total_heat_source_wick_output.close();
     total_heat_source_vapor_output.close();
+
+    total_mass_source_wick_output.close();
+    total_mass_source_vapor_output.close();
 
     double end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
