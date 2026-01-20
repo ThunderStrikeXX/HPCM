@@ -582,11 +582,11 @@ int main() {
                 q_ow[i] = Q_ow[i] * (r_o * r_o - r_i * r_i) / (2 * r_o);  // Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
 
                 // Mass flux from the wick to the vapor [kg/(m2 s)]
-                                /*
+                /*
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
                     sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                     (std::sqrt(2 * M_PI * Rv));
-                                    */
+                */
                 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) - sigma_c * Omega * p_v[i]) 
                     / std::sqrt(2 * M_PI * Rv * T_x_v[i]);
@@ -1450,7 +1450,7 @@ int main() {
                             ;                                   /// [s/m]
 
                         bVP[i] =
-                            +E_l + E_r
+                            + E_l + E_r
                             + std::max(C_r, 0.0)
                             + std::max(-C_l, 0.0)
                             + psi_i * dz / dt;                  /// [s/m]
