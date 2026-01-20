@@ -481,8 +481,8 @@ int main() {
     std::ofstream total_heat_source_wick_output(case_chosen + "/total_heat_source_wick.txt", std::ios::app);
     std::ofstream total_heat_source_vapor_output(case_chosen + "/total_heat_source_vapor.txt", std::ios::app);
 
-    std::ofstream total_mass_source_wick_output(case_chosen + "total_mass_source_wick.txt", std::ios::app);
-    std::ofstream total_mass_source_vapor_output(case_chosen + "total_mass_source_vapor.txt", std::ios::app);
+    std::ofstream total_mass_source_wick_output(case_chosen + "/total_mass_source_wick.txt", std::ios::app);
+    std::ofstream total_mass_source_vapor_output(case_chosen + "/total_mass_source_vapor.txt", std::ios::app);
 
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
