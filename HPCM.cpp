@@ -51,7 +51,7 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 20;                                          // Number of axial nodes [-]
+    const int N = 100;                                           // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
