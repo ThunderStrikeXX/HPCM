@@ -93,7 +93,7 @@ int main() {
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
-    double          accelerator = 10;              // Adaptive timestep multiplier [-]
+    double          accelerator = 1;              // Adaptive timestep multiplier [-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
@@ -334,8 +334,8 @@ int main() {
     std::vector<double> mesh_center(N, 0.0);
     for (int i = 0; i < N; ++i) mesh_center[i] = (i + 0.5) * dz;
 
-    const int output_precision = 4;                 // Output precision
-    const int sampling_frequency = 5000;            // Sampling frequency
+    const int output_precision = 6;                             // Output precision
+    const int sampling_frequency = 10000 / accelerator;         // Sampling frequency
 
     std::string case_chosen = "case_0";
 
