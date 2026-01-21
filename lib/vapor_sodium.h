@@ -222,7 +222,7 @@ namespace vapor_sodium {
         double Re,
         double Pr
     ) {
-        if (Re <= 0.0 || Pr <= 0.0)
+        if (Re < 0.0 || Pr < 0.0)
             throw std::invalid_argument("Re or Pr <= 0 in Nusselt");
 
         // -----------------------------

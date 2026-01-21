@@ -93,7 +93,7 @@ int main() {
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
-    double          accelerator = 0.2;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    double          accelerator = 0.1;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
@@ -515,6 +515,15 @@ int main() {
     momentum_res_v_output << std::setprecision(output_precision);
     continuity_res_v_output << std::setprecision(output_precision);
     temperature_res_v_output << std::setprecision(output_precision);
+
+    std::vector<double> a_Q_mass_vapor(N, 0.0);
+    std::vector<double> b_Q_mass_vapor(N, 0.0);
+
+    std::vector<double> a_Q_mass_vapor_old;
+    std::vector<double> b_Q_mass_vapor_old;
+
+    a_Q_mass_vapor_old = a_Q_mass_vapor;
+    b_Q_mass_vapor_old = b_Q_mass_vapor;
 
     #pragma endregion
 
@@ -1083,15 +1092,27 @@ int main() {
                         + std::max(C_r, 0.0)
                         + std::max(-C_l, 0.0)
                         + D_l + D_r
-                        + rho_v[i] * cp_v[i] * dz / dt;     /// [W/(m2 K)]
+                        + rho_v[i] * cp_v[i] * dz / dt;      /// [W/(m2 K)]
+                        // - a_Q_mass_vapor[i] * dz;
 
                     dVT[i] =
                         + rho_v_old[i] * cp_P_old * dz / dt * T_v_bulk_old[i]
                         + dp_dt
                         + dpdz_up
                         + viscous_dissipation * dz
-                        + Q_xm[i] * dz                      // Positive if heat from wick to vapor
-                        + Q_mass_vapor[i] * dz;             // [W/m2]
+                        + Q_xm[i] * dz;                     // Positive if heat from wick to vapor
+                        // + b_Q_mass_vapor[i] * dz
+                        // + Q_mass_vapor[i] * dz          // [W/m2]
+
+                    if (time_total < 1.0) {
+
+                        dVT[i] += Q_mass_vapor[i] * dz;           // Approximated evaporation mass flux [kg/(m2s)]
+                    }
+                    else {
+
+                        bVT[i] += -a_Q_mass_vapor[i] * dz;
+                        dVT[i] += b_Q_mass_vapor[i] * dz;
+                    }
                 }
 
                 // Temperature BCs: zero gradient on the first node
@@ -1411,14 +1432,23 @@ int main() {
                                 sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                 (std::sqrt(2 * M_PI * Rv));                             // Real evaporation mass flux [kg/(m2s)]
 
-                /*
 
-                phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
-                    sigma_c * Omega * p_v[i]) /
-                    std::sqrt(2 * M_PI * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
+                if (time_total < 1.0) {
 
-                                    */
+                    phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
+                        sigma_c * Omega * p_v[i]) /
+                        std::sqrt(2 * M_PI * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
+                }
+                else {
 
+                    const double A_Q_mass_vapor = sigma_e * saturation_pressure[i] / std::sqrt(T_x_v[i]);
+                    const double B_Q_mass_vapor = sigma_c * Omega * p_v[i];
+                    const double C_Q_mass_vapor = std::sqrt(2 * M_PI * Rv);
+
+                    a_Q_mass_vapor[i] = h_xv_v * (2.0 * eps_s / r_v) * B_Q_mass_vapor / (2 * C_Q_mass_vapor) * std::pow(T_v_bulk[i], -3.0 / 2.0);
+                    b_Q_mass_vapor[i] = h_xv_v * (2.0 * eps_s / r_v) * phi_x_v[i] - a_Q_mass_vapor[i] * T_v_bulk[i];
+                }
+               
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;     // Volumetric mass source [kg/m3s] to vapor
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
                     / (r_i * r_i - r_v * r_v);                          // Volumetric mass source [kg/m3s] to wick
@@ -1508,7 +1538,7 @@ int main() {
             bTW[i] = 1 / dt + (k_l + k_r) / (rho * cp * dz * dz);
             cTW[i] = -k_r / (rho * cp * dz * dz);
             dTW[i] =
-                +T_w_bulk_old[i] / dt
+                + T_w_bulk_old[i] / dt
                 + Q_ow[i] / (cp * rho)      // Positive if heat is added to the wall
                 + Q_xw[i] / (cp * rho);     // Positive if heat is added to the wall
         }
@@ -1574,6 +1604,9 @@ int main() {
             p_outlet_x_old = p_outlet_x;
             p_outlet_v_old = p_outlet_v;
 
+            a_Q_mass_vapor_old = a_Q_mass_vapor;
+            b_Q_mass_vapor_old = b_Q_mass_vapor;
+
             // Update total time elapsed
             time_total += dt;
 
@@ -1621,6 +1654,9 @@ int main() {
 
             p_outlet_x = p_outlet_x_old;
             p_outlet_v = p_outlet_v_old;
+
+            a_Q_mass_vapor = a_Q_mass_vapor_old;
+            b_Q_mass_vapor = b_Q_mass_vapor_old;
 
             halves += 1;        // Reduce time step if max Picard iterations reached
 			n -= 1;             // Repeat current time step
