@@ -203,25 +203,72 @@ namespace vapor_sodium {
     }
 
     /**
-    * @brief Friction factor [-] (Prandtl–von Kármán smooth pipe law) as a function of Reynolds number.
-    * Retrieves an error if Re < 0.*/
+     * @brief Darcy friction factor (Petukhov correlation, smooth pipe)
+     *        Valid for 3e3 < Re < 5e6
+     */
+    inline double friction_factor(double Re) {
+        if (Re <= 0.0)
+            throw std::invalid_argument("Re <= 0 in friction_factor");
 
-    inline double f(double Re) {
-
-        if (Re <= 0.0) throw std::invalid_argument("Error: Re < 0");
-
-        const double t = 0.79 * std::log(Re) - 1.64;
-        return 1.0 / (t * t);
-    }    
+        return std::pow(0.79 * std::log(Re) - 1.64, -2.0);
+    }
 
     /**
-     * @brief Convective heat transfer coefficient [W/m^2/K]
-     *        with smooth blending between laminar and Gnielinski turbulent regimes.
-     *
-     * Regimes:
-     *  - Re <= Re1      : purely laminar
-     *  - Re >= Re2      : purely Gnielinski
-     *  - Re1 < Re < Re2: linear blending
+     * @brief Nusselt number for internal flow
+     *        Laminar + Petukhov–Gnielinski turbulent
+     *        Smooth logarithmic blending
+     */
+    inline double Nusselt(
+        double Re,
+        double Pr
+    ) {
+        if (Re <= 0.0 || Pr <= 0.0)
+            throw std::invalid_argument("Re or Pr <= 0 in Nusselt");
+
+        // -----------------------------
+        // Laminar fully developed
+        // -----------------------------
+        constexpr double Nu_lam = 4.36;
+
+        // -----------------------------
+        // Turbulent (Petukhov–Gnielinski)
+        // -----------------------------
+        auto Nu_turb = [&](double Re_loc) {
+            const double f = friction_factor(Re_loc);
+            const double num = (f / 8.0) * (Re_loc - 1000.0) * Pr;
+            const double den = 1.0 + 12.7 * std::sqrt(f / 8.0)
+                * (std::pow(Pr, 2.0 / 3.0) - 1.0);
+            return num / den;
+            };
+
+        // -----------------------------
+        // Transition limits
+        // -----------------------------
+        constexpr double Re_lam = 2300.0;
+        constexpr double Re_turb = 4000.0;
+
+        // -----------------------------
+        // Regime selection
+        // -----------------------------
+        if (Re <= Re_lam)
+            return Nu_lam;
+
+        if (Re >= Re_turb)
+            return Nu_turb(Re);
+
+        // -----------------------------
+        // Logarithmic blending
+        // -----------------------------
+        const double chi =
+            (std::log(Re) - std::log(Re_lam)) /
+            (std::log(Re_turb) - std::log(Re_lam));
+
+        return (1.0 - chi) * Nu_lam + chi * Nu_turb(Re);
+    }
+
+    /**
+     * @brief Convective heat transfer coefficient [W/m2/K]
+     *        Sodium vapor – internal flow in heat pipe
      */
     inline double h_conv(
         double Re,
@@ -229,55 +276,10 @@ namespace vapor_sodium {
         double k,
         double Dh
     ) {
-        if (Re < 0.0 || Pr < 0.0)
-            throw std::invalid_argument("Error: Re or Pr <= 0");
+        if (Dh <= 0.0 || k <= 0.0)
+            throw std::invalid_argument("Dh or k <= 0 in h_conv");
 
-        // -----------------------------
-        // Parameters
-        // -----------------------------
-        constexpr double Nu_lam = 4.36;
-        constexpr double Re1 = 2000.0;
-        constexpr double Re2 = 3000.0;
-
-        // -----------------------------
-        // Laminar
-        // -----------------------------
-        const double Nu_laminar = Nu_lam;
-
-        // -----------------------------
-        // Turbulent (Gnielinski standard)
-        // -----------------------------
-        auto Nu_gnielinski = [&](double Re_loc) {
-            const double f = vapor_sodium::f(Re_loc);
-            const double fp8 = f / 8.0;
-
-            const double num = fp8 * (Re_loc - 1000.0) * Pr;
-            const double den = 1.0 + 12.7 * std::sqrt(fp8)
-                * (std::pow(Pr, 2.0 / 3.0) - 1.0);
-
-            return num / den;
-            };
-
-        // -----------------------------
-        // Regime selection
-        // -----------------------------
-        double Nu;
-
-        if (Re <= Re1) {
-            Nu = Nu_laminar;
-        }
-        else if (Re >= Re2) {
-            Nu = Nu_gnielinski(Re);
-        }
-        else {
-            const double chi = (Re - Re1) / (Re2 - Re1);  // 0 → 1
-            Nu = (1.0 - chi) * Nu_laminar + chi * Nu_gnielinski(Re);
-        }
-
-        // -----------------------------
-        // Convective coefficient
-        // -----------------------------
-        return Nu * k / Dh;
+        return Nusselt(Re, Pr) * k / Dh;
     }
 
     inline double surf_ten(double T) {

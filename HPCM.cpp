@@ -89,7 +89,7 @@ int main() {
     double          dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	double          dt = dt_user;                   // Current time step [s]
     double          time_total = 0.0;               // Total simulation time [s]
-    const double    time_simulation = 2000;          // Simulation total number [s]
+    const double    time_simulation = 2000;         // Simulation total number [s]
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
@@ -357,7 +357,7 @@ int main() {
     for (int i = 0; i < N; ++i) mesh_center[i] = (i + 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision
-    const int sampling_frequency = 10000 / accelerator;         // Sampling frequency
+    const int sampling_frequency = 10 / accelerator;         // Sampling frequency
 
     std::string case_chosen = "case_0";
 
@@ -1406,15 +1406,18 @@ int main() {
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
 
-                /*
+
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
                                 sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                 (std::sqrt(2 * M_PI * Rv));                             // Real evaporation mass flux [kg/(m2s)]
-                */
+
+                /*
 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
                     sigma_c * Omega * p_v[i]) /
                     std::sqrt(2 * M_PI * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
+
+                                    */
 
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;     // Volumetric mass source [kg/m3s] to vapor
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
