@@ -42,7 +42,9 @@ def time_to_index(time, t):
 # ============================================================
 # Case selection
 # ============================================================
-root = os.getcwd()
+script_dir = os.path.dirname(os.path.abspath(__file__))
+root = script_dir
+
 cases = []
 
 # case_* nella cartella corrente

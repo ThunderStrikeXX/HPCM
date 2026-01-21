@@ -93,7 +93,7 @@ int main() {
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
-    double          accelerator = 0.2;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    double          accelerator = 0.2;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]

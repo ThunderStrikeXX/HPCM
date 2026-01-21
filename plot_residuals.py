@@ -17,14 +17,13 @@ def safe_loadtxt(filename, fill_value=-1e30):
 # -------------------- Case discovery --------------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root = script_dir
-
 cases = []
 
 for dirpath, dirnames, filenames in os.walk(root):
     base = os.path.basename(dirpath)
     parent = os.path.basename(os.path.dirname(dirpath))
 
-    if "case" in base and (parent.startswith("cases") or base.startswith("case")):
+    if base.startswith("case") or (parent.startswith("cases") and "case" in base):
         cases.append(dirpath)
 
 cases = sorted(cases)
@@ -44,11 +43,12 @@ case = cases[idx]
 time_file = os.path.join(case, "time.txt")
 
 targets = [
-    "total_heat_source_wall.txt",
-    "total_heat_source_wick.txt",
-    "total_heat_source_vapor.txt",
-    "total_mass_source_wick.txt",
-    "total_mass_source_vapor.txt",
+    "continuity_res_x.txt",
+    "continuity_res_v.txt",
+    "momentum_res_x.txt",
+    "momentum_res_v.txt",
+    "temperature_res_x.txt",
+    "temperature_res_v.txt",
 ]
 
 y_files = [os.path.join(case, f) for f in targets]
@@ -67,39 +67,24 @@ time = safe_loadtxt(time_file)
 Y = [safe_loadtxt(f) for f in y_files]
 
 names = [
-    "Total wall heat source",
-    "Total wick heat source",
-    "Total vapor heat source",
-    "Total wick mass source",
-    "Total vapor mass source",
+    "Continuity\nresidual (wick)",
+    "Continuity\nresidual (vapor)",
+    "Momentum\nresidual (wick)",
+    "Momentum\nresidual (vapor)",
+    "Temperature\nresidual (wick)",
+    "Temperature\nresidual (vapor)",
 ]
 
-units = [
-    "[W/m3]",
-    "[W/m3]",
-    "[W/m3]",
-    "[kg/m3s]",
-    "[kg/m3s]",
-]
+
+units = ["[-]"] * len(names)
 
 # -------------------- Utils --------------------
 def robust_ylim(y):
-    y = np.asarray(y)
-    finite = y[np.isfinite(y)]
-
-    if finite.size == 0:
-        return -1.0, 1.0
-
-    lo = finite.min()
-    hi = finite.max()
-
+    lo, hi = np.percentile(y, [1, 99])
     if lo == hi:
-        delta = abs(lo) * 0.1 if lo != 0 else 1.0
-        return lo - delta, hi + delta
-
-    margin = 0.05 * (hi - lo)
+        lo, hi = np.min(y), np.max(y)
+    margin = 0.1 * (hi - lo) if hi > lo else 1.0
     return lo - margin, hi + margin
-
 
 # -------------------- Figure --------------------
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -131,10 +116,18 @@ ax.set_ylim(*robust_ylim(Y[current_idx]))
 
 # -------------------- Drawing --------------------
 def draw():
-    y = Y[current_idx]
-    line.set_data(time, y)
+    y = np.asarray(Y[current_idx])
+    t = np.asarray(time)
+
+    n = min(len(t), len(y))
+    t = t[:n]
+    y = y[:n]
+
+    line.set_data(t, y)
+    ax.set_xlim(t.min(), t.max())
     ax.set_ylim(*robust_ylim(y))
     fig.canvas.draw_idle()
+
 
 # -------------------- Variable change --------------------
 def change_variable(idx):
