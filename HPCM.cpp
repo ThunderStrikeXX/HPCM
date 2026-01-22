@@ -51,7 +51,7 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 20;                                           // Number of axial nodes [-]
+    const int N = 50;                                           // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
@@ -93,7 +93,7 @@ int main() {
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
     int             n = 0;                          // Iteration number [-]
-    double          accelerator = 0.1;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    double          accelerator = 1;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
@@ -1099,8 +1099,8 @@ int main() {
                         + dp_dt
                         + dpdz_up
                         + viscous_dissipation * dz
-                        + Q_xm[i] * dz;                     // Positive if heat from wick to vapor
-                        + Q_mass_vapor[i] * dz          // [W/m2]
+                        + Q_xm[i] * dz                     // Positive if heat from wick to vapor
+                        + Q_mass_vapor[i] * dz;          // [W/m2]
                 }
 
                 // Temperature BCs: zero gradient on the first node

@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.widgets import Button, Slider
+from matplotlib.widgets import Button, Slider, TextBox
 from io import StringIO
 import textwrap
 
@@ -186,6 +186,21 @@ for i in range(n_cases):
                     label=case_labels[i])
     lines.append(ln)
 
+IDX_VAPOR_VEL = names.index("Vapor velocity")
+IDX_SONIC    = names.index("Sonic speed")
+
+(sonic_line,) = ax.plot(
+    [], [],
+    color="orange",
+    linestyle="--",
+    linewidth=1.0,
+    alpha=1.0,
+    zorder=10,
+    label="Sonic velocity"
+)
+sonic_line.set_visible(False)
+ax.legend()
+
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")
 ax.legend()
@@ -193,6 +208,10 @@ ax.legend()
 # Slider
 ax_slider = plt.axes([0.08, 0.10, 0.50, 0.03])
 slider = Slider(ax_slider, "Time [s]", TIME.min(), TIME.max(), valinit=TIME[0])
+
+# Timebox
+ax_timebox = plt.axes([0.70, 0.09, 0.15, 0.05])
+time_box = TextBox(ax_timebox, "Set t [s] ", initial=f"{TIME[0]:.6g}")
 
 # ============================================================
 # Variable buttons
@@ -226,6 +245,7 @@ for i, name in enumerate(names):
 current_var = 0
 current_frame = [0]
 running = [False]
+updating = [False]
 
 ax.set_title(f"{names[current_var]} {units[current_var]}")
 xmin = min(x.min() for x in X)
@@ -237,6 +257,7 @@ ax.set_ylim(*robust_ylim(Y[current_var]))
 # Drawing
 # ============================================================
 def draw_frame(i, update_slider=True):
+
     for c in range(n_cases):
         y = Y[current_var][c]
         if y.ndim > 1:
@@ -245,13 +266,32 @@ def draw_frame(i, update_slider=True):
         else:
             lines[c].set_data(X[c], y)
 
+    if current_var == IDX_VAPOR_VEL:
+        yson = Y[IDX_SONIC]
+        # Gestione dati sonic
+        if isinstance(yson, list):
+             yson_data = yson[0] 
+        else:
+             yson_data = yson
+
+        # Se yson ha dimensione temporale
+        if hasattr(yson_data, 'ndim') and yson_data.ndim > 1:
+            ii = min(i, yson_data.shape[0] - 1)
+            sonic_line.set_data(X[0], yson_data[ii, :])
+        else:
+            # Caso stazionario o array semplice
+            sonic_line.set_data(X[0], yson_data)
+
+        sonic_line.set_visible(True)
+    else:
+        sonic_line.set_visible(False)
+
     if update_slider:
         slider.disconnect(slider_cid)
         slider.set_val(TIME[min(i, len(TIME) - 1)])
         connect_slider()
 
-    return lines
-
+    return lines + [sonic_line]
 
 def update_auto(i):
     current_frame[0] = i
@@ -259,9 +299,31 @@ def update_auto(i):
     return lines
 
 def slider_update(val):
+    if updating[0]:
+        return
+    updating[0] = True
     i = time_to_index(TIME, val)
     current_frame[0] = i
     draw_frame(i, update_slider=False)
+    time_box.set_val(f"{val:.6g}")
+    updating[0] = False
+    fig.canvas.draw_idle()
+
+def submit_time(text):
+    if updating[0]:
+        return
+    try:
+        t = float(text)
+    except ValueError:
+        return
+
+    t = max(TIME.min(), min(t, TIME.max()))
+    updating[0] = True
+    i = time_to_index(TIME, t)
+    current_frame[0] = i
+    draw_frame(i, update_slider=False)
+    slider.set_val(t)
+    updating[0] = False
     fig.canvas.draw_idle()
 
 def connect_slider():
@@ -270,6 +332,8 @@ def connect_slider():
 
 connect_slider()
 
+time_box.on_submit(submit_time)
+
 # ============================================================
 # Variable change
 # ============================================================
@@ -277,7 +341,21 @@ def change_variable(idx):
     global current_var
     current_var = idx
     ax.set_title(f"{names[idx]} {units[idx]}")
-    ax.set_ylim(*robust_ylim(Y[idx]))
+
+    if idx == IDX_VAPOR_VEL:
+
+        combined_data = Y[IDX_VAPOR_VEL] + Y[IDX_SONIC]
+        ax.set_ylim(*robust_ylim(combined_data))
+
+        sonic_line.set_visible(True)
+        ax.legend(handles=lines + [sonic_line], loc='best')
+        
+    else:
+        ax.set_ylim(*robust_ylim(Y[idx]))
+        
+        sonic_line.set_visible(False)
+        ax.legend(handles=lines, loc='best')
+
     current_frame[0] = 0
     draw_frame(0)
 
@@ -309,6 +387,7 @@ def reset(event):
     current_frame[0] = 0
     draw_frame(0)
     slider.set_val(TIME[0])
+    time_box.set_val(f"{TIME[0]:.6g}")
     fig.canvas.draw_idle()
 
 btn_play.on_clicked(play)
