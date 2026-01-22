@@ -266,20 +266,18 @@ def draw_frame(i, update_slider=True):
         else:
             lines[c].set_data(X[c], y)
 
-    if current_var == IDX_VAPOR_VEL:
+    if current_var == IDX_VAPOR_VEL and n_cases == 1:
         yson = Y[IDX_SONIC]
-        # Gestione dati sonic
-        if isinstance(yson, list):
-             yson_data = yson[0] 
+        
+        if isinstance(yson, list): 
+             yson_data = yson[0] # Prende il primo caso dato che n_cases == 1
         else:
              yson_data = yson
 
-        # Se yson ha dimensione temporale
         if hasattr(yson_data, 'ndim') and yson_data.ndim > 1:
             ii = min(i, yson_data.shape[0] - 1)
             sonic_line.set_data(X[0], yson_data[ii, :])
         else:
-            # Caso stazionario o array semplice
             sonic_line.set_data(X[0], yson_data)
 
         sonic_line.set_visible(True)
@@ -288,7 +286,9 @@ def draw_frame(i, update_slider=True):
 
     if update_slider:
         slider.disconnect(slider_cid)
-        slider.set_val(TIME[min(i, len(TIME) - 1)])
+
+        if len(TIME) > 0:
+            slider.set_val(TIME[min(i, len(TIME) - 1)])
         connect_slider()
 
     return lines + [sonic_line]
@@ -342,15 +342,18 @@ def change_variable(idx):
     current_var = idx
     ax.set_title(f"{names[idx]} {units[idx]}")
 
-    if idx == IDX_VAPOR_VEL:
+    show_sonic = (idx == IDX_VAPOR_VEL and n_cases == 1)
+
+    if show_sonic:
 
         combined_data = Y[IDX_VAPOR_VEL] + Y[IDX_SONIC]
         ax.set_ylim(*robust_ylim(combined_data))
-
+        
         sonic_line.set_visible(True)
         ax.legend(handles=lines + [sonic_line], loc='best')
         
     else:
+
         ax.set_ylim(*robust_ylim(Y[idx]))
         
         sonic_line.set_visible(False)
@@ -413,5 +416,7 @@ ani.event_source.stop()
 running[0] = False
 current_frame[0] = 0
 draw_frame(0)
+
+change_variable(current_var)
 
 plt.show()
