@@ -17,14 +17,24 @@ def safe_loadtxt(filename, fill_value=-1e30):
 # -------------------- Case discovery --------------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root = script_dir
+
 cases = []
 
-for dirpath, dirnames, filenames in os.walk(root):
-    base = os.path.basename(dirpath)
-    parent = os.path.basename(os.path.dirname(dirpath))
+# case_* nella cartella corrente
+for d in os.listdir(root):
+    full = os.path.join(root, d)
+    if os.path.isdir(full) and d.startswith("case_"):
+        cases.append(full)
 
-    if base.startswith("case") or (parent.startswith("cases") and "case" in base):
-        cases.append(dirpath)
+# case_* dentro sottocartelle cases_*
+for d in os.listdir(root):
+    parent = os.path.join(root, d)
+    if os.path.isdir(parent) and d.startswith("cases_"):
+        for sub in os.listdir(parent):
+            full = os.path.join(parent, sub)
+            if os.path.isdir(full) and sub.startswith("case_"):
+                cases.append(full)
+
 
 cases = sorted(cases)
 

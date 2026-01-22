@@ -20,12 +20,20 @@ root = script_dir
 
 cases = []
 
-for dirpath, dirnames, filenames in os.walk(root):
-    base = os.path.basename(dirpath)
-    parent = os.path.basename(os.path.dirname(dirpath))
+# case_* nella cartella corrente
+for d in os.listdir(root):
+    full = os.path.join(root, d)
+    if os.path.isdir(full) and d.startswith("case_"):
+        cases.append(full)
 
-    if "case" in base and (parent.startswith("cases") or base.startswith("case")):
-        cases.append(dirpath)
+# case_* dentro sottocartelle cases_*
+for d in os.listdir(root):
+    parent = os.path.join(root, d)
+    if os.path.isdir(parent) and d.startswith("cases_"):
+        for sub in os.listdir(parent):
+            full = os.path.join(parent, sub)
+            if os.path.isdir(full) and sub.startswith("case_"):
+                cases.append(full)
 
 cases = sorted(cases)
 

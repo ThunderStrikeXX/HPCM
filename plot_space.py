@@ -371,10 +371,12 @@ for i, btn in enumerate(buttons):
 ax_play = plt.axes([0.15, 0.02, 0.10, 0.05])
 ax_pause = plt.axes([0.27, 0.02, 0.10, 0.05])
 ax_reset = plt.axes([0.39, 0.02, 0.10, 0.05])
+ax_save = plt.axes([0.51, 0.02, 0.10, 0.05])
 
 btn_play = Button(ax_play, "Play")
 btn_pause = Button(ax_pause, "Pause")
 btn_reset = Button(ax_reset, "Reset")
+btn_save = Button(ax_save, "Save")
 
 def play(event):
     ani.event_source.start()
@@ -393,9 +395,33 @@ def reset(event):
     time_box.set_val(f"{TIME[0]:.6g}")
     fig.canvas.draw_idle()
 
+def save_plot(event):
+    fig.canvas.draw()
+
+    # bounding box dell'axes
+    bbox = ax.get_tightbbox(fig.canvas.get_renderer())
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+    filename = os.path.join(
+        desktop,
+        f"{names[current_var].replace(' ', '_')}.png"
+    )
+
+    fig.savefig(
+        filename,
+        dpi=300,
+        bbox_inches=bbox_inches,
+        pad_inches=0.02
+    )
+
+    print(f"Saved on Desktop: {filename}")
+
 btn_play.on_clicked(play)
 btn_pause.on_clicked(pause)
 btn_reset.on_clicked(reset)
+btn_save.on_clicked(save_plot)
 
 # ============================================================
 # Animation

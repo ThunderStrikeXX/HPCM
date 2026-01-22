@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.widgets import Button, Slider
+from matplotlib.widgets import Button, Slider, TextBox
 from io import StringIO
 import textwrap
 
@@ -179,8 +179,15 @@ units = [
 def robust_ylim(y):
     vals = y.flatten() if y.ndim > 1 else y
     lo, hi = np.percentile(vals, [1, 99])
+
     if lo == hi:
-        lo, hi = np.min(vals), np.max(vals)
+        if lo == 0.0:
+            eps = 1e-12
+        else:
+            eps = abs(lo) * 1e-6
+        lo -= eps
+        hi += eps
+
     margin = 0.1 * (hi - lo)
     return lo - margin, hi + margin
 
@@ -201,6 +208,9 @@ ax.set_xlabel("Time [s]")
 # Slider posizione assiale
 ax_slider = plt.axes([0.13, 0.10, 0.42, 0.03])
 slider = Slider(ax_slider, "Axial pos [m]", x.min(), x.max(), valinit=x[0])
+
+ax_xbox = plt.axes([0.70, 0.10, 0.08, 0.04])
+x_box = TextBox(ax_xbox, "Set x [m] ", initial=f"{x[0]:.6g}")
 
 # -------------------- Buttons (layout come versione buona) --------------------
 buttons = []
@@ -240,6 +250,8 @@ ax_pause = plt.axes([0.27, 0.02, 0.10, 0.05])
 btn_pause = Button(ax_pause, "Pause", hovercolor='0.975')
 ax_reset = plt.axes([0.39, 0.02, 0.10, 0.05])
 btn_reset = Button(ax_reset, "Reset", hovercolor='0.975')
+ax_save = plt.axes([0.51, 0.02, 0.10, 0.05])
+btn_save = Button(ax_save, "Save")
 
 current_idx = 0
 ydata = Y[current_idx]
@@ -290,11 +302,28 @@ def slider_update(val):
     draw_node(i, update_slider=False)
     fig.canvas.draw_idle()
 
+def submit_x(text):
+    try:
+        xv = float(text)
+    except ValueError:
+        return
+
+    # clamp nel dominio
+    xv = max(x.min(), min(xv, x.max()))
+
+    i = pos_to_index(xv)
+    current_node[0] = i
+
+    draw_node(i, update_slider=False)
+    slider.set_val(index_to_pos(i))
+    fig.canvas.draw_idle()
+
 def connect_slider():
     global slider_cid
     slider_cid = slider.on_changed(slider_update)
 
 connect_slider()
+x_box.on_submit(submit_x)
 
 # -------------------- Variable change --------------------
 def change_variable(idx):
@@ -317,13 +346,46 @@ def reset(event):
     draw_node(0)
     slider.set_val(x[0])
     fig.canvas.draw_idle()
+    x_box.set_val(f"{x[0]:.6g}")
+
+def reset(event):
+    paused[0] = True
+    current_node[0] = 0
+    draw_node(0)
+    slider.set_val(x[0])
+    x_box.set_val(f"{x[0]:.6g}")
+    fig.canvas.draw_idle()
 
 def play(event):
     paused[0] = False
 
+def save_plot(event):
+    fig.canvas.draw()
+
+    # bounding box dell'axes
+    bbox = ax.get_tightbbox(fig.canvas.get_renderer())
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+    filename = os.path.join(
+        desktop,
+        f"{names[current_idx].replace(' ', '_')}.png"
+    )
+
+    fig.savefig(
+        filename,
+        dpi=300,
+        bbox_inches=bbox_inches,
+        pad_inches=0.02
+    )
+
+    print(f"Saved on Desktop: {filename}")
+
 btn_play.on_clicked(play)
 btn_pause.on_clicked(pause)
 btn_reset.on_clicked(reset)
+btn_save.on_clicked(save_plot)
 
 # -------------------- Animation --------------------
 skip = max(1, n_nodes // 200)
