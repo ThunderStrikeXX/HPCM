@@ -1,5 +1,7 @@
 #pragma once
 
+using data_type = float;
+
 /**
  * @brief Provides thermophysical properties for Liquid Sodium (Na).
  *
@@ -13,16 +15,16 @@
 namespace liquid_sodium {
 
     /// Critical temperature [K]
-    constexpr double Tcrit = 2509.46;
+    constexpr data_type Tcrit = 2509.46;
 
     /// Solidification temperature [K]
-    constexpr double Tsolid = 370.87;
+    constexpr data_type Tsolid = 370.87;
 
     /**
     * @brief Density [kg/m3] as a function of temperature T
     *   Keenan–Keyes / Vargaftik
     */
-    inline double rho(double T) {
+    inline data_type rho(data_type T) {
 
         return 219.0 + 275.32 * (1.0 - T / Tcrit) + 511.58 * pow(1.0 - T / Tcrit, 0.5);
     }
@@ -31,7 +33,7 @@ namespace liquid_sodium {
     * @brief Thermal conductivity [W/(m*K)] as a function of temperature T
     *   Vargaftik
     */
-    inline double k(double T) {
+    inline data_type k(data_type T) {
 
         return 124.67 - 0.11381 * T + 5.5226e-5 * T * T - 1.1842e-8 * T * T * T;
     }
@@ -40,9 +42,9 @@ namespace liquid_sodium {
     * @brief Specific heat at constant pressure [J/(kg·K)] as a function of temperature
     *   Vargaftik / Fink & Leibowitz
     */
-    inline double cp(double T) {
+    inline data_type cp(data_type T) {
 
-        double dXT = T - 273.15;
+        data_type dXT = T - 273.15;
         return 1436.72 - 0.58 * dXT + 4.627e-4 * dXT * dXT;
     }
 
@@ -50,13 +52,13 @@ namespace liquid_sodium {
     * @brief Dynamic viscosity [Pa·s] using Shpilrain et al. correlation, valid for 371 K < T < 2500 K
     *   Shpilrain et al
     */
-    inline double mu(double T) {
+    inline data_type mu(data_type T) {
 
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
     }
 
     /// Enthalpy of liquid sodium [J/kg] (CODATA correlation)
-    inline double h(double T) {
+    inline data_type h(data_type T) {
         // Numerical safety only
         if (T < 300.0)  T = 300.0;
         if (T > 2500.0) T = 2500.0;

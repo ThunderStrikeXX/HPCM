@@ -15,30 +15,32 @@
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
 
+using data_type = float;
+
 // Wall
-double new_dt_w(
-    double dt_old,
-    const std::vector<double>& T,
-    const std::vector<double>& St
+data_type new_dt_w(
+    data_type dt_old,
+    const std::vector<data_type>& T,
+    const std::vector<data_type>& St
 );
 
 // Wick
-double new_dt_x(
-    double dt_old,
-    const std::vector<double>& u,
-    const std::vector<double>& T,
-    const std::vector<double>& Sm,
-    const std::vector<double>& Qf
+data_type new_dt_x(
+    data_type dt_old,
+    const std::vector<data_type>& u,
+    const std::vector<data_type>& T,
+    const std::vector<data_type>& Sm,
+    const std::vector<data_type>& Qf
 );
 
 // Vapor
-double new_dt_v(
-    double dz,
-    double dt_old,
-    const std::vector<double>& u,
-    const std::vector<double>& T,
-    const std::vector<double>& rho,
-    const std::vector<double>& Sm,
-    const std::vector<double>& Qf,
-    const std::vector<double>& bVU
+data_type new_dt_v(
+    data_type dz,
+    data_type dt_old,
+    const std::vector<data_type>& u,
+    const std::vector<data_type>& T,
+    const std::vector<data_type>& rho,
+    const std::vector<data_type>& Sm,
+    const std::vector<data_type>& Qf,
+    const std::vector<data_type>& bVU
 );
