@@ -26,7 +26,7 @@ int main() {
 
     #pragma region constants_and_variables
 
-    using data_type = float;
+    using data_type = double;
 
     // Mathematical constants
     const data_type pi = 3.141592;             // Pi [-]
@@ -52,16 +52,16 @@ int main() {
     const data_type CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const std::size_t N = 50;                                   // Number of axial nodes [-]
-    const data_type L = 0.982; 			                        // Length of the heat pipe [m]
-    const data_type dz = L / N;                                    // Axial discretization step [m]
-    const data_type evaporator_start = 0.020;                      // Evaporator begin [m]
-	const data_type evaporator_end = 0.073;                        // Evaporator end [m]
-	const data_type condenser_length = 0.292;                      // Condenser length [m]
-    const data_type r_o = 0.01335;                                 // Outer wall radius [m]
-    const data_type r_i = 0.0112;                                  // Wall-wick interface radius [m]
-    const data_type r_v = 0.01075;                                 // Vapor-wick interface radius [m]
-    const data_type Dh_v = 2.0 * r_v;                              // Hydraulic diameter of the vapor core [m]
+    const std::size_t N = 50;                                       // Number of axial nodes [-]
+    const data_type L = 0.982; 			                            // Length of the heat pipe [m]
+    const data_type dz = L / N;                                     // Axial discretization step [m]
+    const data_type evaporator_start = 0.020;                       // Evaporator begin [m]
+	const data_type evaporator_end = 0.073;                         // Evaporator end [m]
+	const data_type condenser_length = 0.292;                       // Condenser length [m]
+    const data_type r_o = 0.01335;                                  // Outer wall radius [m]
+    const data_type r_i = 0.0112;                                   // Wall-wick interface radius [m]
+    const data_type r_v = 0.01075;                                  // Vapor-wick interface radius [m]
+    const data_type Dh_v = 2.0 * r_v;                               // Hydraulic diameter of the vapor core [m]
 
     // Evaporator region parameters
     const data_type Lh = evaporator_end - evaporator_start;
@@ -80,36 +80,36 @@ int main() {
     const data_type E2x = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    data_type          dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
-	data_type          dt = dt_user;                   // Current time step [s]
-    data_type          time_total = 0.0;               // Total simulation time [s]
-    const data_type    time_simulation = 2000;         // Simulation total number [s]
-	data_type          dt_code = dt_user;              // Time step used in the code [s]
-	int             halves = 0;                     // Number of halvings of the time step
-    data_type          accelerator = 1;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
+	data_type           dt = dt_user;                   // Current time step [s]
+    data_type           time_total = 0.0;               // Total simulation time [s]
+    const data_type     time_simulation = 2000;         // Simulation total number [s]
+	data_type           dt_code = dt_user;              // Time step used in the code [s]
+    data_type           halves = 0;                     // Number of halvings of the time step
+    data_type           accelerator = 2;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
-	const data_type max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
-    int pic = 0;                                    // Outside to check if convergence is reached [-]
-    std::vector<data_type> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
-    std::vector<data_type> pic_tolerance(3, 1e-3);     // Picard convergence tolerance [K, K, K]
+	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
+    int pic = 0;                                        // Outside to check if convergence is reached [-]
+    std::vector<data_type> pic_error(3, 0.0);           // L1 error for picard convergence [K, K, K]
+    std::vector<data_type> pic_tolerance(3, 1e-3);      // Picard convergence tolerance [K, K, K]
 
     // PISO Wick parameters
-    const int tot_simple_iter_x = 5;                // Outer iterations per time-step [-]
-    const int tot_piso_iter_x = 10;                 // Inner iterations per outer iteration [-]
-    const data_type momentum_tol_x = 1e-6;             // Tolerance for the momentum equation [-]
-    const data_type continuity_tol_x = 1e-6;           // Tolerance for the continuity equation [-]
-    const data_type temperature_tol_x = 1e-2;          // Tolerance for the energy equation [-]
+    const int tot_simple_iter_x = 5;                    // Outer iterations per time-step [-]
+    const int tot_piso_iter_x = 10;                     // Inner iterations per outer iteration [-]
+    const data_type momentum_tol_x = 1e-6;              // Tolerance for the momentum equation [-]
+    const data_type continuity_tol_x = 1e-6;            // Tolerance for the continuity equation [-]
+    const data_type temperature_tol_x = 1e-2;           // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_simple_iter_v = 5;                // Outer iterations per time-step [-]
-    const int tot_piso_iter_v = 10;                 // Inner iterations per outer iteration [-]
-    const data_type momentum_tol_v = 1e-6;             // Tolerance for the outer iterations (velocity) [-]
-    const data_type continuity_tol_v = 1e-6;           // Tolerance for the inner iterations (pressure) [-]
-    const data_type temperature_tol_v = 1e-2;          // Tolerance for the energy equation [-]
+    const int tot_simple_iter_v = 5;                    // Outer iterations per time-step [-]
+    const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
+    const data_type momentum_tol_v = 1e-6;              // Tolerance for the outer iterations (velocity) [-]
+    const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
+    const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
     // Constant temperature for initialization
-    const data_type T_init = 800.0;
+    const data_type T_init = 1200.0;
 
     std::vector<data_type> T_o_w(N, T_init);           // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);        // Wall bulk temperature [K]
@@ -339,8 +339,8 @@ int main() {
     std::vector<data_type> T_prev_v(N);
 
     // Printing parameters
-    data_type t_last_print = 0.0;                  // Time from last print [s]
-    const data_type print_interval = 0.5;        // Time interval for printing [s]
+    data_type t_last_print = 0.0;                   // Time from last print [s]
+    const data_type print_interval = 0.5;           // Time interval for printing [s]
 
     // TDMA solver
     tdma::Solver tdma_solver(N);
@@ -1611,8 +1611,7 @@ int main() {
             p_outlet_x = p_outlet_x_old;
             p_outlet_v = p_outlet_v_old;
 
-            halves += 1;        // Reduce time step if max Picard iterations reached
-            time_total += dt;
+            halves += 1;                        // Reduce time step if max Picard iterations reached
         }
 
         // =======================================================================

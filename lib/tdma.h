@@ -2,7 +2,7 @@
 #include <vector>
 #include <cstddef>
 
-using data_type = float;
+using data_type = double;
 
 namespace tdma {
 

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-using data_type = float;
+using data_type = double;
 
 // ============================================================================
 // WALL REGION

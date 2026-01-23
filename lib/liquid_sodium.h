@@ -1,6 +1,6 @@
 #pragma once
 
-using data_type = float;
+using data_type = double;
 
 /**
  * @brief Provides thermophysical properties for Liquid Sodium (Na).

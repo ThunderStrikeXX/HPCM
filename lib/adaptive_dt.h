@@ -15,7 +15,7 @@
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
 
-using data_type = float;
+using data_type = double;
 
 // Wall
 data_type new_dt_w(
