@@ -11,11 +11,6 @@
 namespace vapor_sodium {
 
     /**
-    * @brief Function that clamps a value x to the range [a, b]
-    */
-    constexpr inline double clamp(double x, double a, double b) { return std::max(a, std::min(x, b)); }
-
-    /**
     * @brief 1D table interpolation in T over monotone grid
     */
     template<size_t N>
@@ -27,7 +22,7 @@ namespace vapor_sodium {
         size_t i = 0;
         while (i + 1 < N && Tgrid[i + 1] < T) ++i;
 
-        if (i + 1 >= N) return Ygrid[N - 1];  // fallback assoluto
+        if (i + 1 >= N) return Ygrid[N - 1];
 
         // interpolazione
         double T0 = Tgrid[i];

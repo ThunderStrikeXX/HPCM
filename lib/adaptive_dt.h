@@ -17,7 +17,6 @@
 
 // Wall
 double new_dt_w(
-    double dz,
     double dt_old,
     const std::vector<double>& T,
     const std::vector<double>& St
@@ -25,7 +24,6 @@ double new_dt_w(
 
 // Wick
 double new_dt_x(
-    double dz,
     double dt_old,
     const std::vector<double>& u,
     const std::vector<double>& T,

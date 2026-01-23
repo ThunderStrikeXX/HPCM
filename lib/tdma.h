@@ -1,12 +1,13 @@
 #pragma once
 #include <vector>
+#include <cstddef>
 
 namespace tdma {
 
     class Solver {
     public:
-        explicit Solver(int n)
-            : n_(n), c_star_(n), d_star_(n) {
+        explicit Solver(std::size_t n)
+            : c_star_(n), d_star_(n), n_(n) {
         }
 
         void solve(
@@ -17,9 +18,9 @@ namespace tdma {
             std::vector<double>& x);
 
     private:
-        int n_;
         std::vector<double> c_star_;
         std::vector<double> d_star_;
+        std::size_t n_;
     };
 
 }

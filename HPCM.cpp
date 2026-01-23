@@ -28,7 +28,7 @@ int main() {
     #pragma region constants_and_variables
 
     // Mathematical constants
-    const double M_PI = 3.141592;           // Pi [-]
+    const double pi = 3.141592;             // Pi [-]
 
     // Physical properties
     const double emissivity = 0.5;          // Wall emissivity [-]
@@ -51,18 +51,12 @@ int main() {
     const double CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const int N = 50;                                           // Number of axial nodes [-]
+    const std::size_t N = 50;                                   // Number of axial nodes [-]
     const double L = 0.982; 			                        // Length of the heat pipe [m]
     const double dz = L / N;                                    // Axial discretization step [m]
     const double evaporator_start = 0.020;                      // Evaporator begin [m]
 	const double evaporator_end = 0.073;                        // Evaporator end [m]
 	const double condenser_length = 0.292;                      // Condenser length [m]
-    const double evaporator_nodes = 
-        std::floor((evaporator_end - evaporator_start) / dz);   // Number of evaporator nodes [-]
-    const double condenser_nodes = 
-        std::ceil(condenser_length / dz);                       // Number of condenser nodes [-]
-    const double adiabatic_nodes = 
-        N - (evaporator_nodes + condenser_nodes);               // Number of adiabatic nodes [-]
     const double r_o = 0.01335;                                 // Outer wall radius [m]
     const double r_i = 0.0112;                                  // Wall-wick interface radius [m]
     const double r_v = 0.01075;                                 // Vapor-wick interface radius [m]
@@ -72,12 +66,11 @@ int main() {
     const double Lh = evaporator_end - evaporator_start;
     const double delta_h = 0.01;
     const double Lh_eff = Lh + delta_h;
-    const double q0 = power / (2.0 * M_PI * r_o * Lh_eff);      // [W/m2]
+    const double q0 = power / (2.0 * pi * r_o * Lh_eff);      // [W/m2]
 
     // Condenser region parameters
     const double delta_c = 0.05;
     const double condenser_start = L - condenser_length;
-    const double condenser_end = L;
 
     // Coefficients for the parabolic temperature profiles in wall and wick (check equations)
     const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
@@ -92,14 +85,13 @@ int main() {
     const double    time_simulation = 2000;         // Simulation total number [s]
 	double          dt_code = dt_user;              // Time step used in the code [s]
 	int             halves = 0;                     // Number of halvings of the time step
-    int             n = 0;                          // Iteration number [-]
     double          accelerator = 1;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
-	const double pic_tolerance = 1e-3;   	        // Tolerance for Picard iterations [-]   
     int pic = 0;                                    // Outside to check if convergence is reached [-]
-    std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [-]
+    std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
+    std::vector<double> pic_tolerance(3, 1e-3);     // Picard convergence tolerance [K, K, K]
 
     // PISO Wick parameters
     const int tot_simple_iter_x = 5;                // Outer iterations per time-step [-]
@@ -133,8 +125,8 @@ int main() {
     std::vector<double> p_storage_x(N + 2);         // Wick padded pressure vector for R&C correction [Pa]
     double* p_padded_x = &p_storage_x[1];           // Poìnter to work on the wick pressure padded storage with the same indes
 
-    for (int i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);         // Initialization of the wick pressure
-    for (int i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);     // Initialization of the wick density
+    for (std::size_t i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);         // Initialization of the wick pressure
+    for (std::size_t i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);     // Initialization of the wick density
 
     // Vapor fields
     std::vector<double> u_v(N, 0.1);            // Vapor velocity field [m/s]
@@ -144,12 +136,12 @@ int main() {
     std::vector<double> p_storage_v(N + 2);     // Vapor padded pressure vector for R&C correction [Pa]
     double* p_padded_v = &p_storage_v[1];       // Poìnter to work on the storage with the same indes
 
-    for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);         // Initialization of the vapor pressure
+    for (std::size_t i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);         // Initialization of the vapor pressure
 
     // Vapor Equation of State update function. Updates density
     auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
 
-        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
+        for (std::size_t i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
 
     }; eos_update(rho_v, p_v, T_v_bulk);
 
@@ -178,11 +170,11 @@ int main() {
 	std::vector<double> sonic_velocity(N, 0.0);         // Sonic velocity field [m/s]
 
     // Padding pressure storages
-    for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
+    for (std::size_t i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
     p_storage_x[0] = p_storage_x[1];
     p_storage_x[N + 1] = p_storage_x[N];
 
-    for (int i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
+    for (std::size_t i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
     p_storage_v[0] = p_storage_v[1];
     p_storage_v[N + 1] = p_storage_v[N];
 
@@ -345,24 +337,27 @@ int main() {
     std::vector<double> T_prev_x(N);
     std::vector<double> T_prev_v(N);
 
+    // Printing parameters
+    double t_last_print = 0.0;                  // Time from last print [s]
+    const double print_interval = 0.5;        // Time interval for printing [s]
+
     // TDMA solver
     tdma::Solver tdma_solver(N);
 
     // Mesh z positions of the begin of the cells
     std::vector<double> mesh(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh[i] = i * dz;
+    for (std::size_t i = 0; i < N; ++i) mesh[i] = (static_cast<double>(i)) * dz;
 
     // Mesh z positions of the center of the cells
     std::vector<double> mesh_center(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh_center[i] = (i + 0.5) * dz;
+    for (std::size_t i = 0; i < N; ++i) mesh_center[i] = (static_cast<double>(i) + 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision
-    const int sampling_frequency = 10 / accelerator;         // Sampling frequency
 
     std::string case_chosen = "case_0";
 
     // Create result folder
-    int new_case = 0;
+    std::size_t new_case = 0;
     while (true) {
         case_chosen = "case_" + std::to_string(new_case);
         if (!std::filesystem::exists(case_chosen)) {
@@ -377,7 +372,7 @@ int main() {
     std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
     mesh_output << std::setprecision(output_precision);
 
-    for (int i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
+    for (std::size_t i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
@@ -536,14 +531,12 @@ int main() {
     // Time stepping loop
     while (time_total < time_simulation) {
 
-        n++;
-
         // Start computational time iteration
         auto t0 = std::chrono::high_resolution_clock::now();
 
         // Timestep calculation
-        double dt_cand_w = new_dt_w(dz, dt, T_w_bulk, Q_tot_w);
-        double dt_cand_x = new_dt_x(dz, dt, u_x, T_x_bulk, Gamma_xv_wick, Q_tot_x);
+        double dt_cand_w = new_dt_w(dt, T_w_bulk, Q_tot_w);
+        double dt_cand_x = new_dt_x(dt, u_x, T_x_bulk, Gamma_xv_wick, Q_tot_x);
         double dt_cand_v = new_dt_v(dz, dt, u_v, T_v_bulk, rho_v, Gamma_xv_vapor, Q_tot_v, bVU);
 
         dt_code = std::min(std::min(dt_cand_w, dt_cand_x), std::min(dt_cand_x, dt_cand_v));
@@ -558,7 +551,7 @@ int main() {
         T_x_v_iter = T_x_v_old;
 
         // Updating all properties
-        for (int i = 0; i < N; ++i) {
+        for (std::size_t i = 0; i < N; ++i) {
 
             cp_w[i] = steel::cp(T_w_bulk[i]);
             rho_w[i] = steel::rho(T_w_bulk[i]);
@@ -599,7 +592,7 @@ int main() {
 				// ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
-                for (int i = 1; i < N - 1; i++) {
+                for (std::size_t i = 1; i < N - 1; i++) {
 
 				    // Physical properties
                     const double rho_P = rho_x[i];    
@@ -673,7 +666,7 @@ int main() {
                 // =========== TEMPERATURE CALCULATOR
                 #pragma region temperature_calculator
 
-                for (int i = 1; i < N - 1; i++) {
+                for (std::size_t i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_x[i];
@@ -760,7 +753,7 @@ int main() {
                 #pragma region temperature_residual_calculator
                 temperature_res_x = 0.0;
 
-                for (int i = 0; i < N; ++i) {
+                for (std::size_t i = 0; i < N; ++i) {
 
                     temperature_res_x = std::max(
                         temperature_res_x,
@@ -783,7 +776,7 @@ int main() {
                     #pragma region continuity_satisfactor
 
 					// Loop to assemble the linear system for the pressure correction
-                    for (int i = 1; i < N - 1; i++) {
+                    for (std::size_t i = 1; i < N - 1; i++) {
 
 					    // Physical properties
                         const double rho_P = rho_x[i];
@@ -847,7 +840,7 @@ int main() {
                     // Initialization maximum pressure variation
                     p_error_x = 0.0;
 
-                    for (int i = 0; i < N; i++) {
+                    for (std::size_t i = 0; i < N; i++) {
 
                         double p_prev_x = p_x[i];
                         p_x[i] += p_prime_x[i];         // PIMPLE does not require an under-relaxation factor
@@ -871,7 +864,7 @@ int main() {
                     // Initialization maximum pressure variation
                     u_error_x = 0.0;
 
-                    for (int i = 1; i < N - 1; i++) {
+                    for (std::size_t i = 1; i < N - 1; i++) {
 
                         double u_prev = u_x[i];
                         u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
@@ -886,7 +879,7 @@ int main() {
 
                     continuity_res_x = 0.0;
 
-                    for (int i = 1; i < N - 1; ++i) {
+                    for (std::size_t i = 1; i < N - 1; ++i) {
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
                     }
@@ -901,7 +894,7 @@ int main() {
 
                 momentum_res_x = 0.0;
 
-                for (int i = 1; i < N - 1; ++i) {
+                for (std::size_t i = 1; i < N - 1; ++i) {
                     momentum_res_x = std::max(momentum_res_x, std::abs(aXU[i] * u_x[i - 1] + bXU[i] * u_x[i] + cXU[i] * u_x[i + 1] - dXU[i]));
                 }
 
@@ -936,7 +929,7 @@ int main() {
                 // ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
-                for (int i = 1; i < N - 1; i++) {
+                for (std::size_t i = 1; i < N - 1; i++) {
 
 				    // Physical properties
                     const double rho_P = rho_v[i];
@@ -1023,7 +1016,7 @@ int main() {
                 // ==========  TEMPERATURE CALCULATOR 
                 #pragma region temperature_calculator
 
-                for (int i = 1; i < N - 1; i++) {
+                for (std::size_t i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_v[i];
@@ -1040,8 +1033,6 @@ int main() {
 
                     const double cp_P_old = vapor_sodium::cp(T_v_bulk_old[i]);
 
-                    const double mu_P = vapor_sodium::mu(T_v_bulk[i]);
-
                     const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
                     const double D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
@@ -1056,11 +1047,11 @@ int main() {
                     const double u_l_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc_v;         // [m/s]
                     const double u_r_face = 0.5 * (u_v[i] + u_v[i + 1]) + rhie_chow_on_off_v * rc_r;         // [m/s]
 
-                    const double rho_l = (u_l_face >= 0) ? rho_v[i - 1] : rho_v[i];     // [kg/m3]
-                    const double rho_r = (u_r_face >= 0) ? rho_v[i] : rho_v[i + 1];     // [kg/m3]
+                    const double rho_l = (u_l_face >= 0) ? rho_L : rho_P;     // [kg/m3]
+                    const double rho_r = (u_r_face >= 0) ? rho_P : rho_R;     // [kg/m3]
 
-                    const double cp_l = (u_l_face >= 0) ? cp_v[i - 1] : cp_v[i];     // [kg/m3]
-                    const double cp_r = (u_r_face >= 0) ? cp_v[i] : cp_v[i + 1];     // [kg/m3]
+                    const double cp_l = (u_l_face >= 0) ? cp_L : cp_P;     // [kg/m3]
+                    const double cp_r = (u_r_face >= 0) ? cp_P : cp_R;     // [kg/m3]
 
                     const double Fl = rho_l * u_l_face;         // [kg/m2s]
                     const double Fr = rho_r * u_r_face;         // [kg/m2s]
@@ -1126,7 +1117,7 @@ int main() {
 
                 temperature_res_v = 0.0;
 
-                for (int i = 0; i < N; ++i) {
+                for (std::size_t i = 0; i < N; ++i) {
 
                     temperature_res_v = std::max(
                         temperature_res_v,
@@ -1148,7 +1139,7 @@ int main() {
                     // =========== CONTINUITY SATIFACTOR
                     #pragma region continuity_satisfactor
 
-                    for (int i = 1; i < N - 1; ++i) {
+                    for (std::size_t i = 1; i < N - 1; ++i) {
 
                         const double avgInvbVU_L = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);     // [m2s/kg]
                         const double avgInvbVU_R = 0.5 * (1.0 / bVU[i + 1] + 1.0 / bVU[i]);     // [m2s/kg]
@@ -1222,7 +1213,7 @@ int main() {
 
                     p_error_v = 0.0;
 
-                    for (int i = 0; i < N; i++) {
+                    for (std::size_t i = 0; i < N; i++) {
 
                         double p_prev = p_v[i];
                         p_v[i] += p_prime_v[i];        // PISO does not require an under-relaxation factor
@@ -1245,7 +1236,7 @@ int main() {
 
                     u_error_v = 0.0;
 
-                    for (int i = 1; i < N - 1; ++i) {
+                    for (std::size_t i = 1; i < N - 1; ++i) {
 
                         double u_prev = u_v[i];
 
@@ -1267,7 +1258,7 @@ int main() {
 
                     rho_error_v = 0.0;
 
-                    for (int i = 0; i < N; ++i) {
+                    for (std::size_t i = 0; i < N; ++i) {
                         double rho_prev = rho_v[i];
                         rho_v[i] += p_prime_v[i] / (Rv * T_v_bulk[i]);
                         rho_error_v = std::max(rho_error_v, std::abs(rho_v[i] - rho_prev));
@@ -1280,7 +1271,7 @@ int main() {
 
                     continuity_res_v = 0.0;
 
-                    for (int i = 1; i < N - 1; ++i) {
+                    for (std::size_t i = 1; i < N - 1; ++i) {
 
                         continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
                     }
@@ -1295,7 +1286,7 @@ int main() {
 
                 momentum_res_v = 0.0;
 
-                for (int i = 1; i < N - 1; ++i) {
+                for (std::size_t i = 1; i < N - 1; ++i) {
                     momentum_res_v = std::max(momentum_res_v, std::abs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
                 }
 
@@ -1306,7 +1297,7 @@ int main() {
 
                 temperature_res_v = 0.0;
 
-                for (int i = 1; i < N - 1; ++i) {
+                for (std::size_t i = 1; i < N - 1; ++i) {
                     temperature_res_v = std::max(temperature_res_v, std::abs(T_v_bulk[i] - T_prev_v[i]));
                 }
 
@@ -1326,16 +1317,13 @@ int main() {
 
             #pragma region interfaces 
 
-            for (int i = 0; i < N; ++i) {
+            for (std::size_t i = 0; i < N; ++i) {
 
                 // Physical properties
                 const double Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];       // Reynolds number [-]
                 const double Pr_v = cp_v[i] * mu_v[i] / k_v[i];                         // Prandtl number [-]
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa]        
-                const double H_xmdPsat_dT =
-                    saturation_pressure[i] * std::log(10.0) *
-                    (7740.0 / (T_x_v_iter[i] * T_x_v_iter[i]));                         // Derivative of the saturation pressure wrt T [Pa/K]   
 
                 // Enthalpies
                 if (phi_x_v[i] > 0.0) {                             // Evaporation case
@@ -1388,18 +1376,18 @@ int main() {
                 // Outer wall power profile
                 if (mesh_center[i] >= (evaporator_start - delta_h) && mesh_center[i] < evaporator_start) {
                     double x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
-                    q_ow[i] = 0.5 * q0 * (1.0 - std::cos(M_PI * x));
+                    q_ow[i] = 0.5 * q0 * (1.0 - std::cos(pi * x));
                 }
                 else if (mesh_center[i] >= evaporator_start && mesh_center[i] <= evaporator_end) {
                     q_ow[i] = q0;
                 }
                 else if (mesh_center[i] > evaporator_end && mesh_center[i] <= (evaporator_end + delta_h)) {
                     double x = (mesh_center[i] - evaporator_end) / delta_h;
-                    q_ow[i] = 0.5 * q0 * (1.0 + std::cos(M_PI * x));
+                    q_ow[i] = 0.5 * q0 * (1.0 + std::cos(pi * x));
                 }
                 else if (mesh_center[i] >= condenser_start && mesh_center[i] < condenser_start + delta_c) {
                     double x = (mesh_center[i] - condenser_start) / delta_c;
-                    double w = 0.5 * (1.0 - std::cos(M_PI * x));
+                    double w = 0.5 * (1.0 - std::cos(pi * x));
                     q_ow[i] = -(conv + irr) * w;
                 }
                 else if (mesh_center[i] >= condenser_start + delta_c) {
@@ -1417,7 +1405,7 @@ int main() {
 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
                     sigma_c * Omega * p_v[i]) /
-                    std::sqrt(2 * M_PI * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
+                    std::sqrt(2 * pi * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
                
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;     // Volumetric mass source [kg/m3s] to vapor
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
@@ -1443,7 +1431,7 @@ int main() {
             pic_error[1] = 0.0;
             pic_error[2] = 0.0;
 
-            for (int i = 0; i < N; ++i) {
+            for (std::size_t i = 0; i < N; ++i) {
 
                 Aold = T_o_w_iter[i];
                 Anew = T_o_w[i];
@@ -1470,9 +1458,9 @@ int main() {
             pic_error[1] /= N;
             pic_error[2] /= N;
 
-            if (pic_error[0] < 1e-2 &&
-                pic_error[1] < 1e-2 &&
-                pic_error[2] < 1e-2) {
+            if (pic_error[0] < pic_tolerance[0] &&
+                pic_error[1] < pic_tolerance[1] &&
+                pic_error[2] < pic_tolerance[2]) {
 
 				halves = 0;     // Reset halves if Picard converged
                 break;          // Picard converged
@@ -1493,7 +1481,7 @@ int main() {
         #pragma region wall
 
         // Loop to assembly the linear system for the wall bulk temperature
-        for (int i = 1; i < N - 1; ++i) {
+        for (std::size_t i = 1; i < N - 1; ++i) {
 
             // Physical properties
             const double cp = cp_w[i];
@@ -1623,7 +1611,7 @@ int main() {
             p_outlet_v = p_outlet_v_old;
 
             halves += 1;        // Reduce time step if max Picard iterations reached
-			n -= 1;             // Repeat current time step
+            time_total += dt;
         }
 
         // =======================================================================
@@ -1632,8 +1620,8 @@ int main() {
 
         #pragma region output
 
-        if(n % sampling_frequency == 0){
-            for (int i = 0; i < N; ++i) {
+        if (time_total >= t_last_print + print_interval) {
+            for (std::size_t i = 0; i < N; ++i) {
 
                 v_velocity_output << u_v[i] << " ";
                 v_pressure_output << p_v[i] << " ";
@@ -1685,7 +1673,7 @@ int main() {
             double total_mass_source_wick = 0.0;
             double total_mass_source_vapor = 0.0;
 
-            for (int i = 1; i < N - 1; ++i) {
+            for (std::size_t i = 1; i < N - 1; ++i) {
 
                 total_heat_source_wall += Q_tot_w[i];
                 total_heat_source_wick += Q_tot_x[i];
@@ -1787,6 +1775,8 @@ int main() {
             momentum_res_v_output.flush();
             continuity_res_v_output.flush();
             temperature_res_v_output.flush();
+
+            t_last_print += print_interval;
         }
 
         #pragma endregion

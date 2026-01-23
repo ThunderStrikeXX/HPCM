@@ -9,7 +9,6 @@
 
 // Calculates maximum timestep to prevent DT > CSW in the wall
 double new_dt_w(
-    double dz,
     double dt_old,
     const std::vector<double>& T,
     const std::vector<double>& St)
@@ -21,11 +20,11 @@ double new_dt_w(
     const double dt_min = 1e-8;         // Minimum timestep tolerated [s]
     const double dt_max = 1;            // Maximum timestep tolerated [s]
 
-    const int N = static_cast<int>(St.size());  // Number of nodes [-]
+    const std::size_t N = static_cast<std::size_t>(St.size());  // Number of nodes [-]
 
     double dt_cand = dt_max;        
 
-    for (int i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < N; ++i) {
         double dt_s =
             CSW * steel::rho(T[i]) * steel::cp(T[i]) /
             (std::abs(St[i]) + epsS);
@@ -48,7 +47,6 @@ double new_dt_w(
 
 // Calculates maximum timestep to prevent Drho > CSX_mass and DT > CSX_flux in the wick
 double new_dt_x(
-    double dz,
     double dt_old,
     const std::vector<double>& u,
     const std::vector<double>& T,
@@ -64,11 +62,11 @@ double new_dt_x(
     const double dt_min = 1e-8;         // Minimum timestep tolerated [s]
     const double dt_max = 1;            // Maximum timestep tolerated [s]
 
-    const int N = static_cast<int>(u.size());   // Number of nodes [-]
+    const std::size_t N = static_cast<std::size_t>(u.size());   // Number of nodes [-]
 
     double dt_cand = dt_max;
 
-    for (int i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < N; ++i) {
 
         double dt_mass =
             CSX_mass * liquid_sodium::rho(T[i]) /
@@ -122,15 +120,15 @@ double new_dt_v(
     const double dt_min = 1e-8;             // Minimum timestep tolerated [s]
     const double dt_max = 1;                // Maximum timestep tolerated [s]
 
-	const int N = static_cast<int>(u.size());   // Number of nodes [-]
+	const std::size_t N = static_cast<std::size_t>(u.size());   // Number of nodes [-]
 
-    auto invb = [&](int i) {
+    auto invb = [&](std::size_t i) {
 		return 1.0 / std::max(bVU[i], 1e-30);   // Momentum equation coefficient inverse [m2s/kg]
     };
 
     double dt_cand = dt_max;
 
-    for (int i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < N; ++i) {
 
         double dt_mass =
             CSV_mass * rho[i] /
