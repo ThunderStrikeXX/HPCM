@@ -110,9 +110,9 @@ data_type new_dt_v(
 {
 	const data_type Rv = static_cast<data_type>(361.5);                // Gas constant for the sodium vapor [J/(kgK)]
 
-    const data_type CSV_mass = static_cast<data_type>(0.5);            // Maximum Drho tolerated per timestep [kg/m3]  
-    const data_type CSV_flux = static_cast<data_type>(0.5);            // Maximum DT tolerated per timestep [K]
-    const data_type CP  = static_cast<data_type>(0.5);                // Maximum DP tolerated per timestep [Pa]
+    const data_type CSV_mass = static_cast<data_type>(500);            // Maximum Drho tolerated per timestep [kg/m3]  
+    const data_type CSV_flux = static_cast<data_type>(500);            // Maximum DT tolerated per timestep [K]
+    const data_type CP  = static_cast<data_type>(100);                // Maximum DP tolerated per timestep [Pa]
 
     const data_type epsS  = static_cast<data_type>(1e-12);             // Lower mass source boundary [kg/m3s]
     const data_type epsT  = static_cast<data_type>(1e-12);             // Lower heat source boundary [W/m3]

@@ -52,7 +52,7 @@ int main() {
     const data_type CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const std::size_t N = 50;                                       // Number of axial nodes [-]
+    const std::size_t N = 20;                                       // Number of axial nodes [-]
     const data_type L = 0.982; 			                            // Length of the heat pipe [m]
     const data_type dz = L / N;                                     // Axial discretization step [m]
     const data_type evaporator_start = 0.020;                       // Evaporator begin [m]
@@ -86,7 +86,7 @@ int main() {
     const data_type     time_simulation = 2000;         // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
-    data_type           accelerator = 2;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    data_type           accelerator = 1;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -109,7 +109,7 @@ int main() {
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
     // Constant temperature for initialization
-    const data_type T_init = 1200.0;
+    const data_type T_init = 800.0;
 
     std::vector<data_type> T_o_w(N, T_init);           // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);        // Wall bulk temperature [K]
@@ -1399,7 +1399,9 @@ int main() {
                 Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            // Heat source to the wick due to wall-wick heat flux [W/m3]
                 Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           // Heat source to the wall due to wall-wick heat flux [W/m3]
                 Q_xm[i] = H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  // Heat source to the vapor due to wick-vapor heat flux [W/m3])
-                Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);           // Heat source to the wick due to wick-vapor heat flux [W/m3]
+                Q_mx[i] = -H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 * r_v / (r_i * r_i - r_v * r_v);  // Heat source to the wick due to wick-vapor heat flux [W/m3])
+                
+                // Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);           // Heat source to the wick due to wick-vapor heat flux [W/m3]
 
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
