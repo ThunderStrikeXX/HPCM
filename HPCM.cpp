@@ -524,6 +524,12 @@ int main() {
     a_Q_mass_vapor_old = a_Q_mass_vapor;
     b_Q_mass_vapor_old = b_Q_mass_vapor;
 
+    std::vector<double> heat_balance_surface(N, 0.0);
+
+    std::ofstream heat_balance_surface_output(case_chosen + "/heat_balance_surface.txt", std::ios::app);
+
+    heat_balance_surface_output << std::setprecision(output_precision);
+
     #pragma endregion
 
     // Print number of working threads
@@ -1307,7 +1313,7 @@ int main() {
                 // Physical properties
                 const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
                 const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                              // Prandtl number [-]
-                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                const data_type H_xm = 10 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa]        
 
                 // Enthalpies
@@ -1324,7 +1330,7 @@ int main() {
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
 
-                const double vaporization_enthalpy = h_xv_v - h_vx_x;
+                const double enthalpy_diff = h_xv_v - h_vx_x;
 
                 // Useful constants
                 const data_type E3 = H_xm;
@@ -1349,6 +1355,13 @@ int main() {
                 ABC[6 * i + 0] = T_w_bulk[i] - E1w * q_ow[i] / k_w[i] + (2 * r_o * E1w - E2w) * ABC[6 * i + 2];
                 ABC[6 * i + 4] = (E6 - E3 * T_x_bulk[i] - (E5 - E2x * E3) * ABC[6 * i + 5]) / (E4 - E1x * E3);
                 ABC[6 * i + 3] = T_x_bulk[i] - E1x * ABC[6 * i + 4] - E2x * ABC[6 * i + 5];
+
+                // ABC[6 * i + 0] = a_w
+                // ABC[6 * i + 1] = b_w
+                // ABC[6 * i + 2] = c_w
+                // ABC[6 * i + 3] = a_x
+                // ABC[6 * i + 4] = b_x
+                // ABC[6 * i + 5] = c_x
 
                 // Update temperatures at the interfaces
                 T_o_w[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_o + ABC[6 * i + 2] * r_o * r_o; // Temperature at the outer wall
@@ -1397,33 +1410,28 @@ int main() {
                 Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
-                Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
+                // Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
+                Q_mass_vapor[i] = +Gamma_xv_vapor[i] * enthalpy_diff;
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
-                Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   
+                // Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
+                Q_mass_wick[i] = -Gamma_xv_wick[i] * enthalpy_diff;
 
+                // Real evaporation mass flux [kg/(m2s)]
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / T_x_v[i] -
                     sigma_c * Omega * p_v[i] / T_v_bulk[i]) /
-                    std::sqrt(2 * pi * Rv);                  // Approximated evaporation mass flux [kg/(m2s)]
-
-                /*
-                 
-                // Approximated evaporation mass flux [kg/(m2s)]
-                
-                phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
-                    sigma_c * Omega * p_v[i]) /
-                    std::sqrt(2 * pi * Rv * T_x_v[i]);   
-
-                */
+                    std::sqrt(2 * pi * Rv);                 
 
                 // Volumetric mass source [kg/m3s] to vapor
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;    
                 
                 // Volumetric mass source [kg/m3s] to wick
-                // Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);    
+                Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);    
 
-                // Volumetric mass source [kg/m3s] to wick
-                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v;
+                heat_balance_surface[i] =
+                    + k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
+                    - H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
+                    - (h_xv_v - h_vx_x) * phi_x_v[i];
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
@@ -1664,6 +1672,8 @@ int main() {
 
                 saturation_pressure_output << saturation_pressure[i] << " ";
                 sonic_velocity_output << sonic_velocity[i] << " ";
+
+                heat_balance_surface_output << heat_balance_surface[i] << " ";
             }
 
             // Time between timesteps [ms]
@@ -1740,6 +1750,8 @@ int main() {
             saturation_pressure_output << "\n";
             sonic_velocity_output << "\n";
 
+            heat_balance_surface_output << "\n";
+
             v_velocity_output.flush();
             v_pressure_output.flush();
             v_bulk_temperature_output.flush();
@@ -1788,6 +1800,8 @@ int main() {
             momentum_res_v_output.flush();
             continuity_res_v_output.flush();
             temperature_res_v_output.flush();
+
+            heat_balance_surface_output.flush();
 
             t_last_print += print_interval;
         }
@@ -1842,6 +1856,8 @@ int main() {
     momentum_res_v_output.close();
     continuity_res_v_output.close();
     temperature_res_v_output.close();
+
+    heat_balance_surface_output.close();
 
     data_type end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
