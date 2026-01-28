@@ -186,21 +186,6 @@ for i in range(n_cases):
                     label=case_labels[i])
     lines.append(ln)
 
-IDX_VAPOR_VEL = names.index("Vapor velocity")
-IDX_SONIC    = names.index("Sonic speed")
-
-(sonic_line,) = ax.plot(
-    [], [],
-    color="orange",
-    linestyle="--",
-    linewidth=1.0,
-    alpha=1.0,
-    zorder=10,
-    label="Sonic velocity"
-)
-sonic_line.set_visible(False)
-ax.legend()
-
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")
 ax.legend()
@@ -266,24 +251,6 @@ def draw_frame(i, update_slider=True):
         else:
             lines[c].set_data(X[c], y)
 
-    if current_var == IDX_VAPOR_VEL and n_cases == 1:
-        yson = Y[IDX_SONIC]
-        
-        if isinstance(yson, list): 
-             yson_data = yson[0] # Prende il primo caso dato che n_cases == 1
-        else:
-             yson_data = yson
-
-        if hasattr(yson_data, 'ndim') and yson_data.ndim > 1:
-            ii = min(i, yson_data.shape[0] - 1)
-            sonic_line.set_data(X[0], yson_data[ii, :])
-        else:
-            sonic_line.set_data(X[0], yson_data)
-
-        sonic_line.set_visible(True)
-    else:
-        sonic_line.set_visible(False)
-
     if update_slider:
         slider.disconnect(slider_cid)
 
@@ -291,7 +258,7 @@ def draw_frame(i, update_slider=True):
             slider.set_val(TIME[min(i, len(TIME) - 1)])
         connect_slider()
 
-    return lines + [sonic_line]
+    return lines
 
 def update_auto(i):
     current_frame[0] = i
@@ -342,22 +309,9 @@ def change_variable(idx):
     current_var = idx
     ax.set_title(f"{names[idx]} {units[idx]}")
 
-    show_sonic = (idx == IDX_VAPOR_VEL and n_cases == 1)
 
-    if show_sonic:
-
-        combined_data = Y[IDX_VAPOR_VEL] + Y[IDX_SONIC]
-        ax.set_ylim(*robust_ylim(combined_data))
-        
-        sonic_line.set_visible(True)
-        ax.legend(handles=lines + [sonic_line], loc='best')
-        
-    else:
-
-        ax.set_ylim(*robust_ylim(Y[idx]))
-        
-        sonic_line.set_visible(False)
-        ax.legend(handles=lines, loc='best')
+    ax.set_ylim(*robust_ylim(Y[idx]))
+    ax.legend(handles=lines, loc='best')
 
     current_frame[0] = 0
     draw_frame(0)

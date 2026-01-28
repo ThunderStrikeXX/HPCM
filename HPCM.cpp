@@ -52,7 +52,7 @@ int main() {
     const data_type CF = 1e5;                  // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const std::size_t N = 20;                                       // Number of axial nodes [-]
+    const std::size_t N = 22;                                       // Number of axial nodes [-]
     const data_type L = 0.982; 			                            // Length of the heat pipe [m]
     const data_type dz = L / N;                                     // Axial discretization step [m]
     const data_type evaporator_start = 0.020;                       // Evaporator begin [m]
@@ -350,11 +350,11 @@ int main() {
 
     // Mesh z positions of the begin of the cells
     std::vector<data_type> mesh(N, 0.0);
-    for (std::size_t i = 0; i < N; ++i) mesh[i] = (static_cast<data_type>(i)) * dz;
+    for (int i = -1; i <= N; ++i) mesh[i] = i * dz;
 
     // Mesh z positions of the center of the cells
     std::vector<data_type> mesh_center(N, 0.0);
-    for (std::size_t i = 0; i < N; ++i) mesh_center[i] = (static_cast<data_type>(i) + 0.5) * dz;
+    for (int i = -1; i <= N; ++i) mesh_center[i] = (i + 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision
 
@@ -1305,10 +1305,10 @@ int main() {
             for (std::size_t i = 0; i < N; ++i) {
 
                 // Physical properties
-                const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];       // Reynolds number [-]
-                const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                         // Prandtl number [-]
-                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                // Saturation pressure [Pa]        
+                const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
+                const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                              // Prandtl number [-]
+                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa]        
 
                 // Enthalpies
                 if (Gamma_xv_vapor[i] > 0.0) {                          // Evaporation case
@@ -1379,33 +1379,53 @@ int main() {
                     q_ow[i] = -(conv + irr);
                 }
 
-                Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    // Outer wall heat source [W/m3]
-                Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);            // Heat source to the wick due to wall-wick heat flux [W/m3]
-                Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           // Heat source to the wall due to wall-wick heat flux [W/m3]
-                Q_xm[i] = H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  // Heat source to the vapor due to wick-vapor heat flux [W/m3]) 
-                Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);           // Heat source to the wick due to wick-vapor heat flux [W/m3]
+                // Outer wall to bulk wall, heat source due to BCs [W/m3] 
+                Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    
+                    
+                // Wick to wall, heat source due to heat flux [W/m3]
+                Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           
 
-                Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
-                Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
+                // Wall to wick, heat source due to heat flux [W/m3]
+                Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);
+                
+                // Wick to mixture, heat source due to heat flux [W/m3] 
+                Q_xm[i] = H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  
+                
+                // Mixture to wick, heat source due to heat flux [W/m3] 
+                Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
+
+                // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
+                Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
+
+                // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
+                Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   
 
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / T_x_v[i] -
                     sigma_c * Omega * p_v[i] / T_v_bulk[i]) /
                     std::sqrt(2 * pi * Rv);                  // Approximated evaporation mass flux [kg/(m2s)]
 
                 /*
+                 
+                // Approximated evaporation mass flux [kg/(m2s)]
+                
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
                     sigma_c * Omega * p_v[i]) /
-                    std::sqrt(2 * pi * Rv * T_x_v[i]);                  // Approximated evaporation mass flux [kg/(m2s)]
+                    std::sqrt(2 * pi * Rv * T_x_v[i]);   
+
+                // Volumetric mass source [kg/m3s] to wick
+                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v; 
+
                 */
 
-                Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;     // Volumetric mass source [kg/m3s] to vapor
-                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v;      // Volumetric mass source [kg/m3s] to wick
-                // Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
-                //     / (r_i * r_i - r_v * r_v);                       // Volumetric mass source [kg/m3s] to wick
+                // Volumetric mass source [kg/m3s] to vapor
+                Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;    
+                
+                // Volumetric mass source [kg/m3s] to wick
+                Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);                       
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
-            p_outlet_v = vapor_sodium::P_sat(T_x_v_iter[N - 1]);
+            // p_outlet_v = vapor_sodium::P_sat(T_x_v_iter[N - 1]);
 
             #pragma endregion
 
@@ -1612,7 +1632,7 @@ int main() {
         #pragma region output
 
         if (time_total >= t_last_print + print_interval) {
-            for (std::size_t i = 0; i < N; ++i) {
+            for (std::size_t i = 1; i < N - 1; ++i) {
 
                 v_velocity_output << u_v[i] << " ";
                 v_pressure_output << p_v[i] << " ";

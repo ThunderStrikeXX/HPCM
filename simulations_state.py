@@ -7,7 +7,7 @@ os.chdir(script_dir)
 
 T1 = 2000.0
 T2 = 10000.0
-T3 = 100000.0
+T3 = 20000.0
 
 def format_dhm(seconds):
     if seconds <= 0 or not (seconds < 1e12):
