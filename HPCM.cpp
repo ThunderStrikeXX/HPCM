@@ -515,20 +515,27 @@ int main() {
     continuity_res_v_output << std::setprecision(output_precision);
     temperature_res_v_output << std::setprecision(output_precision);
 
-    std::vector<data_type> a_Q_mass_vapor(N, 0.0);
-    std::vector<data_type> b_Q_mass_vapor(N, 0.0);
-
-    std::vector<data_type> a_Q_mass_vapor_old;
-    std::vector<data_type> b_Q_mass_vapor_old;
-
-    a_Q_mass_vapor_old = a_Q_mass_vapor;
-    b_Q_mass_vapor_old = b_Q_mass_vapor;
+    // New things to sort inside of the other variables when approved
 
     std::vector<double> heat_balance_surface(N, 0.0);
 
     std::ofstream heat_balance_surface_output(case_chosen + "/heat_balance_surface.txt", std::ios::app);
 
     heat_balance_surface_output << std::setprecision(output_precision);
+
+    std::vector<double> wall_wick_heat_balance(N, 0.0);
+    std::vector<double> wick_vapor_heat_balance_flux(N, 0.0);
+    std::vector<double> wall_wick_heat_balance_mass(N, 0.0);
+
+    std::ofstream global_heat_balance_output(case_chosen + "/global_heat_balance.txt", std::ios::app);
+    std::ofstream wall_wick_heat_balance_output(case_chosen + "/wall_wick_heat_balance.txt", std::ios::app);
+    std::ofstream wick_vapor_heat_balance_flux_output(case_chosen + "/wick_vapor_heat_balance_flux.txt", std::ios::app);
+    std::ofstream wall_wick_heat_balance_mass_output(case_chosen + "/wall_wick_heat_balance_mass.txt", std::ios::app);
+
+    global_heat_balance_output << std::setprecision(output_precision);
+    wall_wick_heat_balance_output << std::setprecision(output_precision);
+    wick_vapor_heat_balance_flux_output << std::setprecision(output_precision);
+    wall_wick_heat_balance_mass_output << std::setprecision(output_precision);
 
     #pragma endregion
 
@@ -1674,6 +1681,10 @@ int main() {
                 sonic_velocity_output << sonic_velocity[i] << " ";
 
                 heat_balance_surface_output << heat_balance_surface[i] << " ";
+
+                wall_wick_heat_balance_output << wall_wick_heat_balance[i] << " ";
+                wick_vapor_heat_balance_flux_output << wick_vapor_heat_balance_flux[i] << " ";
+                wall_wick_heat_balance_mass_output << wall_wick_heat_balance_mass[i] << " ";
             }
 
             // Time between timesteps [ms]
@@ -1696,8 +1707,15 @@ int main() {
             data_type total_mass_source_wick = 0.0;
             data_type total_mass_source_vapor = 0.0;
 
+            data_type global_heat_balance = 0.0;
+
             for (std::size_t i = 1; i < N - 1; ++i) {
 
+                wall_wick_heat_balance[i] = Q_wx[i] * (r_i * r_i - r_v * r_v) + Q_xw[i] * (r_o * r_o - r_i * r_i);
+                wick_vapor_heat_balance_flux[i] = Q_xm[i] * (r_v * r_v) + Q_mx[i] * (r_i * r_i - r_v * r_v);
+                wall_wick_heat_balance_mass[i] = Q_mass_vapor[i] * (r_v * r_v) + Q_mass_wick[i] * (r_i * r_i - r_v * r_v);
+
+                global_heat_balance += Q_ow[i];
                 total_heat_source_wall += Q_tot_w[i];
                 total_heat_source_wick += Q_tot_x[i];
                 total_heat_source_vapor += Q_tot_v[i];
@@ -1712,6 +1730,8 @@ int main() {
 
             total_mass_source_wick_output << total_mass_source_wick << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
+
+            global_heat_balance_output << global_heat_balance << " ";
 
             momentum_res_x_output << momentum_res_x << " ";
             continuity_res_x_output << continuity_res_x << " ";
@@ -1751,6 +1771,10 @@ int main() {
             sonic_velocity_output << "\n";
 
             heat_balance_surface_output << "\n";
+
+            wall_wick_heat_balance_output << "\n";
+            wick_vapor_heat_balance_flux_output << "\n";
+            wall_wick_heat_balance_mass_output << "\n";
 
             v_velocity_output.flush();
             v_pressure_output.flush();
@@ -1802,6 +1826,12 @@ int main() {
             temperature_res_v_output.flush();
 
             heat_balance_surface_output.flush();
+
+            global_heat_balance_output.flush();
+
+            wall_wick_heat_balance_output.flush();
+            wick_vapor_heat_balance_flux_output.flush();
+            wall_wick_heat_balance_mass_output.flush();
 
             t_last_print += print_interval;
         }
@@ -1858,6 +1888,12 @@ int main() {
     temperature_res_v_output.close();
 
     heat_balance_surface_output.close();
+
+    global_heat_balance_output.close();
+
+    wall_wick_heat_balance_output.close();
+    wick_vapor_heat_balance_flux_output.close();
+    wall_wick_heat_balance_mass_output.close();
 
     data_type end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
