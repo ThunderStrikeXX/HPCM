@@ -74,6 +74,10 @@ for f in y_files:
 time = safe_loadtxt(time_file)
 Y = [safe_loadtxt(f) for f in y_files]
 
+n = min(len(time), *(len(y) for y in Y))
+time = time[:n]
+Y = [y[:n] for y in Y]
+
 names = [
     "Total wall heat source",
     "Total wick heat source",

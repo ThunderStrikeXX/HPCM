@@ -38,7 +38,7 @@ int main() {
     
     // Environmental boundary conditions
     const data_type h_conv = 1;                // Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const data_type power = 119;               // Power at the evaporator side [W]
+    const data_type power = 1000;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;             // External environmental temperature [K]
 
     // Evaporation and condensation parameters
@@ -1026,7 +1026,7 @@ int main() {
                         4.0 / 3.0 * 0.25 * mu_v[i] * ((u_v[i + 1] - u_v[i]) * (u_v[i + 1] - u_v[i])
                             + (u_v[i] + u_v[i - 1]) * (u_v[i] + u_v[i - 1])) / dz;
 
-                    Q_tot_v[i] = dp_dt / dz + dpdz_up / dz + viscous_dissipation + Q_xm[i] + Q_mass_vapor[i];
+                    Q_tot_v[i] = /*dp_dt / dz + dpdz_up / dz + viscous_dissipation +*/ Q_xm[i] + Q_mass_vapor[i];
 
                     aVT[i] =
                         - D_l
@@ -1046,9 +1046,9 @@ int main() {
 
                     dVT[i] =
                         + rho_v_old[i] * cp_P_old * dz / dt * T_v_bulk_old[i]
-                        + dp_dt
-                        + dpdz_up
-                        + viscous_dissipation * dz
+                        // + dp_dt
+                        // + dpdz_up
+                        // + viscous_dissipation * dz
                         + Q_xm[i] * dz                     // Positive if heat from wick to vapor
                         + Q_mass_vapor[i] * dz;          // [W/m2]
                 }
@@ -1324,6 +1324,8 @@ int main() {
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
 
+                const double vaporization_enthalpy = h_xv_v - h_vx_x;
+
                 // Useful constants
                 const data_type E3 = H_xm;
                 const data_type E4 = -k_x[i] + H_xm * r_v;
@@ -1412,16 +1414,16 @@ int main() {
                     sigma_c * Omega * p_v[i]) /
                     std::sqrt(2 * pi * Rv * T_x_v[i]);   
 
-                // Volumetric mass source [kg/m3s] to wick
-                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v; 
-
                 */
 
                 // Volumetric mass source [kg/m3s] to vapor
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;    
                 
                 // Volumetric mass source [kg/m3s] to wick
-                Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);                       
+                // Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);    
+
+                // Volumetric mass source [kg/m3s] to wick
+                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v;
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
