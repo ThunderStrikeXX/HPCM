@@ -5,7 +5,9 @@ import sys
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
-T_TARGET = 2000.0  # target time.txt [s]
+T1 = 2000.0
+T2 = 10000.0
+T3 = 100000.0
 
 def format_dhm(seconds):
     if seconds <= 0 or not (seconds < 1e12):
@@ -15,6 +17,23 @@ def format_dhm(seconds):
     h = (seconds % 86400) // 3600
     m = (seconds % 3600) // 60
     return f"{d}d {h}h {m}m"
+
+def estimate_remaining(t_last, c_last):
+    if t_last <= 0:
+        return None, None
+
+    if t_last <= T1:
+        target = T1
+    elif t_last <= T2:
+        target = T2
+    elif t_last <= T3:
+        target = T3
+    else:
+        return None, None  # oltre 100000 non stimiamo
+
+    total_clock_est = c_last * (target / t_last)
+    remaining_clock = max(total_clock_est - c_last, 0.0)
+    return target, remaining_clock
 
 for name in sorted(os.listdir(script_dir)):
     case_path = os.path.join(script_dir, name)
@@ -45,20 +64,21 @@ for name in sorted(os.listdir(script_dir)):
         t_last = t_vals[-1]   # [s]
         c_last = c_vals[-1]   # [s]
 
-        if t_last <= 0:
-            print(f"{name}: INVALID time.txt")
-            continue
+        target, remaining = estimate_remaining(t_last, c_last)
 
-        # stima lineare richiesta
-        total_clock_est = c_last * (T_TARGET / t_last)
-        remaining_clock = max(total_clock_est - c_last, 0.0)
-
-        print(
+        base_msg = (
             f"{name}: "
             f"t={t_last:.2f} s | "
-            f"elapsed {format_dhm(c_last)} | "
-            f"remaining {format_dhm(remaining_clock)}"
+            f"elapsed {format_dhm(c_last)}"
         )
+
+        if target is None:
+            print(base_msg + " | no further estimate")
+        else:
+            print(
+                base_msg +
+                f" | remaining to {int(target)} s: {format_dhm(remaining)}"
+            )
 
     except Exception as e:
         print(f"{name}: ERROR ({e})")

@@ -43,8 +43,8 @@ int main() {
 
     // Evaporation and condensation parameters
     const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
-    const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const data_type sigma_e = 0.01;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const data_type sigma_c = 0.01;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -83,10 +83,10 @@ int main() {
     data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	data_type           dt = dt_user;                   // Current time step [s]
     data_type           time_total = 0.0;               // Total simulation time [s]
-    const data_type     time_simulation = 10000;         // Simulation total number [s]
+    const data_type     time_simulation = 20000;       // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
-    data_type           accelerator = 0.5;                // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    data_type           accelerator = 0.5;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -130,7 +130,7 @@ int main() {
     for (std::size_t i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);     // Initialization of the wick density
 
     // Vapor fields
-    std::vector<data_type> u_v(N, 0.1);            // Vapor velocity field [m/s]
+    std::vector<data_type> u_v(N, 10.0);            // Vapor velocity field [m/s]
     std::vector<data_type> p_v(N);                 // Vapor pressure field [Pa]
     std::vector<data_type> p_prime_v(N, 0.0);      // Vapor correction pressure field [Pa]
     std::vector<data_type> rho_v(N);               // Vapor density field [Pa]
@@ -948,36 +948,19 @@ int main() {
                     const data_type D_l = 4.0 / 3.0 * 0.5 * (mu_P + mu_L) / dz;
                     const data_type D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;    
 
-                    const data_type avgInvbVU_L = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
-                    const data_type avgInvbVU_R = 0.5 * (1.0 / bVU[i + 1] + 1.0 / bVU[i]); // [m2s/kg]
-
-                    const data_type rc_l = -avgInvbVU_L / 4.0 *
-                        (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]); // [m/s]
-                    const data_type rc_r = -avgInvbVU_R / 4.0 *
-                        (p_padded_v[i - 1] - 3.0 * p_padded_v[i] + 3.0 * p_padded_v[i + 1] - p_padded_v[i + 2]); // [m/s]
-
-                    const data_type u_l_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc_l;    // [m/s]
-                    const data_type u_r_face = 0.5 * (u_v[i] + u_v[i + 1]) + rhie_chow_on_off_v * rc_r;    // [m/s]
-
-                    const data_type rho_l = (u_l_face >= 0) ? rho_L : rho_P;
-                    const data_type rho_r = (u_r_face >= 0) ? rho_P : rho_R;       
-
-                    const data_type F_l = rho_l * u_l_face;
-                    const data_type F_r = rho_r * u_r_face;           
-
                     const data_type Re = u_v[i] * (2 * r_v) * rho_P / mu_P;
                     const data_type f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);  
                     const data_type F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
 
                     aVU[i] = 
-                        - std::max(F_l, static_cast<data_type>(0.0))
+                        - std::max(phi_v[i], static_cast<data_type>(0.0))
                         - D_l;                              // [kg/(m2 s)]
                     cVU[i] = 
-                        - std::max(-F_r, static_cast<data_type>(0.0))
+                        - std::max(-phi_v[i + 1], static_cast<data_type>(0.0))
                         - D_r;                              // [kg/(m2 s)]
                     bVU[i] = 
-                        + std::max(F_r, static_cast<data_type>(0.0))
-                        + std::max(-F_l, static_cast<data_type>(0.0))
+                        + std::max(phi_v[i + 1], static_cast<data_type>(0.0))
+                        + std::max(-phi_v[i], static_cast<data_type>(0.0))
                         + rho_P * dz / dt 
                         + D_l + D_r 
                         + F * dz;                           // [kg/(m2 s)]
@@ -990,27 +973,17 @@ int main() {
                 const data_type D_first = (4.0 / 3.0) * mu_v[0] / dz;
                 const data_type D_last = (4.0 / 3.0) * mu_v[N - 1] / dz;
 
-                /// Velocity BCs needed variables for the first node
-                const data_type u_r_face_first = 0.5 * (u_v[1]);
-                const data_type rho_r_first = (u_r_face_first >= 0) ? rho_v[0] : rho_v[1];
-                const data_type F_r_first = rho_r_first * u_r_face_first;
-
-                /// Velocity BCs needed variables for the last node
-                const data_type u_l_face_last = 0.5 * (u_v[N - 2]);
-                const data_type rho_l_last = (u_l_face_last >= 0) ? rho_v[N - 2] : rho_v[N - 1];
-                const data_type F_l_last = rho_l_last * u_l_face_last;
-
                 // Velocity BCs: zero velocity on the first node
 			    aVU[0] = 0.0;
-                bVU[0] = + (std::max(F_r_first, static_cast<data_type>(0.0)) + rho_v[0] * dz / dt + 2 * D_first);
-                cVU[0] = 0.0; 
-                dVU[0] = bVU[0] * u_inlet_v;
+                bVU[0] = + (rho_v[0] * dz / dt + 2 * D_first);
+                cVU[0] = + (rho_v[0] * dz / dt + 2 * D_first);
+                dVU[0] = 0.0;
 
                 // Velocity BCs: zero velocity on the last node
-                aVU[N - 1] = 0.0;
-                bVU[N - 1] = + (- std::max(-F_l_last, static_cast<data_type>(0.0)) + rho_v[N - 1] * dz / dt + 2 * D_last);
+                aVU[N - 1] = + (rho_v[N - 1] * dz / dt + 2 * D_last);
+                bVU[N - 1] = + (rho_v[N - 1] * dz / dt + 2 * D_last);
 			    cVU[N - 1] = 0.0;
-                dVU[N - 1] = bVU[N - 1] * u_outlet_v;
+                dVU[N - 1] = 0.0;
 
                 tdma_solver.solve(aVU, bVU, cVU, dVU, u_v);
 
@@ -1039,28 +1012,11 @@ int main() {
                     const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
                     const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
-                    const data_type avgInvbVU_v = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);     // [m2s/kg]
-                    const data_type avgInvbVU_R = 0.5 * (1.0 / bVU[i + 1] + 1.0 / bVU[i]);     // [m2s/kg]
+                    const data_type cp_l = (phi_v[i] >= 0) ? cp_L : cp_P;     // [kg/m3]
+                    const data_type cp_r = (phi_v[i + 1] >= 0) ? cp_P : cp_R;     // [kg/m3]
 
-                    const data_type rc_v = -avgInvbVU_v / 4.0 *
-                        (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]);    // [m/s]
-                    const data_type rc_r = -avgInvbVU_R / 4.0 *
-                        (p_padded_v[i - 1] - 3.0 * p_padded_v[i] + 3.0 * p_padded_v[i + 1] - p_padded_v[i + 2]);    // [m/s]
-
-                    const data_type u_l_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc_v;         // [m/s]
-                    const data_type u_r_face = 0.5 * (u_v[i] + u_v[i + 1]) + rhie_chow_on_off_v * rc_r;         // [m/s]
-
-                    const data_type rho_l = (u_l_face >= 0) ? rho_L : rho_P;     // [kg/m3]
-                    const data_type rho_r = (u_r_face >= 0) ? rho_P : rho_R;     // [kg/m3]
-
-                    const data_type cp_l = (u_l_face >= 0) ? cp_L : cp_P;     // [kg/m3]
-                    const data_type cp_r = (u_r_face >= 0) ? cp_P : cp_R;     // [kg/m3]
-
-                    const data_type Fl = rho_l * u_l_face;         // [kg/m2s]
-                    const data_type Fr = rho_r * u_r_face;         // [kg/m2s]
-
-                    const data_type C_l = (Fl * cp_l);               // [W/(m2K)]
-                    const data_type C_r = (Fr * cp_r);               // [W/(m2K)]
+                    const data_type C_l = (phi_v[i] * cp_l);               // [W/(m2K)]
+                    const data_type C_r = (phi_v[i + 1] * cp_r);               // [W/(m2K)]
 
                     const data_type dpdz_up = u_v[i] * (p_v[i + 1] - p_v[i - 1]) / 2.0;
 
@@ -1144,32 +1100,18 @@ int main() {
 
                     for (std::size_t i = 1; i < N - 1; ++i) {
 
-                        const data_type avgInvbVU_L = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);     // [m2s/kg]
-                        const data_type avgInvbVU_R = 0.5 * (1.0 / bVU[i + 1] + 1.0 / bVU[i]);     // [m2s/kg]
-
-                        const data_type rc_l = -avgInvbVU_L / 4.0 *
-                            (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]);    // [m/s]
-                        const data_type rc_r = -avgInvbVU_R / 4.0 *
-                            (p_padded_v[i - 1] - 3.0 * p_padded_v[i] + 3.0 * p_padded_v[i + 1] - p_padded_v[i + 2]);    // [m/s]
-
                         const data_type psi_i = 1.0 / (Rv * T_v_bulk[i]); // [kg/J]
 
-                        const data_type u_l_star = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc_l;    // [m/s]
-                        const data_type u_r_star = 0.5 * (u_v[i] + u_v[i + 1]) + rhie_chow_on_off_v * rc_r;    // [m/s]
+                        const data_type Crho_l = phi_v[i] >= 0 ? (1.0 / (Rv * T_v_bulk[i - 1])) : (1.0 / (Rv * T_v_bulk[i]));  // [s2/m2]
+                        const data_type Crho_r = phi_v[i + 1] >= 0 ? (1.0 / (Rv * T_v_bulk[i])) : (1.0 / (Rv * T_v_bulk[i + 1]));  // [s2/m2]
 
-                        const data_type Crho_l = u_l_star >= 0 ? (1.0 / (Rv * T_v_bulk[i - 1])) : (1.0 / (Rv * T_v_bulk[i]));  // [s2/m2]
-                        const data_type Crho_r = u_r_star >= 0 ? (1.0 / (Rv * T_v_bulk[i])) : (1.0 / (Rv * T_v_bulk[i + 1]));  // [s2/m2]
+                        const data_type C_l = Crho_l * phi_v[i] / rho_v[i];       // [s/m]
+                        const data_type C_r = Crho_r * phi_v[i + 1] / rho_v[i + 1];       // [s/m]
 
-                        const data_type C_l = Crho_l * u_l_star;       // [s/m]
-                        const data_type C_r = Crho_r * u_r_star;       // [s/m]
+                        const data_type rho_l_upwind = (phi_v[i] >= 0.0) ? rho_v[i - 1] : rho_v[i];    // [kg/m3]
+                        const data_type rho_r_upwind = (phi_v[i + 1] >= 0.0) ? rho_v[i] : rho_v[i + 1];    // [kg/m3]
 
-                        const data_type rho_l_upwind = (u_l_star >= 0.0) ? rho_v[i - 1] : rho_v[i];    // [kg/m3]
-                        const data_type rho_r_upwind = (u_r_star >= 0.0) ? rho_v[i] : rho_v[i + 1];    // [kg/m3]
-
-                        const data_type phi_l = rho_l_upwind * u_l_star;   // [kg/(m2s)]
-                        const data_type phi_r = rho_r_upwind * u_r_star;   // [kg/(m2s)]
-
-                        const data_type mass_imbalance = (phi_r - phi_l) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const data_type mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
 
                         const data_type mass_flux = Gamma_xv_vapor[i] * dz;         // [kg/(m2s)]
 
@@ -1202,7 +1144,7 @@ int main() {
                     dVP[0] = 0.0;
 
                     // BCs for the correction of pressure: zero at last node
-                    aVP[N - 1] = 0.0;
+                    aVP[N - 1] = -1.0;
                     bVP[N - 1] = 1.0;  
 				    cVP[N - 1] = 0.0;
                     dVP[N - 1] = 0.0;
@@ -1229,8 +1171,8 @@ int main() {
                     p_v[0] = p_v[1];
                     p_storage_v[0] = p_storage_v[1];
 
-                    p_v[N - 1] = p_outlet_v;
-                    p_storage_v[N + 1] = p_outlet_v;
+                    p_v[N - 1] = p_v[N - 2];
+                    p_storage_v[N + 1] = p_storage_v[N];
 
                     #pragma endregion
 
@@ -1258,6 +1200,40 @@ int main() {
 
                     #pragma endregion
 
+                    // =========== FLUX CORRECTOR
+                    #pragma region flux_corrector
+                    
+                    for (int i = 1; i < N; ++i) {
+
+                        const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
+
+                        double rc = 0.0;
+
+                        // Rhie–Chow corrections for face velocities
+                        if ((i != 1) && (i != N - 1)) {
+
+                            rc = -avgInvbVU / 4.0 *
+                                (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]); // [m/s]
+
+                        }
+
+                        // Face velocities (avg + RC)
+                        const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc;    // [m/s]
+
+                        // Upwind densities at faces
+                        const double rho = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];       // [kg/m3]
+
+                        phi_v[i] = rho * u_face;
+                    }
+
+                    phi_v[0] = u_inlet_v * rho_v[0];
+                    phi_v[1] = u_inlet_v * rho_v[0];
+
+                    phi_v[N - 1] = u_outlet_v * rho_v[N - 1];
+                    phi_v[N] = u_outlet_v * rho_v[N - 1];
+
+                    #pragma endregion
+
                     // =========== DENSITY CORRECTOR
                     #pragma region density_corrector
 
@@ -1268,6 +1244,10 @@ int main() {
                         rho_v[i] += p_prime_v[i] / (Rv * T_v_bulk[i]);
                         rho_error_v = std::max(rho_error_v, std::abs(rho_v[i] - rho_prev));
                     }
+
+                    // Enforcing density BCs on ghost cells
+                    rho_v[0] = rho_v[1];
+                    rho_v[N - 1] = rho_v[N - 2];
 
                     #pragma endregion
 
@@ -1327,19 +1307,19 @@ int main() {
                 // Physical properties
                 const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];       // Reynolds number [-]
                 const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                         // Prandtl number [-]
-                const data_type H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa]        
+                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                // Saturation pressure [Pa]        
 
                 // Enthalpies
-                if (Gamma_xv_vapor[i] > 0.0) {                             // Evaporation case
+                if (Gamma_xv_vapor[i] > 0.0) {                          // Evaporation case
 
                     h_xv_v = vapor_sodium::h(T_x_v_iter[i]);
                     h_vx_x = liquid_sodium::h(T_x_v_iter[i]);
 
                 }
-                else {                                              // Condensation case
+                else {                                                  // Condensation case
 
-                    h_xv_v = vapor_sodium::h(T_v_bulk[i]);
+                    h_xv_v = vapor_sodium::h(T_x_v_iter[i]);
                     h_vx_x = liquid_sodium::h(T_x_v_iter[i])
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
@@ -1408,13 +1388,20 @@ int main() {
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;   // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
 
+                phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / T_x_v[i] -
+                    sigma_c * Omega * p_v[i] / T_v_bulk[i]) /
+                    std::sqrt(2 * pi * Rv);                  // Approximated evaporation mass flux [kg/(m2s)]
+
+                /*
                 phi_x_v[i] = (sigma_e * vapor_sodium::P_sat(T_x_v[i]) -
                     sigma_c * Omega * p_v[i]) /
-                    std::sqrt(2 * pi * Rv * T_x_v[i]);                 // Approximated evaporation mass flux [kg/(m2s)]
-               
+                    std::sqrt(2 * pi * Rv * T_x_v[i]);                  // Approximated evaporation mass flux [kg/(m2s)]
+                */
+
                 Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 * eps_s / r_v;     // Volumetric mass source [kg/m3s] to vapor
-                Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
-                    / (r_i * r_i - r_v * r_v);                          // Volumetric mass source [kg/m3s] to wick
+                Gamma_xv_wick[i] = phi_x_v[i] * 2.0 * eps_s / r_v;      // Volumetric mass source [kg/m3s] to wick
+                // Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s)
+                //     / (r_i * r_i - r_v * r_v);                       // Volumetric mass source [kg/m3s] to wick
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
