@@ -53,8 +53,8 @@ int main() {
             
     // Geometric parameters
     const std::size_t N = 22;                                       // Number of axial nodes [-]
-    const data_type L = 0.982; 			                            // Length of the heat pipe [m]
-    const data_type dz = L / N;                                     // Axial discretization step [m]
+    const data_type L = 1; 			                            // Length of the heat pipe [m]
+    const data_type dz = L / (N - 2);                               // Axial discretization step [m]
     const data_type evaporator_start = 0.020;                       // Evaporator begin [m]
 	const data_type evaporator_end = 0.073;                         // Evaporator end [m]
 	const data_type condenser_length = 0.292;                       // Condenser length [m]
@@ -349,12 +349,12 @@ int main() {
     tdma::Solver tdma_solver(N);
 
     // Mesh z positions of the begin of the cells
-    std::vector<data_type> mesh(N, 0.0);
-    for (int i = -1; i <= N; ++i) mesh[i] = i * dz;
+    std::vector<data_type> mesh(N - 2, 0.0);
+    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;
 
     // Mesh z positions of the center of the cells
-    std::vector<data_type> mesh_center(N, 0.0);
-    for (int i = -1; i <= N; ++i) mesh_center[i] = (i + 0.5) * dz;
+    std::vector<data_type> mesh_center(N - 2, 0.0);
+    for (int i = 0; i < N - 2; ++i) mesh_center[i] = (i + 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision
 
@@ -376,7 +376,7 @@ int main() {
     std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
     mesh_output << std::setprecision(output_precision);
 
-    for (std::size_t i = 0; i < N; ++i) mesh_output << mesh_center[i] << " ";
+    for (std::size_t i = 0; i < N - 2; ++i) mesh_output << mesh_center[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
