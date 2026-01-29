@@ -45,7 +45,7 @@ int main() {
     const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
     const data_type sigma_e = 0.01;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.01;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
-	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
+	data_type Omega = 0.01;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
     const data_type K = 1e-10;                 // Permeability [m2]
@@ -53,7 +53,7 @@ int main() {
             
     // Geometric parameters
     const std::size_t N = 22;                                       // Number of axial nodes [-]
-    const data_type L = 1; 			                            // Length of the heat pipe [m]
+    const data_type L = 1; 			                                // Length of the heat pipe [m]
     const data_type dz = L / (N - 2);                               // Axial discretization step [m]
     const data_type evaporator_start = 0.020;                       // Evaporator begin [m]
 	const data_type evaporator_end = 0.073;                         // Evaporator end [m]
@@ -62,6 +62,9 @@ int main() {
     const data_type r_i = 0.0112;                                   // Wall-wick interface radius [m]
     const data_type r_v = 0.01075;                                  // Vapor-wick interface radius [m]
     const data_type Dh_v = 2.0 * r_v;                               // Hydraulic diameter of the vapor core [m]
+    const data_type vol_wall = (r_o * r_o - r_i * r_i) * pi * L;    // Volume of the wall [m3]
+    const data_type vol_wick = (r_i * r_i - r_v * r_v) * pi * L;    // Volume of the wick [m3]
+    const data_type vol_vapor = r_v * r_v * pi * L;                 // Volume of the vapor [m3]
 
     // Evaporator region parameters
     const data_type Lh = evaporator_end - evaporator_start;
@@ -83,7 +86,7 @@ int main() {
     data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	data_type           dt = dt_user;                   // Current time step [s]
     data_type           time_total = 0.0;               // Total simulation time [s]
-    const data_type     time_simulation = 20000;       // Simulation total number [s]
+    const data_type     time_simulation = 10000;       // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
     data_type           accelerator = 0.5;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
@@ -109,7 +112,7 @@ int main() {
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
     // Constant temperature for initialization
-    const data_type T_init = 800.0;
+    const data_type T_init = 800;
 
     std::vector<data_type> T_o_w(N, T_init);           // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);        // Wall bulk temperature [K]
@@ -466,6 +469,8 @@ int main() {
     std::ofstream continuity_res_v_output(case_chosen + "/continuity_res_v.txt", std::ios::app);
     std::ofstream temperature_res_v_output(case_chosen + "/temperature_res_v.txt", std::ios::app);
 
+    std::ofstream reynolds_output(case_chosen + "/reynolds_vapor.txt", std::ios::app);
+
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
     simulation_time_output << std::setprecision(output_precision);
@@ -513,6 +518,8 @@ int main() {
 
     momentum_res_v_output << std::setprecision(output_precision);
     continuity_res_v_output << std::setprecision(output_precision);
+    temperature_res_v_output << std::setprecision(output_precision);
+
     temperature_res_v_output << std::setprecision(output_precision);
 
     // New things to sort inside of the other variables when approved
@@ -1317,7 +1324,7 @@ int main() {
                 // Physical properties
                 const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
                 const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                              // Prandtl number [-]
-                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                const data_type H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa]        
 
                 // Enthalpies
@@ -1371,7 +1378,7 @@ int main() {
                 T_x_v[i] = ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v; // Temperature at the wick vapor interface
 
                 // Condenser power
-                data_type conv = h_conv * (T_o_w[i] - T_env);                  // [W/m2]
+                data_type conv = h_conv * (T_o_w[i] - T_env);               // [W/m2]
                 data_type irr = emissivity * sigma *
                     (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));           // [W/m2]
 
@@ -1409,7 +1416,7 @@ int main() {
                 Q_xm[i] = H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  
                 
                 // Mixture to wick, heat source due to heat flux [W/m3] 
-                Q_mx[i] = -k_w[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
+                Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
@@ -1428,10 +1435,19 @@ int main() {
                 // Volumetric mass source [kg/m3s] to wick
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);    
 
+                /*
+                
                 heat_balance_surface[i] =
                     + k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
                     - H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
                     - (h_xv_v - h_vx_x) * phi_x_v[i];
+
+                */
+
+                heat_balance_surface[i] =
+                    - k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
+                    + H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
+                    + (h_xv_v - h_vx_x) * phi_x_v[i];
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
