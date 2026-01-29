@@ -90,65 +90,21 @@ case_labels = [
 # Files and metadata
 # ============================================================
 targets = [
-    "vapor_velocity.txt",
-    "vapor_pressure.txt",
-    "vapor_bulk_temperature.txt",
-    "rho_vapor.txt",
-    "wick_velocity.txt",
-    "wick_pressure.txt",
-    "wick_bulk_temperature.txt",
-    "rho_liquid.txt",
-    "wick_vapor_interface_temperature.txt",
-    "wall_wick_interface_temperature.txt",
-    "outer_wall_temperature.txt",
-    "wall_bulk_temperature.txt",
-    "wick_vapor_mass_source.txt",
-    "outer_wall_heat_source.txt",
-    "wall_wx_heat_source.txt",
-    "wick_wx_heat_source.txt",
-    "wick_xv_heat_source.txt",
-    "vapor_xv_heat_source.txt",
-    "vapor_heat_source_mass.txt",
-    "wick_heat_source_mass.txt",
-    "saturation_pressure.txt",
-    "sonic_velocity.txt",
-    "reynolds_vapor.txt" 
+    "heat_balance_surface.txt",
+    "wall_wick_heat_balance.txt",
+    "wick_vapor_heat_balance.txt",
 ]
 
 names = [
-    "Vapor velocity",
-    "Vapor pressure",
-    "Vapor bulk temperature",
-    "Vapor density",
-    "Wick velocity",
-    "Wick pressure",
-    "Wick bulk temperature",
-    "Liquid density",
-    "Wick-vapor interface temperature",
-    "Wall-wick interface temperature",
-    "Outer wall temperature",
-    "Wall bulk temperature",
-    "Wick-vapor mass source",
-    "Outer wall heat-source (flux)",
-    "Wall heat-source from wick (flux)",
-    "Wick heat-source from wall (flux)",
-    "Wick heat-source from vapor (flux)",
-    "Vapor heat-source from wick (flux)",
-    "Vapor heat-source (mass)",
-    "Wick heat-source (mass)",
-    "Saturation pressure",
-    "Sonic speed",
-    "Vapor Reynolds number"
+    "Heat fluxes balance \n at the wick/vapor interface",
+    "Heat volumetric balance \n at the wall/wick interface",
+    "Heat volumetric balance \n at the wick/vapor interface",
 ]
 
 units = [
-    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
-    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
-    "[K]", "[K]", "[K]", "[K]",
-    "[kg/(m³·s)]",
-    "[W/m³]", "[W/m³]", "[W/m³]", "[W/m³]", "[W/m³]",
-    "[W/m³]", "[W/m³]",
-    "[Pa]", "[m/s]", "[-]"
+    "[W/m2]", 
+    "[W/m3]", 
+    "[W/m3]"
 ]
 
 # ============================================================
@@ -205,9 +161,9 @@ time_box = TextBox(ax_timebox, "Set t [s] ", initial=f"{TIME[0]:.6g}")
 # ============================================================
 buttons = []
 n_vars = len(names)
-n_cols = 3
-button_width = 0.11
-button_height = 0.07
+n_cols = 1
+button_width = 0.18
+button_height = 0.12
 col_gap = 0.005
 
 panel_left = 0.62
@@ -222,7 +178,7 @@ for i, name in enumerate(names):
     x_pos = panel_left + col * (button_width + col_gap)
     y_pos = panel_top - (row + 1) * row_height
     bax = plt.axes([x_pos, y_pos, button_width, button_height])
-    btn = Button(bax, "\n".join(textwrap.wrap(name, 12)))
+    btn = Button(bax, name)
     btn.label.set_fontsize(9)
     buttons.append(btn)
 

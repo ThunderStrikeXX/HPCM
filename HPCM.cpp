@@ -43,9 +43,9 @@ int main() {
 
     // Evaporation and condensation parameters
     const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
-    const data_type sigma_e = 0.01;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const data_type sigma_c = 0.01;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
-	data_type Omega = 0.01;                     // Initialization of Omega parameter for evaporation/condensation model [-]
+    const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
+	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
     const data_type K = 1e-10;                 // Permeability [m2]
@@ -86,7 +86,7 @@ int main() {
     data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	data_type           dt = dt_user;                   // Current time step [s]
     data_type           time_total = 0.0;               // Total simulation time [s]
-    const data_type     time_simulation = 10000;       // Simulation total number [s]
+    const data_type     time_simulation = 5000;       // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
     data_type           accelerator = 0.5;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]

@@ -52,6 +52,7 @@ case = cases[idx]
 time_file = os.path.join(case, "time.txt")
 
 targets = [
+    "global_heat_balance.txt",
     "total_heat_source_wall.txt",
     "total_heat_source_wick.txt",
     "total_heat_source_vapor.txt",
@@ -79,6 +80,7 @@ time = time[:n]
 Y = [y[:n] for y in Y]
 
 names = [
+    "Global input/output \n heat balance",
     "Total wall heat source",
     "Total wick heat source",
     "Total vapor heat source",
@@ -87,6 +89,7 @@ names = [
 ]
 
 units = [
+    "[W/m3]",
     "[W/m3]",
     "[W/m3]",
     "[W/m3]",
