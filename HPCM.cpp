@@ -43,8 +43,8 @@ int main() {
 
     // Evaporation and condensation parameters
     const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
-    const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const data_type sigma_e = 0.01;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const data_type sigma_c = 0.01;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -238,6 +238,7 @@ int main() {
     std::vector<data_type> k_v(N);
     std::vector<data_type> k_v_int(N);
     std::vector<data_type> Re_v(N);
+    std::vector<data_type> HTC(N);
 
     data_type h_xv_v;          // Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     data_type h_vx_x;          // Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -480,6 +481,7 @@ int main() {
     std::ofstream wick_vapor_heat_balance_output(case_chosen + "/wick_vapor_heat_balance.txt", std::ios::app);
 
     std::ofstream reynolds_output(case_chosen + "/reynolds_vapor.txt", std::ios::app);
+    std::ofstream HTC_output(case_chosen + "/HTC.txt", std::ios::app);
 
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
@@ -536,6 +538,7 @@ int main() {
     wick_vapor_heat_balance_output << std::setprecision(output_precision);
 
     reynolds_output << std::setprecision(output_precision);
+    HTC_output << std::setprecision(output_precision);
 
     #pragma endregion
 
@@ -1318,10 +1321,10 @@ int main() {
             for (std::size_t i = 0; i < N; ++i) {
 
                 // Physical properties
-                Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
-                const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                              // Prandtl number [-]
-                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa]        
+                Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];                 // Reynolds number [-]
+                const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                      // Prandtl number [-]
+                HTC[i] = 100 * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);       // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa]        
 
                 // Enthalpies
                 if (Gamma_xv_vapor[i] > 0.0) {                          // Evaporation case
@@ -1338,10 +1341,10 @@ int main() {
                 }
 
                 // Useful constants
-                const data_type E3 = H_xm;
-                const data_type E4 = -k_x[i] + H_xm * r_v;
-                const data_type E5 = -2.0 * r_v * k_x[i] + H_xm * r_v * r_v;
-                const data_type E6 = H_xm * T_v_bulk[i] - (h_xv_v - h_vx_x) * phi_x_v[i];
+                const data_type E3 = HTC[i];
+                const data_type E4 = -k_x[i] + HTC[i] * r_v;
+                const data_type E5 = -2.0 * r_v * k_x[i] + HTC[i] * r_v * r_v;
+                const data_type E6 = HTC[i] * T_v_bulk[i] - (h_xv_v - h_vx_x) * phi_x_v[i];
 
                 const data_type alpha = 1.0 / (2 * r_o * (E1w - r_i) + r_i * r_i - E2w);
                 const data_type delta = T_x_bulk[i] - T_w_bulk[i] + q_ow[i] / k_w[i] * (E1w - r_i) -
@@ -1409,7 +1412,7 @@ int main() {
                 Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);
                 
                 // Wick to mixture, heat source due to heat flux [W/m3] 
-                Q_xm[i] = H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  
+                Q_xm[i] = HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  
                 
                 // Mixture to wick, heat source due to heat flux [W/m3] 
                 Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
@@ -1433,7 +1436,7 @@ int main() {
 
                 heat_balance_surface[i] =
                     - k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
-                    + H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
+                    + HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
                     + (h_xv_v - h_vx_x) * phi_x_v[i];
             }
 
@@ -1682,6 +1685,7 @@ int main() {
                 wick_vapor_heat_balance_output << wick_vapor_heat_balance[i] << " ";
 
                 reynolds_output << Re_v[i] << " ";
+                HTC_output << HTC[i] << " ";
             }
 
             // Time between timesteps [ms]
@@ -1772,6 +1776,7 @@ int main() {
             wick_vapor_heat_balance_output << "\n";
 
             reynolds_output << "\n";
+            HTC_output << "\n";
 
             v_velocity_output.flush();
             v_pressure_output.flush();
@@ -1830,6 +1835,7 @@ int main() {
             wick_vapor_heat_balance_output.flush();
 
             reynolds_output.flush();
+            HTC_output.flush();
 
             t_last_print += print_interval;
         }
@@ -1893,6 +1899,7 @@ int main() {
     wick_vapor_heat_balance_output.close();
 
     reynolds_output.close();
+    HTC_output.close();
 
     data_type end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;

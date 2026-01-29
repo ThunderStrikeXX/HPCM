@@ -112,7 +112,8 @@ targets = [
     "wick_heat_source_mass.txt",
     "saturation_pressure.txt",
     "sonic_velocity.txt",
-    "reynolds_vapor.txt" 
+    "reynolds_vapor.txt",
+    "HTC.txt" 
 ]
 
 names = [
@@ -138,7 +139,8 @@ names = [
     "Wick heat-source (mass)",
     "Saturation pressure",
     "Sonic speed",
-    "Vapor Reynolds number"
+    "Vapor Reynolds number",
+    "Vapor HTC"
 ]
 
 units = [
@@ -148,7 +150,7 @@ units = [
     "[kg/(m³·s)]",
     "[W/m³]", "[W/m³]", "[W/m³]", "[W/m³]", "[W/m³]",
     "[W/m³]", "[W/m³]",
-    "[Pa]", "[m/s]", "[-]"
+    "[Pa]", "[m/s]", "[-]", "[W/(m2·K)]"
 ]
 
 # ============================================================
