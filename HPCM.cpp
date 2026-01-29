@@ -161,6 +161,10 @@ int main() {
     std::vector<data_type> Q_tot_x(N, 0.0);            // Total heat flux in the wick [W/m3]
     std::vector<data_type> Q_tot_v(N, 0.0);            // Total heat flux in the vapor [W/m3]
 
+    std::vector<double> heat_balance_surface(N, 0.0);
+    std::vector<double> wall_wick_heat_balance(N, 0.0);
+    std::vector<double> wick_vapor_heat_balance(N, 0.0);
+
     std::vector<data_type> Q_mass_vapor(N, 0.0);       // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
     std::vector<data_type> Q_mass_wick(N, 0.0);        // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the wick
 
@@ -233,6 +237,7 @@ int main() {
     std::vector<data_type> cp_v(N);
     std::vector<data_type> k_v(N);
     std::vector<data_type> k_v_int(N);
+    std::vector<data_type> Re_v(N);
 
     data_type h_xv_v;          // Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     data_type h_vx_x;          // Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -469,6 +474,11 @@ int main() {
     std::ofstream continuity_res_v_output(case_chosen + "/continuity_res_v.txt", std::ios::app);
     std::ofstream temperature_res_v_output(case_chosen + "/temperature_res_v.txt", std::ios::app);
 
+    std::ofstream global_heat_balance_output(case_chosen + "/global_heat_balance.txt", std::ios::app);
+    std::ofstream heat_balance_surface_output(case_chosen + "/heat_balance_surface.txt", std::ios::app);
+    std::ofstream wall_wick_heat_balance_output(case_chosen + "/wall_wick_heat_balance.txt", std::ios::app);
+    std::ofstream wick_vapor_heat_balance_output(case_chosen + "/wick_vapor_heat_balance.txt", std::ios::app);
+
     std::ofstream reynolds_output(case_chosen + "/reynolds_vapor.txt", std::ios::app);
 
     time_output << std::setprecision(output_precision);
@@ -520,26 +530,12 @@ int main() {
     continuity_res_v_output << std::setprecision(output_precision);
     temperature_res_v_output << std::setprecision(output_precision);
 
-    temperature_res_v_output << std::setprecision(output_precision);
-
-    // New things to sort inside of the other variables when approved
-
-    std::vector<double> heat_balance_surface(N, 0.0);
-
-    std::ofstream heat_balance_surface_output(case_chosen + "/heat_balance_surface.txt", std::ios::app);
-
     heat_balance_surface_output << std::setprecision(output_precision);
-
-    std::vector<double> wall_wick_heat_balance(N, 0.0);
-    std::vector<double> wick_vapor_heat_balance(N, 0.0);
-
-    std::ofstream global_heat_balance_output(case_chosen + "/global_heat_balance.txt", std::ios::app);
-    std::ofstream wall_wick_heat_balance_output(case_chosen + "/wall_wick_heat_balance.txt", std::ios::app);
-    std::ofstream wick_vapor_heat_balance_output(case_chosen + "/wick_vapor_heat_balance.txt", std::ios::app);
-
     global_heat_balance_output << std::setprecision(output_precision);
     wall_wick_heat_balance_output << std::setprecision(output_precision);
     wick_vapor_heat_balance_output << std::setprecision(output_precision);
+
+    reynolds_output << std::setprecision(output_precision);
 
     #pragma endregion
 
@@ -1322,9 +1318,9 @@ int main() {
             for (std::size_t i = 0; i < N; ++i) {
 
                 // Physical properties
-                const data_type Re_v = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
+                Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];            // Reynolds number [-]
                 const data_type Pr_v = cp_v[i] * mu_v[i] / k_v[i];                              // Prandtl number [-]
-                const data_type H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                const data_type H_xm = 100 * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa]        
 
                 // Enthalpies
@@ -1434,15 +1430,6 @@ int main() {
                 
                 // Volumetric mass source [kg/m3s] to wick
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v * eps_s) / (r_i * r_i - r_v * r_v);    
-
-                /*
-                
-                heat_balance_surface[i] =
-                    + k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
-                    - H_xm * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
-                    - (h_xv_v - h_vx_x) * phi_x_v[i];
-
-                */
 
                 heat_balance_surface[i] =
                     - k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
@@ -1693,6 +1680,8 @@ int main() {
 
                 wall_wick_heat_balance_output << wall_wick_heat_balance[i] << " ";
                 wick_vapor_heat_balance_output << wick_vapor_heat_balance[i] << " ";
+
+                reynolds_output << Re_v[i] << " ";
             }
 
             // Time between timesteps [ms]
@@ -1782,6 +1771,8 @@ int main() {
             wall_wick_heat_balance_output << "\n";
             wick_vapor_heat_balance_output << "\n";
 
+            reynolds_output << "\n";
+
             v_velocity_output.flush();
             v_pressure_output.flush();
             v_bulk_temperature_output.flush();
@@ -1837,6 +1828,8 @@ int main() {
 
             wall_wick_heat_balance_output.flush();
             wick_vapor_heat_balance_output.flush();
+
+            reynolds_output.flush();
 
             t_last_print += print_interval;
         }
@@ -1898,6 +1891,8 @@ int main() {
 
     wall_wick_heat_balance_output.close();
     wick_vapor_heat_balance_output.close();
+
+    reynolds_output.close();
 
     data_type end = omp_get_wtime();
     std::cout << "Execution time: " << end - start;
