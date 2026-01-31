@@ -43,8 +43,8 @@ int main() {
 
     // Evaporation and condensation parameters
     const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
-    const data_type sigma_e = 0.01;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const data_type sigma_c = 0.01;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -1444,7 +1444,7 @@ int main() {
                     std::sqrt(2 * pi * Rv);                 
 
                 // Volumetric mass source [kg/m3s] to vapor
-                Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 *  r_v;    
+                Gamma_xv_vapor[i] = phi_x_v[i] * 2.0 / r_v;    
                 
                 // Volumetric mass source [kg/m3s] to wick
                 Gamma_xv_wick[i] = phi_x_v[i] * (2.0 * r_v) / (r_i * r_i - r_v * r_v);    
