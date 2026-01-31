@@ -11,6 +11,7 @@
 #include <string>
 #include <limits>
 #include <cstdint>
+#include <regex>
 
 #include "tdma.h"
 #include "steel.h"
@@ -369,15 +370,20 @@ int main() {
 
     std::string case_chosen = "case_0";
 
-    // Create result folder
-    std::size_t new_case = 0;
-    while (true) {
-        case_chosen = "case_" + std::to_string(new_case);
-        if (!std::filesystem::exists(case_chosen)) {
-            std::filesystem::create_directory(case_chosen);
-            break;
-        }
-        new_case++;
+    std::string case_name, case_chosen;
+    const std::regex valid("^[A-Za-z0-9_-]+$");
+
+    for (;;) {
+        std::cout << "Enter case name: ";
+        std::cin >> case_name;
+
+        case_chosen = "case_" + case_name;
+
+        if (!std::regex_match(case_name, valid)) continue;
+        if (std::filesystem::exists(case_chosen)) continue;
+
+        std::filesystem::create_directory(case_chosen);
+        break;
     }
 
     std::cout << "Running case " << case_chosen << "\n";
