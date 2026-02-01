@@ -43,7 +43,7 @@ int main() {
     const data_type T_env = 280.0;             // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const data_type eps_s = 0.1;               // Surface fraction of the wick available for phasic interface [-]
+    const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
     const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
@@ -90,7 +90,7 @@ int main() {
     const data_type     time_simulation = 5000;       // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
-    data_type           accelerator = 0.1;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    data_type           accelerator = 0.5;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -1394,11 +1394,10 @@ int main() {
                 T_w_x[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_i + ABC[6 * i + 2] * r_i * r_i; // Temperature at the wall wick interface
                 T_x_v[i] = ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v; // Temperature at the wick vapor interface
 
-                // Condenser power
-                data_type conv = h_conv * (T_o_w[i] - T_env);               // [W/m2]
+                data_type conv = h_conv * (T_o_w[i] - T_env);       // [W/m2]
                 data_type irr = emissivity * sigma *
-                    (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));           // [W/m2]
-
+                    (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));   // [W/m2]
+               
                 // Outer wall power profile
                 if (mesh_center[i] >= (evaporator_start - delta_h) && mesh_center[i] < evaporator_start) {
                     data_type x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
@@ -1442,8 +1441,8 @@ int main() {
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
 
                 // Real evaporation mass flux [kg/(m2s)]
-                phi_x_v[i] = eps_s * (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / T_x_v[i] -
-                    sigma_c * Omega * p_v[i] / T_v_bulk[i]) /
+                phi_x_v[i] = eps_s * (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
+                    sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                     std::sqrt(2 * pi * Rv);                 
 
                 // Volumetric mass source [kg/m3s] to vapor
