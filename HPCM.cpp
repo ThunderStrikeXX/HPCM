@@ -43,7 +43,7 @@ int main() {
     const data_type T_env = 280.0;             // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
+    const data_type eps_s = 0.1;               // Surface fraction of the wick available for phasic interface [-]
     const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
@@ -90,7 +90,7 @@ int main() {
     const data_type     time_simulation = 5000;       // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step
-    data_type           accelerator = 0.5;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
+    data_type           accelerator = 0.1;              // Adaptive timestep multiplier (maximum value for stability: 5)[-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -113,7 +113,7 @@ int main() {
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
     // Constant temperature for initialization
-    const data_type T_init = 800;
+    const data_type T_init = 1000;
 
     std::vector<data_type> T_o_w(N, T_init);           // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);        // Wall bulk temperature [K]
@@ -358,13 +358,13 @@ int main() {
     // TDMA solver
     tdma::Solver tdma_solver(N);
 
-    // Mesh z positions of the begin of the cells
-    std::vector<data_type> mesh(N - 2, 0.0);
-    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;
+    // Mesh z positions of the begin of the cells (ghost cells included)
+    std::vector<data_type> mesh(N, 0.0);
+    for (int i = 0; i < N; ++i) mesh[i] = (i - 1) * dz;
 
-    // Mesh z positions of the center of the cells
-    std::vector<data_type> mesh_center(N - 2, 0.0);
-    for (int i = 0; i < N - 2; ++i) mesh_center[i] = (i + 0.5) * dz;
+    // Mesh z positions of the center of the cells (ghost cells included)
+    std::vector<data_type> mesh_center(N, 0.0);
+    for (int i = 0; i < N; ++i) mesh_center[i] = (i - 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision
 
@@ -389,7 +389,7 @@ int main() {
     std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
     mesh_output << std::setprecision(output_precision);
 
-    for (std::size_t i = 0; i < N - 2; ++i) mesh_output << mesh_center[i] << " ";
+    for (std::size_t i = 1; i < N - 1; ++i) mesh_output << mesh_center[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
@@ -1322,7 +1322,7 @@ int main() {
 
             #pragma region interfaces 
 
-            for (std::size_t i = 0; i < N; ++i) {
+            for (std::size_t i = 1; i < N - 1; ++i) {
 
                 // Physical properties
                 Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];                         // Reynolds number [-]
@@ -1338,7 +1338,7 @@ int main() {
 
                 */
 
-                const data_type HTC_multiplier = 100.0;
+                const data_type HTC_multiplier = 1.0;
 
                 HTC[i] = HTC_multiplier * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
 
