@@ -1,7 +1,5 @@
 ﻿#pragma once
 
-using data_type = double;
-
 /**
  * @brief Provides thermophysical and transport properties for Sodium Vapor.
  *
@@ -11,6 +9,8 @@ using data_type = double;
  * in standard SI units unless otherwise noted.
  */
 namespace vapor_sodium {
+
+    using data_type = double;
 
     /**
     * @brief 1D table interpolation in T over monotone grid
@@ -50,14 +50,23 @@ namespace vapor_sodium {
             ) * 1e3;   // J/kg
     }
 
-    /// Enthalpy of vaporization of sodium [J/kg]
-    /// Fink (1995)
+    /// Enthalpy of vaporization of sodium Δh_vap(T) [J/kg]
+    /// Critical-scaling correlation (vanishes at Tcrit)
     inline data_type h_vap_sodium(data_type T) {
+
         // Numerical safety
         if (T < 300.0)  T = 300.0;
         if (T > 2500.0) T = 2500.0;
 
-        return (2128.4 + 0.86496 * T) * 1e3; // J/kg
+        // Sodium critical temperature [K]
+        constexpr data_type Tcrit = 2503.0;
+
+        const data_type theta = 1.0 - T / Tcrit;
+
+        return (
+            393.37 * theta
+            + 4398.6 * std::pow(theta, 0.29302)
+            ) * 1e3;   // J/kg
     }
 
     /// Enthalpy of sodium vapor [J/kg]
@@ -310,4 +319,44 @@ namespace vapor_sodium {
         data_type cv_val = cv(T);
         return cp_val / cv_val;
     }
+
+
+    /**
+     * @brief Vapor enthalpy obtained by numerical integration of cp(T)
+     *        using the same reference enthalpy as liquid sodium.
+     *
+     * h_v(T) = h_l(T_ref) + ∫_{T_ref}^{T} cp(T) dT
+     *
+     * Reference:
+     *  - cp(T): Fink & Leibowitz (tabulated, interpolated)
+     *  - h_l(T): CODATA liquid sodium enthalpy
+
+    inline data_type h(data_type T) {
+        // --- reference temperature ---
+        constexpr data_type Tref = 400.0;
+
+        // clamp for numerical safety
+        if (T < Tref)  T = Tref;
+        if (T > 2500.0) T = 2500.0;
+
+        // reference enthalpy: liquid sodium
+        const data_type href = h(Tref);   // J/kg
+
+        // --- numerical integration (trapezoidal rule) ---
+        constexpr int N = 200;             // fixed quadrature resolution
+        const data_type dT = (T - Tref) / N;
+
+        data_type integral = 0.0;
+        data_type Ti = Tref;
+
+        for (int i = 0; i < N; ++i) {
+            const data_type Tj = Ti + dT;
+            integral += 0.5 * (cp(Ti) + cp(Tj)) * dT;
+            Ti = Tj;
+        }
+
+        return href + integral;            // J/kg
+    }
+         */
+
 }
