@@ -1763,17 +1763,17 @@ int main() {
                 total_mass_source_vapor += Gamma_xv_vapor[i];
             }
 
-            global_heat_balance *= vol_wall;
-            total_heat_source_wall *= vol_wall;
-            total_heat_source_wick *= vol_wick;
-            total_heat_source_vapor *= vol_vapor;
+            global_heat_balance *= (vol_wall / N);
+            total_heat_source_wall *= (vol_wall / N);
+            total_heat_source_wick *= (vol_wick / N);
+            total_heat_source_vapor *= (vol_vapor / N);
 
             total_heat_source_wall_output << total_heat_source_wall << " ";
             total_heat_source_wick_output << total_heat_source_wick << " ";
             total_heat_source_vapor_output << total_heat_source_vapor << " ";
 
-            total_mass_source_wick *= vol_wick;
-            total_mass_source_vapor *= vol_vapor;
+            total_mass_source_wick *= (vol_wick / N);
+            total_mass_source_vapor *= (vol_vapor / N);
 
             total_mass_source_wick_output << total_mass_source_wick << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
