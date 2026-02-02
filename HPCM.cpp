@@ -1338,7 +1338,7 @@ int main() {
 
                 */
 
-                const data_type HTC_multiplier = 100.0;
+                const data_type HTC_multiplier = 1.0;
 
                 HTC[i] = HTC_multiplier * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
 
@@ -1356,13 +1356,16 @@ int main() {
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
 
-                // data_type latent_heat = h_xv_v - h_vx_x;
+                const auto h_v_cell = vapor_sodium::h(T_v_bulk[i]);
+                const auto h_x_cell = liquid_sodium::h(T_x_bulk[i]);
+
+                data_type enthalpy_difference = ((h_xv_v - h_v_cell) - (h_vx_x - h_x_cell));
 
                 // Useful constants
                 const data_type E3 = HTC[i];
                 const data_type E4 = -k_x[i] + HTC[i] * r_v;
                 const data_type E5 = -2.0 * r_v * k_x[i] + HTC[i] * r_v * r_v;
-                const data_type E6 = HTC[i] * T_v_bulk[i] - (h_xv_v - h_vx_x) * phi_x_v[i];
+                const data_type E6 = HTC[i] * T_v_bulk[i] - enthalpy_difference * phi_x_v[i];
 
                 const data_type alpha = 1.0 / (2 * r_o * (E1w - r_i) + r_i * r_i - E2w);
                 const data_type delta = T_x_bulk[i] - T_w_bulk[i] + q_ow[i] / k_w[i] * (E1w - r_i) -
@@ -1434,11 +1437,18 @@ int main() {
                 // Mixture to wick, heat source due to heat flux [W/m3] 
                 Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
+                Q_mass_vapor[i] = Gamma_xv_vapor[i] * (h_xv_v - h_v_cell);
+                Q_mass_wick[i] = -Gamma_xv_wick[i] * (h_vx_x - h_x_cell);
+
+                /*
+                
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
+
+                */
 
                 /*
 
@@ -1464,7 +1474,7 @@ int main() {
                 heat_balance_surface[i] =
                     - k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
                     + HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
-                    + (h_xv_v - h_vx_x) * phi_x_v[i];
+                    + enthalpy_difference * phi_x_v[i];
             }
 
             // Coupling hypotheses: temperature is transferred to the pressure of the sodium vapor
@@ -1753,9 +1763,17 @@ int main() {
                 total_mass_source_vapor += Gamma_xv_vapor[i];
             }
 
+            global_heat_balance *= vol_wall;
+            total_heat_source_wall *= vol_wall;
+            total_heat_source_wick *= vol_wick;
+            total_heat_source_vapor *= vol_vapor;
+
             total_heat_source_wall_output << total_heat_source_wall << " ";
             total_heat_source_wick_output << total_heat_source_wick << " ";
             total_heat_source_vapor_output << total_heat_source_vapor << " ";
+
+            total_mass_source_wick *= vol_wick;
+            total_mass_source_vapor *= vol_vapor;
 
             total_mass_source_wick_output << total_mass_source_wick << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
