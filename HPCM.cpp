@@ -63,9 +63,9 @@ int main() {
     const data_type r_i = 0.0112;                                   // Wall-wick interface radius [m]
     const data_type r_v = 0.01075;                                  // Vapor-wick interface radius [m]
     const data_type Dh_v = 2.0 * r_v;                               // Hydraulic diameter of the vapor core [m]
-    const data_type vol_wall = (r_o * r_o - r_i * r_i) * pi * L;    // Volume of the wall [m3]
-    const data_type vol_wick = (r_i * r_i - r_v * r_v) * pi * L;    // Volume of the wick [m3]
-    const data_type vol_vapor = r_v * r_v * pi * L;                 // Volume of the vapor [m3]
+    const data_type vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;    // Volume of the wall [m3]
+    const data_type vol_wick_cell = (r_i * r_i - r_v * r_v) * pi * dz;    // Volume of the wick [m3]
+    const data_type vol_vapor_cell = r_v * r_v * pi * dz;                 // Volume of the vapor [m3]
 
     // Evaporator region parameters
     const data_type Lh = evaporator_end - evaporator_start;
@@ -1338,7 +1338,7 @@ int main() {
 
                 */
 
-                const data_type HTC_multiplier = 1.0;
+                const data_type HTC_multiplier = 1000.0;
 
                 HTC[i] = HTC_multiplier * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
 
@@ -1356,10 +1356,16 @@ int main() {
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
 
+                /*
+                
                 const auto h_v_cell = vapor_sodium::h(T_v_bulk[i]);
                 const auto h_x_cell = liquid_sodium::h(T_x_bulk[i]);
 
                 data_type enthalpy_difference = ((h_xv_v - h_v_cell) - (h_vx_x - h_x_cell));
+
+                */
+
+                data_type enthalpy_difference = (h_xv_v - h_vx_x);
 
                 // Useful constants
                 const data_type E3 = HTC[i];
@@ -1437,18 +1443,18 @@ int main() {
                 // Mixture to wick, heat source due to heat flux [W/m3] 
                 Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
+                /*
+
                 Q_mass_vapor[i] = Gamma_xv_vapor[i] * (h_xv_v - h_v_cell);
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * (h_vx_x - h_x_cell);
 
-                /*
-                
+                */
+
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
-
-                */
 
                 /*
 
@@ -1704,14 +1710,14 @@ int main() {
 
                 x_v_mass_flux_output << phi_x_v[i] << " ";
 
-                Q_ow_output << Q_ow[i] << " ";
-                Q_wx_output << Q_wx[i] << " ";
-                Q_xw_output << Q_xw[i] << " ";
-                Q_xm_output << Q_xm[i] << " ";
-                Q_mx_output << Q_mx[i] << " ";
+                Q_ow_output << Q_ow[i] * vol_wall_cell << " ";
+                Q_wx_output << Q_wx[i] * vol_wick_cell << " ";
+                Q_xw_output << Q_xw[i] * vol_wall_cell << " ";
+                Q_xm_output << Q_xm[i] * vol_vapor_cell << " ";
+                Q_mx_output << Q_mx[i] * vol_wick_cell << " ";
 
-                Q_mass_vapor_output << Q_mass_vapor[i] << " ";
-                Q_mass_wick_output << Q_mass_wick[i] << " ";
+                Q_mass_vapor_output << Q_mass_vapor[i] * vol_vapor_cell << " ";
+                Q_mass_wick_output << Q_mass_wick[i] * vol_wick_cell << " ";
 
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);                    // Saturation pressure [Pa] 
 
@@ -1763,17 +1769,17 @@ int main() {
                 total_mass_source_vapor += Gamma_xv_vapor[i];
             }
 
-            global_heat_balance *= (vol_wall / N);
-            total_heat_source_wall *= (vol_wall / N);
-            total_heat_source_wick *= (vol_wick / N);
-            total_heat_source_vapor *= (vol_vapor / N);
+            global_heat_balance *= vol_wall_cell;
+            total_heat_source_wall *= vol_wall_cell;
+            total_heat_source_wick *= vol_wick_cell;
+            total_heat_source_vapor *= vol_vapor_cell;
 
             total_heat_source_wall_output << total_heat_source_wall << " ";
             total_heat_source_wick_output << total_heat_source_wick << " ";
             total_heat_source_vapor_output << total_heat_source_vapor << " ";
 
-            total_mass_source_wick *= (vol_wick / N);
-            total_mass_source_vapor *= (vol_vapor / N);
+            total_mass_source_wick *= vol_wick_cell;
+            total_mass_source_vapor *= vol_vapor_cell;
 
             total_mass_source_wick_output << total_mass_source_wick << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
