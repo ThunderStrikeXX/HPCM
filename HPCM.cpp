@@ -1408,6 +1408,62 @@ int main() {
                 data_type irr = emissivity * sigma *
                     (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));   // [W/m2]
                
+
+                data_type sum_w = 0.0;
+                std::size_t n_evap = 0;
+
+                // Evaporator
+                for (std::size_t i = 0; i < N; ++i) {
+                    data_type w = 0.0;
+
+                    if (mesh_center[i] >= evaporator_start - delta_h &&
+                        mesh_center[i] <= evaporator_end + delta_h) {
+
+                        ++n_evap;
+
+                        if (mesh_center[i] >= evaporator_start - delta_h &&
+                            mesh_center[i] < evaporator_start) {
+
+                            data_type x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
+                            w = 0.5 * (1.0 - std::cos(pi * x));
+                        }
+                        else if (mesh_center[i] >= evaporator_start &&
+                            mesh_center[i] <= evaporator_end) {
+
+                            w = 1.0;
+                        }
+                        else if (mesh_center[i] > evaporator_end &&
+                            mesh_center[i] <= evaporator_end + delta_h) {
+
+                            data_type x = (mesh_center[i] - evaporator_end) / delta_h;
+                            w = 0.5 * (1.0 + std::cos(pi * x));
+                        }
+                    }
+
+                    q_ow[i] = w;        // evaporator weight
+                    sum_w += w;
+                }
+
+                // Evaporator normalitazion 
+                const data_type s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
+                for (std::size_t i = 0; i < N; ++i)
+                    q_ow[i] *= s;
+
+                // Condenser
+                for (std::size_t i = 0; i < N; ++i) {
+
+                    if (mesh_center[i] >= condenser_start &&
+                        mesh_center[i] < condenser_start + delta_c) {
+
+                        data_type x = (mesh_center[i] - condenser_start) / delta_c;
+                        q_ow[i] = -(conv + irr) * 0.5 * (1.0 - std::cos(pi * x));
+                    }
+                    else if (mesh_center[i] >= condenser_start + delta_c) {
+                        q_ow[i] = -(conv + irr);
+                    }
+                }
+
+                /*
                 // Outer wall power profile
                 if (mesh_center[i] >= (evaporator_start - delta_h) && mesh_center[i] < evaporator_start) {
                     data_type x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
@@ -1428,9 +1484,10 @@ int main() {
                 else if (mesh_center[i] >= condenser_start + delta_c) {
                     q_ow[i] = -(conv + irr);
                 }
+                */
 
                 // Outer wall to bulk wall, heat source due to BCs [W/m3] 
-                Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);    
+                Q_ow[i] = q_ow[i] * 2 * r_o * Lh_eff / ((r_o * r_o - r_i * r_i) * dz);    
                     
                 // Wick to wall, heat source due to heat flux [W/m3]
                 Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           
