@@ -75,6 +75,49 @@ namespace vapor_sodium {
         return h_liquid_sodium(T) + h_vap_sodium(T);
     }
 
+    inline data_type T_from_h_vapor(data_type h_target) {
+
+        constexpr data_type T_min = 300.0;
+        constexpr data_type T_max = 2500.0;
+        constexpr int max_iter = 80;
+
+        // tolleranze su entalpia [J/kg]
+        constexpr data_type rel_tol = 1e-8;
+        constexpr data_type abs_tol = 1e-3;   // 1 mJ/kg: praticamente zero
+
+        data_type T_lo = T_min;
+        data_type T_hi = T_max;
+
+        const data_type h_lo = vapor_sodium::h(T_lo);
+        const data_type h_hi = vapor_sodium::h(T_hi);
+
+        // Se la tua h(T) è monotona crescente, questo deve valere.
+        // Se per qualche ragione non lo è, l'inversione non è definita.
+        if (h_hi <= h_lo) return T_min;
+
+        // Clamp su range coperto
+        if (h_target <= h_lo) return T_lo;
+        if (h_target >= h_hi) return T_hi;
+
+        for (int it = 0; it < max_iter; ++it) {
+
+            const data_type T_mid = 0.5 * (T_lo + T_hi);
+            const data_type h_mid = vapor_sodium::h(T_mid);
+
+            const data_type err = h_mid - h_target;
+            const data_type tol_h = abs_tol + rel_tol * std::max(std::abs(h_target), std::abs(h_mid));
+
+            if (std::abs(err) <= tol_h)
+                return T_mid;
+
+            // monotona crescente: se h_mid troppo grande, abbassa T_hi
+            if (err > 0.0) T_hi = T_mid;
+            else           T_lo = T_mid;
+        }
+
+        return 0.5 * (T_lo + T_hi);
+    }
+
     /**
     * @brief Saturation pressure [Pa] as a function of temperature T
     *   Satou-Moriyama

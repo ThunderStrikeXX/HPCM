@@ -71,4 +71,38 @@ namespace liquid_sodium {
             + 2992.6 / T
             ) * 1e3;   // J/kg
     }
+
+    inline data_type T_from_h_liquid_bisection(data_type h_target) {
+
+        constexpr data_type T_min = 300.0;
+        constexpr data_type T_max = 2500.0;
+        constexpr int max_iter = 60;
+        constexpr data_type rel_tol = 1e-8;
+
+        data_type T_lo = T_min;
+        data_type T_hi = T_max;
+
+        data_type h_lo = liquid_sodium::h(T_lo);
+        data_type h_hi = liquid_sodium::h(T_hi);
+
+        // Clamp di sicurezza
+        if (h_target <= h_lo) return T_lo;
+        if (h_target >= h_hi) return T_hi;
+
+        for (int it = 0; it < max_iter; ++it) {
+
+            data_type T_mid = 0.5 * (T_lo + T_hi);
+            data_type h_mid = liquid_sodium::h(T_mid);
+
+            if (std::abs(h_mid - h_target) < rel_tol * h_target)
+                return T_mid;
+
+            if (h_mid > h_target)
+                T_hi = T_mid;
+            else
+                T_lo = T_mid;
+        }
+
+        return 0.5 * (T_lo + T_hi);
+    }
 }

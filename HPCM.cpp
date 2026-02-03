@@ -545,6 +545,12 @@ int main() {
     reynolds_output << std::setprecision(output_precision);
     HTC_output << std::setprecision(output_precision);
 
+    std::vector<double> h_x(N, vapor_sodium::h(T_init));
+    std::vector<double> h_x_old(N, vapor_sodium::h(T_init));
+
+    std::vector<double> h_v(N, vapor_sodium::h(T_init));
+    std::vector<double> h_v_old(N, vapor_sodium::h(T_init));
+
     #pragma endregion
 
     // Print number of working threads
@@ -697,6 +703,16 @@ int main() {
 
                     const data_type rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
 
+                    const data_type h_L = h_x[i - 1];
+                    const data_type h_P = h_x[i];
+                    const data_type h_R = h_x[i + 1];
+
+                    const data_type h_l = (phi_x[i] >= 0) ? h_L : h_P;
+                    const data_type h_r = (phi_x[i + 1] >= 0) ? h_P : h_R;
+
+                    const data_type C_l = phi_x[i] * h_l;   // [W/m2]
+                    const data_type C_r = phi_x[i + 1] * h_r;
+
                     const data_type k_cond_P = k_x[i];
                     const data_type k_cond_L = k_x[i - 1];
                     const data_type k_cond_R = k_x[i + 1];
@@ -705,32 +721,32 @@ int main() {
                     const data_type cp_L = cp_x[i - 1];
                     const data_type cp_R = cp_x[i + 1];
 
+                    const data_type cp_l = 0.5 * (cp_P + cp_L);
+                    const data_type cp_r = 0.5 * (cp_P + cp_R);
+
                     const data_type cp_P_old = liquid_sodium::cp(T_x_bulk_old[i]);
 
-                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
-                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
-
-                    const data_type cp_l = (phi_x[i] >= 0) ? cp_L : cp_P;
-                    const data_type cp_r = (phi_x[i + 1] >= 0) ? cp_P : cp_R;
-
-                    const data_type C_l = (phi_x[i] * cp_l);
-                    const data_type C_r = (phi_x[i + 1] * cp_r);
+                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
+                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
 
                     Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_wick[i];
 
                     aXT[i] =
-                        -D_l
+                        - D_l
                         - std::max(C_l, static_cast<data_type>(0.0));       // [W/(m2 K)]
+
                     cXT[i] =
-                        -D_r
+                        - D_r
                         - std::max(-C_r, static_cast<data_type>(0.0));      // [W/(m2 K)]
+
                     bXT[i] =
-                        +std::max(C_r, static_cast<data_type>(0.0))
+                        + std::max(C_r, static_cast<data_type>(0.0))
                         + std::max(-C_l, static_cast<data_type>(0.0))
                         + D_l + D_r
-                        + rho_P * cp_P * dz / dt;   // [W/(m2 K)]
+                        + rho_P * dz / dt;   // [W/(m2 K)]
+
                     dXT[i] =
-                        +rho_P_old * cp_P_old * dz / dt * T_x_bulk_old[i]
+                        + rho_P_old * dz / dt * h_x_old[i]
                         + Q_wx[i] * dz              // Positive if heat is added to the wick
                         + Q_mx[i] * dz              // Positive if heat is added to the wick
                         + Q_mass_wick[i] * dz;      // [W/m2]       
@@ -750,7 +766,12 @@ int main() {
 
                 T_prev_x = T_x_bulk;
 
-                tdma_solver.solve(aXT, bXT, cXT, dXT, T_x_bulk);
+                tdma_solver.solve(aXT, bXT, cXT, dXT, h_x);
+
+                for (std::size_t i = 1; i < N - 1; i++) {
+
+                    T_x_bulk[i] = liquid_sodium::T_from_h_liquid_bisection(h_x[i]);
+                }
 
                 #pragma endregion
 
@@ -1034,24 +1055,29 @@ int main() {
                     const data_type rho_L = rho_v[i - 1];
                     const data_type rho_R = rho_v[i + 1];
 
-                    const data_type k_cond_P = k_v[i];
-                    const data_type k_cond_L = k_v[i - 1];
-                    const data_type k_cond_R = k_v[i + 1];
-
                     const data_type cp_P = cp_v[i];
                     const data_type cp_L = cp_v[i - 1];
                     const data_type cp_R = cp_v[i + 1];
 
-                    const data_type cp_P_old = vapor_sodium::cp(T_v_bulk_old[i]);
+                    const data_type cp_l = (phi_v[i] >= 0) ? cp_L : cp_P;
+                    const data_type cp_r = (phi_v[i + 1] >= 0) ? cp_P : cp_R;
 
-                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
-                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
+                    const data_type k_cond_P = k_v[i];
+                    const data_type k_cond_L = k_v[i - 1];
+                    const data_type k_cond_R = k_v[i + 1];
 
-                    const data_type cp_l = (phi_v[i] >= 0) ? cp_L : cp_P;     // [kg/m3]
-                    const data_type cp_r = (phi_v[i + 1] >= 0) ? cp_P : cp_R;     // [kg/m3]
+                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
+                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
 
-                    const data_type C_l = (phi_v[i] * cp_l);               // [W/(m2K)]
-                    const data_type C_r = (phi_v[i + 1] * cp_r);               // [W/(m2K)]
+                    const data_type h_L = h_v[i - 1];
+                    const data_type h_P = h_v[i];
+                    const data_type h_R = h_v[i + 1];
+
+                    const data_type h_l = (phi_v[i] >= 0) ? h_L : h_P;
+                    const data_type h_r = (phi_v[i + 1] >= 0) ? h_P : h_R;
+
+                    const data_type C_l = phi_v[i] * h_l;
+                    const data_type C_r = phi_v[i + 1] * h_r;
 
                     const data_type dpdz_up = u_v[i] * (p_v[i + 1] - p_v[i - 1]) / 2.0;
 
@@ -1077,15 +1103,15 @@ int main() {
                         + std::max(C_r, static_cast<data_type>(0.0))
                         + std::max(-C_l, static_cast<data_type>(0.0))
                         + D_l + D_r
-                        + rho_v[i] * cp_v[i] * dz / dt;      /// [W/(m2 K)]
+                        + rho_v[i] * dz / dt;               /// [W/(m2 K)]
 
                     dVT[i] =
-                        + rho_v_old[i] * cp_P_old * dz / dt * T_v_bulk_old[i]
+                        + rho_v_old[i] * dz / dt * h_v_old[i]
                         // + dp_dt
                         // + dpdz_up
                         // + viscous_dissipation * dz
-                        + Q_xm[i] * dz                     // Positive if heat from wick to vapor
-                        + Q_mass_vapor[i] * dz;          // [W/m2]
+                        + Q_xm[i] * dz                      // Positive if heat from wick to vapor
+                        + Q_mass_vapor[i] * dz;             // [W/m2]
                 }
 
                 // Temperature BCs: zero gradient on the first node
@@ -1102,7 +1128,13 @@ int main() {
 
                 T_prev_v = T_v_bulk;
 
-                tdma_solver.solve(aVT, bVT, cVT, dVT, T_v_bulk);
+                tdma_solver.solve(aVT, bVT, cVT, dVT, h_v);
+
+                for (std::size_t i = 1; i < N - 1; i++) {
+
+                    T_v_bulk[i] = vapor_sodium::T_from_h_vapor(h_v[i]);
+
+                }
 
                 #pragma endregion
 
@@ -1370,17 +1402,17 @@ int main() {
                     h_vx_x = liquid_sodium::h(T_x_v_iter[i])
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
+
+                /*
                 
                 const auto h_v_cell = vapor_sodium::h(T_v_bulk[i]);
                 const auto h_x_cell = liquid_sodium::h(T_x_bulk[i]);
 
                 data_type enthalpy_difference = ((h_xv_v - h_v_cell) - (h_vx_x - h_x_cell));
 
-                /*
+                */
 
                 data_type enthalpy_difference = (h_xv_v - h_vx_x);
-
-                */
 
                 // Useful constants
                 const data_type E3 = HTC[i];
@@ -1500,18 +1532,18 @@ int main() {
                 // Mixture to wick, heat source due to heat flux [W/m3] 
                 Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
+                /*
+
                 Q_mass_vapor[i] = Gamma_xv_vapor[i] * (h_xv_v - h_v_cell);
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * (h_vx_x - h_x_cell);
 
-                /*
+                */
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
-
-                */
 
                 /*
 
@@ -1690,6 +1722,9 @@ int main() {
             p_outlet_x_old = p_outlet_x;
             p_outlet_v_old = p_outlet_v;
 
+            h_x_old = h_x;
+            h_v_old = h_v;
+
             // Update total time elapsed
             time_total += dt;
 
@@ -1737,6 +1772,9 @@ int main() {
 
             p_outlet_x = p_outlet_x_old;
             p_outlet_v = p_outlet_v_old;
+
+            h_x = h_x_old;
+            h_v = h_v_old;
 
             halves += 1;                        // Reduce time step if max Picard iterations reached
         }
