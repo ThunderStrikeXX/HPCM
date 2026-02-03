@@ -39,7 +39,7 @@ int main() {
     
     // Environmental boundary conditions
     const data_type h_conv = 1;                // Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const data_type power = 1000;               // Power at the evaporator side [W]
+    const data_type power = 10;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;             // External environmental temperature [K]
 
     // Evaporation and condensation parameters
@@ -354,7 +354,7 @@ int main() {
 
     // Printing parameters
     data_type t_last_print = 0.0;                   // Time from last print [s]
-    const data_type print_interval = 0.5;           // Time interval for printing [s]
+    const data_type print_interval = 0.05;           // Time interval for printing [s]
 
     // TDMA solver
     tdma::Solver tdma_solver(N);
@@ -574,6 +574,20 @@ int main() {
         T_o_w_iter = T_o_w_old;
         T_w_x_iter = T_w_x_old;
         T_x_v_iter = T_x_v_old;
+
+        constexpr data_type T_ramp = 1000.0;   // [s]
+
+        data_type ramp = 1.0;
+
+        if (time_total <= 0.0) {
+            ramp = 0.0;
+        }
+        else if (time_total < T_ramp) {
+            ramp = 0.5 * (1.0 - std::cos(pi * time_total / T_ramp));
+        }
+        else {
+            ramp = 1.0;
+        }
 
         // Updating all properties
         for (std::size_t i = 0; i < N; ++i) {
@@ -1339,7 +1353,7 @@ int main() {
 
                 */
 
-                const data_type HTC_multiplier = 1000.0;
+                const data_type HTC_multiplier = 1.0;
 
                 HTC[i] = HTC_multiplier * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
 
@@ -1356,17 +1370,17 @@ int main() {
                     h_vx_x = liquid_sodium::h(T_x_v_iter[i])
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
                 }
-
-                /*
                 
                 const auto h_v_cell = vapor_sodium::h(T_v_bulk[i]);
                 const auto h_x_cell = liquid_sodium::h(T_x_bulk[i]);
 
                 data_type enthalpy_difference = ((h_xv_v - h_v_cell) - (h_vx_x - h_x_cell));
 
-                */
+                /*
 
                 data_type enthalpy_difference = (h_xv_v - h_vx_x);
+
+                */
 
                 // Useful constants
                 const data_type E3 = HTC[i];
@@ -1446,8 +1460,11 @@ int main() {
 
                 // Evaporator normalitazion 
                 const data_type s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
-                for (std::size_t i = 0; i < N; ++i)
+                for (std::size_t i = 0; i < N; ++i) {
+
                     q_ow[i] *= s;
+                    Q_ow[i] = q_ow[i] * 2 * r_o * Lh_eff / ((r_o * r_o - r_i * r_i) * dz);
+                }
 
                 // Condenser
                 for (std::size_t i = 0; i < N; ++i) {
@@ -1457,37 +1474,19 @@ int main() {
 
                         data_type x = (mesh_center[i] - condenser_start) / delta_c;
                         q_ow[i] = -(conv + irr) * 0.5 * (1.0 - std::cos(pi * x));
+                        Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);
                     }
                     else if (mesh_center[i] >= condenser_start + delta_c) {
                         q_ow[i] = -(conv + irr);
+                        Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);
                     }
                 }
 
-                /*
-                // Outer wall power profile
-                if (mesh_center[i] >= (evaporator_start - delta_h) && mesh_center[i] < evaporator_start) {
-                    data_type x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
-                    q_ow[i] = 0.5 * q0 * (1.0 - std::cos(pi * x));
-                }
-                else if (mesh_center[i] >= evaporator_start && mesh_center[i] <= evaporator_end) {
-                    q_ow[i] = q0;
-                }
-                else if (mesh_center[i] > evaporator_end && mesh_center[i] <= (evaporator_end + delta_h)) {
-                    data_type x = (mesh_center[i] - evaporator_end) / delta_h;
-                    q_ow[i] = 0.5 * q0 * (1.0 + std::cos(pi * x));
-                }
-                else if (mesh_center[i] >= condenser_start && mesh_center[i] < condenser_start + delta_c) {
-                    data_type x = (mesh_center[i] - condenser_start) / delta_c;
-                    data_type w = 0.5 * (1.0 - std::cos(pi * x));
-                    q_ow[i] = -(conv + irr) * w;
-                }
-                else if (mesh_center[i] >= condenser_start + delta_c) {
-                    q_ow[i] = -(conv + irr);
-                }
-                */
+                for (std::size_t i = 0; i < N; ++i) {
 
-                // Outer wall to bulk wall, heat source due to BCs [W/m3] 
-                Q_ow[i] = q_ow[i] * 2 * r_o * Lh_eff / ((r_o * r_o - r_i * r_i) * dz);    
+                    q_ow[i] *= ramp;
+                    Q_ow[i] *= ramp;
+                }
                     
                 // Wick to wall, heat source due to heat flux [W/m3]
                 Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           
@@ -1501,18 +1500,18 @@ int main() {
                 // Mixture to wick, heat source due to heat flux [W/m3] 
                 Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
 
-                /*
-
                 Q_mass_vapor[i] = Gamma_xv_vapor[i] * (h_xv_v - h_v_cell);
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * (h_vx_x - h_x_cell);
 
-                */
+                /*
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
                 Q_mass_vapor[i] = +Gamma_xv_vapor[i] * h_xv_v; 
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the wick)
                 Q_mass_wick[i] = -Gamma_xv_wick[i] * h_vx_x;
+
+                */
 
                 /*
 
