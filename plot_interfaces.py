@@ -91,14 +91,14 @@ case_labels = [
 # ============================================================
 targets = [
     "heat_balance_surface.txt",
-    "wall_wick_heat_balance.txt",
-    "wick_vapor_heat_balance.txt",
+    "wall_liquid_heat_balance.txt",
+    "liquid_vapor_heat_balance.txt",
 ]
 
 names = [
-    "Heat fluxes balance \n at the wick/vapor interface",
-    "Heat volumetric balance \n at the wall/wick interface",
-    "Heat volumetric balance \n at the wick/vapor interface",
+    "Heat fluxes balance \n at the liquid/vapor interface",
+    "Heat volumetric balance \n at the wall/liquid interface",
+    "Heat volumetric balance \n at the liquid/vapor interface",
 ]
 
 units = [

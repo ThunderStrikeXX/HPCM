@@ -59,31 +59,26 @@ targets = [
     "vapor_pressure.txt",
     "vapor_bulk_temperature.txt",
     "rho_vapor.txt",
-
-    "wick_velocity.txt",
-    "wick_pressure.txt",
-    "wick_bulk_temperature.txt",
+    "liquid_velocity.txt",
+    "liquid_pressure.txt",
+    "liquid_bulk_temperature.txt",
     "rho_liquid.txt",
-
-    "wick_vapor_interface_temperature.txt",
-    "wall_wick_interface_temperature.txt",
+    "liquid_vapor_interface_temperature.txt",
+    "wall_liquid_interface_temperature.txt",
     "outer_wall_temperature.txt",
     "wall_bulk_temperature.txt",
-
-    "wick_vapor_mass_source.txt",
-
-    # --- HEAT SOURCES (NUOVI) ---
+    "liquid_vapor_mass_source.txt",
     "outer_wall_heat_source.txt",
     "wall_wx_heat_source.txt",
-    "wick_wx_heat_source.txt",
-    "wick_xv_heat_source.txt",
+    "liquid_wx_heat_source.txt",
+    "liquid_xv_heat_source.txt",
     "vapor_xv_heat_source.txt",
-
     "vapor_heat_source_mass.txt",
-    "wick_heat_source_mass.txt",
-
+    "liquid_heat_source_mass.txt",
     "saturation_pressure.txt",
-    "sonic_velocity.txt"
+    "sonic_velocity.txt",
+    "reynolds_vapor.txt",
+    "HTC.txt" 
 ]
 
 y_files = [os.path.join(case, p) for p in targets]
@@ -118,61 +113,36 @@ names = [
     "Vapor pressure",
     "Vapor bulk temperature",
     "Vapor density",
-
-    "Wick velocity",
-    "Wick pressure",
-    "Wick bulk temperature",
+    "Liquid velocity",
+    "Liquid pressure",
+    "Liquid bulk temperature",
     "Liquid density",
-
-    "Wick-vapor interface temperature",
-    "Wall-wick interface temperature",
+    "Liquid-vapor interface temperature",
+    "Wall-liquid interface temperature",
     "Outer wall temperature",
     "Wall bulk temperature",
-
-    "Wick-vapor mass source",
-
-    "Outer wall heat-source",
-    "Wall-WX heat-source",
-    "Wick-WX heat-source",
-    "Wick-XV heat-source",
-    "Vapor-XV heat-source",
-
-    "Vapor heat-source mass",
-    "Wick heat-source mass",
-
+    "Liquid-vapor mass source",
+    "Outer wall heat power (flux)",
+    "Wall heat power from liquid (flux)",
+    "Liquid heat power from wall (flux)",
+    "Liquid heat power from vapor (flux)",
+    "Vapor heat power from liquid (flux)",
+    "Vapor heat power (mass)",
+    "Liquid heat power (mass)",
     "Saturation pressure",
-    "Sonic speed"
+    "Sonic speed",
+    "Vapor Reynolds number",
+    "Vapor HTC"
 ]
 
 units = [
-    "[m/s]",
-    "[Pa]",
-    "[K]",
-    "[kg/m³]",
-
-    "[m/s]",
-    "[Pa]",
-    "[K]",
-    "[kg/m³]",
-
-    "[K]",
-    "[K]",
-    "[K]",
-    "[K]",
-
-    "[kg/(m³·s)]",
-
-    "[W/m³]",
-    "[W/m³]",
-    "[W/m³]",
-    "[W/m³]",
-    "[W/m³]",
-
-    "[kg/(m³·s)]",
-    "[kg/(m³·s)]",
-
-    "[Pa]",
-    "[m/s]"
+    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
+    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
+    "[K]", "[K]", "[K]", "[K]",
+    "[kg/s]",
+    "[W]", "[W]", "[W]", "[W]", "[W]",
+    "[W]", "[W]",
+    "[Pa]", "[m/s]", "[-]", "[W/(m2·K)]"
 ]
 
 # -------------------- Utils --------------------
@@ -239,7 +209,7 @@ for i, name in enumerate(names):
     y_pos = panel_top - (row + 1) * row_height
 
     b_ax = plt.axes([x_pos, y_pos, button_width, button_height])
-    btn = Button(b_ax, "\n".join(textwrap.wrap(name, 12)), hovercolor='0.975')
+    btn = Button(b_ax, "\n".join(textwrap.wrap(name, 15)), hovercolor='0.975')
     btn.label.set_fontsize(9)
     buttons.append(btn)
 
