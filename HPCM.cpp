@@ -52,7 +52,7 @@ int main() {
     const data_type CF = 1e5;                   // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const std::size_t N = 22;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
+    const std::size_t N = 102;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
     const data_type L = 1; 			                                    // Length of the heat pipe [m]
     const data_type dz = L / (N - 2);                                   // Axial discretization step [m]
     const data_type r_o = 0.01335;                                      // Outer wall radius [m]
@@ -106,7 +106,7 @@ int main() {
     const data_type temperature_tol_x = 1e-2;           // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_simple_iter_v = 20;                   // Outer iterations per time-step [-]
+    const int tot_simple_iter_v = 100;                   // Outer iterations per time-step [-]
     const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
     const data_type momentum_tol_v = 1e-6;              // Tolerance for the outer iterations (velocity) [-]
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]

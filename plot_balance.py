@@ -54,9 +54,9 @@ time_file = os.path.join(case, "time.txt")
 targets = [
     "global_heat_balance.txt",
     "total_heat_source_wall.txt",
-    "total_heat_source_wick.txt",
+    "total_heat_source_liquid.txt",
     "total_heat_source_vapor.txt",
-    "total_mass_source_wick.txt",
+    "total_mass_source_liquid.txt",
     "total_mass_source_vapor.txt",
 ]
 
@@ -82,9 +82,9 @@ Y = [y[:n] for y in Y]
 names = [
     "Global input/output \n heat balance",
     "Total wall heat source",
-    "Total wick heat source",
+    "Total liquid heat source",
     "Total vapor heat source",
-    "Total wick mass source",
+    "Total liquid mass source",
     "Total vapor mass source",
 ]
 
