@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "numeric_types.h"
+
 /**
  * @brief Provides thermophysical and transport properties for Sodium Vapor.
  *
@@ -9,8 +11,6 @@
  * in standard SI units unless otherwise noted.
  */
 namespace vapor_sodium {
-
-    using data_type = double;
 
     /**
     * @brief 1D table interpolation in T over monotone grid

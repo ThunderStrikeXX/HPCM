@@ -1,6 +1,6 @@
 #pragma once
 
-using data_type = double;
+#include "numeric_types.h"
 
 /**
  * @brief Provides thermophysical properties for Liquid Sodium (Na).

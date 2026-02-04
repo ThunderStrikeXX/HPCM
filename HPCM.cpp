@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <regex>
 
+#include "numeric_types.h"
 #include "tdma.h"
 #include "steel.h"
 #include "liquid_sodium.h"
@@ -25,8 +26,6 @@ int main() {
     // =======================================================================
 
     #pragma region constants_and_variables
-
-    using data_type = double;
 
     // Mathematical constants
     const data_type pi = 3.141592;              // Pi [-]
@@ -121,8 +120,8 @@ int main() {
     std::vector<data_type> T_x_v(N, T_init);            // Liquid-vapore interface temperature [K]
     std::vector<data_type> T_v_bulk(N, T_init);         // Vapor bulk temperature [K]
 
-    std::vector<double> h_x(N, liquid_sodium::h_l_linear(T_init));      // Liquid enthalpy [J/kg]
-    std::vector<double> h_v(N, vapor_sodium::h_g_linear(T_init));       // Liquid enthalpy [J/kg]
+    std::vector<data_type> h_x(N, liquid_sodium::h_l_linear(T_init));      // Liquid enthalpy [J/kg]
+    std::vector<data_type> h_v(N, vapor_sodium::h_g_linear(T_init));       // Liquid enthalpy [J/kg]
 
     // Liquid fields
     std::vector<data_type> u_x(N, -0.0001);             // Liquid velocity field [m/s]
@@ -164,9 +163,9 @@ int main() {
     std::vector<data_type> Q_tot_x(N, 0.0);                 // Total heat flux in the liquid [W/m3]
     std::vector<data_type> Q_tot_v(N, 0.0);                 // Total heat flux in the vapor [W/m3]
 
-    std::vector<double> heat_balance_surface(N, 0.0);       // Flux balance at vapor-liquid interface post-linearization [W/m2] 
-    std::vector<double> wall_liquid_heat_balance(N, 0.0);   // Wall-liquid interface heat fluxes difference (should be zero) [W/m2]
-    std::vector<double> liquid_vapor_heat_balance(N, 0.0);  // Vapor-liquid interface heat fluxes difference (should be zero) [W/m2]
+    std::vector<data_type> heat_balance_surface(N, 0.0);       // Flux balance at vapor-liquid interface post-linearization [W/m2] 
+    std::vector<data_type> wall_liquid_heat_balance(N, 0.0);   // Wall-liquid interface heat fluxes difference (should be zero) [W/m2]
+    std::vector<data_type> liquid_vapor_heat_balance(N, 0.0);  // Vapor-liquid interface heat fluxes difference (should be zero) [W/m2]
 
     std::vector<data_type> Q_mass_vapor(N, 0.0);            // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
     std::vector<data_type> Q_mass_liquid(N, 0.0);           // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the liquid
@@ -883,9 +882,9 @@ int main() {
 
                     for (int i = 1; i < N; ++i) {
 
-                        const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
+                        const data_type avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
 
-                        double rc = 0.0;
+                        data_type rc = 0.0;
 
                         // Rhie–Chow corrections for face velocities
                         if ((i != 1) && (i != N - 1)) {
@@ -896,10 +895,10 @@ int main() {
                         }
 
                         // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc;    // [m/s]
+                        const data_type u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc;    // [m/s]
 
                         // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];       // [kg/m3]
+                        const data_type rho = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];       // [kg/m3]
 
                         phi_x[i] = rho * u_face;
                     }
@@ -1242,9 +1241,9 @@ int main() {
                     
                     for (int i = 1; i < N; ++i) {
 
-                        const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
+                        const data_type avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
 
-                        double rc = 0.0;
+                        data_type rc = 0.0;
 
                         // Rhie–Chow corrections for face velocities
                         if ((i != 1) && (i != N - 1)) {
@@ -1255,10 +1254,10 @@ int main() {
                         }
 
                         // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc;    // [m/s]
+                        const data_type u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc;    // [m/s]
 
                         // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];       // [kg/m3]
+                        const data_type rho = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];       // [kg/m3]
 
                         phi_v[i] = rho * u_face;
                     }

@@ -142,6 +142,7 @@
     <ClInclude Include="lib\adaptive_dt.h" />
     <ClInclude Include="lib\io_utils.h" />
     <ClInclude Include="lib\liquid_sodium.h" />
+    <ClInclude Include="lib\numeric_types.h" />
     <ClInclude Include="lib\steel.h" />
     <ClInclude Include="lib\tdma.h" />
     <ClInclude Include="lib\vapor_sodium.h" />

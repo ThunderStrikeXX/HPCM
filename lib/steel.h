@@ -1,8 +1,7 @@
 #pragma once
 #include <array>
 #include <cstddef>
-
-using data_type = double;
+#include "numeric_types.h"
 
 namespace steel {
 

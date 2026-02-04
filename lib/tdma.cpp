@@ -1,6 +1,8 @@
 #include "tdma.h"
 #include <stdexcept>
 
+#include "numeric_types.h"
+
 namespace tdma {
 
     void Solver::solve(

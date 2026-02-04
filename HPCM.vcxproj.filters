@@ -44,5 +44,8 @@
     <ClInclude Include="lib\io_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="lib\numeric_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
