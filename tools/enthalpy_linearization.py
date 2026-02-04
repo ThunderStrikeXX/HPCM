@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # -------------------------------
-# Correlazioni sodio (dal C++)
+# Sodium correlations (from C++)
 # -------------------------------
 def h_liquid_sodium(T):
     T = np.clip(T, 300.0, 2500.0)
@@ -24,7 +24,7 @@ def h_vapor_sodium(T):
     return h_liquid_sodium(T) + h_vap_sodium(T)
 
 # -------------------------------
-# Intervallo e fit
+# Fit interval
 # -------------------------------
 T_fit = np.linspace(800, 1200, 300)
 
@@ -32,28 +32,69 @@ bg, ag = np.polyfit(T_fit, h_vapor_sodium(T_fit), 1)
 bl, al = np.polyfit(T_fit, h_liquid_sodium(T_fit), 1)
 
 # -------------------------------
-# Stampa coefficienti
+# Print coefficients
 # -------------------------------
-print("=== Coefficienti lineari (fit 800–1200 K) ===")
+print("=== Linear coefficients (fit 800–1200 K) ===")
 print(f"h_g(T) = {ag:.6e} + {bg:.6e} * T   [J/kg]")
 print(f"h_l(T) = {al:.6e} + {bl:.6e} * T   [J/kg]")
 
 # -------------------------------
-# Rette
+# Reference and linearized curves
 # -------------------------------
+h_g_corr = h_vapor_sodium(T_fit)
+h_l_corr = h_liquid_sodium(T_fit)
+
 h_g_lin = ag + bg * T_fit
 h_l_lin = al + bl * T_fit
 
 # -------------------------------
-# Plot
+# Percentage errors
+# -------------------------------
+err_g_pct = 100.0 * (h_g_lin - h_g_corr) / h_g_corr
+err_l_pct = 100.0 * (h_l_lin - h_l_corr) / h_l_corr
+
+# -------------------------------
+# Plot 1: Vapor enthalpy
 # -------------------------------
 plt.figure()
-plt.plot(T_fit, h_vapor_sodium(T_fit), label="h_g correlazione")
-plt.plot(T_fit, h_g_lin, "--", label="h_g lineare")
-plt.plot(T_fit, h_liquid_sodium(T_fit), label="h_l correlazione")
-plt.plot(T_fit, h_l_lin, "--", label="h_l lineare")
+plt.plot(T_fit, h_g_corr, label="h_g correlation")
+plt.plot(T_fit, h_g_lin, "--", label="h_g linear")
 plt.xlabel("Temperature [K]")
 plt.ylabel("Enthalpy [J/kg]")
 plt.legend()
 plt.grid(True)
+
+# -------------------------------
+# Plot 2: Liquid enthalpy
+# -------------------------------
+plt.figure()
+plt.plot(T_fit, h_l_corr, label="h_l correlation")
+plt.plot(T_fit, h_l_lin, "--", label="h_l linear")
+plt.xlabel("Temperature [K]")
+plt.ylabel("Enthalpy [J/kg]")
+plt.legend()
+plt.grid(True)
+
+# -------------------------------
+# Plot 3: Vapor relative error
+# -------------------------------
+plt.figure()
+plt.plot(T_fit, err_g_pct, label="h_g relative error [%]")
+plt.axhline(0.0)
+plt.xlabel("Temperature [K]")
+plt.ylabel("Relative error [%]")
+plt.legend()
+plt.grid(True)
+
+# -------------------------------
+# Plot 4: Liquid relative error
+# -------------------------------
+plt.figure()
+plt.plot(T_fit, err_l_pct, label="h_l relative error [%]")
+plt.axhline(0.0)
+plt.xlabel("Temperature [K]")
+plt.ylabel("Relative error [%]")
+plt.legend()
+plt.grid(True)
+
 plt.show()

@@ -51,7 +51,7 @@ int main() {
     const data_type CF = 1e5;                   // Forchheimer coefficient [1/m]
             
     // Geometric parameters
-    const std::size_t N = 102;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
+    const std::size_t N = 22;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
     const data_type L = 1; 			                                    // Length of the heat pipe [m]
     const data_type dz = L / (N - 2);                                   // Axial discretization step [m]
     const data_type r_o = 0.01335;                                      // Outer wall radius [m]
@@ -111,7 +111,7 @@ int main() {
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
-    const data_type T_init = 1000;                      // Initial uniform temperature [K]
+    const data_type T_init = 1100;                      // Initial uniform temperature [K]
 
     std::vector<data_type> T_o_w(N, T_init);            // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);         // Wall bulk temperature [K]
