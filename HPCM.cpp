@@ -39,11 +39,11 @@ int main() {
     
     // Environmental boundary conditions
     const data_type h_conv = 1;                // Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const data_type power = 10;               // Power at the evaporator side [W]
+    const data_type power = 1000;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;             // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const data_type eps_s = 1.0;               // Surface fraction of the wick available for phasic interface [-]
+    const data_type eps_s = 0.1;               // Surface fraction of the wick available for phasic interface [-]
     const data_type sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                     // Initialization of Omega parameter for evaporation/condensation model [-]
@@ -107,7 +107,7 @@ int main() {
     const data_type temperature_tol_x = 1e-2;           // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_simple_iter_v = 5;                    // Outer iterations per time-step [-]
+    const int tot_simple_iter_v = 20;                    // Outer iterations per time-step [-]
     const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
     const data_type momentum_tol_v = 1e-6;              // Tolerance for the outer iterations (velocity) [-]
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
@@ -545,11 +545,11 @@ int main() {
     reynolds_output << std::setprecision(output_precision);
     HTC_output << std::setprecision(output_precision);
 
-    std::vector<double> h_x(N, vapor_sodium::h(T_init));
-    std::vector<double> h_x_old(N, vapor_sodium::h(T_init));
+    std::vector<double> h_x(N, liquid_sodium::h_l_linear(T_init));
+    std::vector<double> h_x_old(N, liquid_sodium::h_l_linear(T_init));
 
-    std::vector<double> h_v(N, vapor_sodium::h(T_init));
-    std::vector<double> h_v_old(N, vapor_sodium::h(T_init));
+    std::vector<double> h_v(N, vapor_sodium::h_g_linear(T_init));
+    std::vector<double> h_v_old(N, vapor_sodium::h_g_linear(T_init));
 
     #pragma endregion
 
@@ -604,12 +604,14 @@ int main() {
 
             rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);
             mu_x[i] = liquid_sodium::mu(T_x_bulk[i]);
-            cp_x[i] = liquid_sodium::cp(T_x_bulk[i]);
+            // cp_x[i] = liquid_sodium::cp(T_x_bulk[i]);
+            cp_x[i] = liquid_sodium::cp_l_linear();
             k_x[i] = liquid_sodium::k(T_x_bulk[i]);
 
             mu_v[i] = vapor_sodium::mu(T_v_bulk[i]);
-            cp_v[i] = vapor_sodium::cp(T_v_bulk[i]);
+            // cp_v[i] = vapor_sodium::cp(T_v_bulk[i]);
             k_v[i] = vapor_sodium::k(T_v_bulk[i], p_v[i]);
+            cp_v[i] = vapor_sodium::cp_g_linear();
             k_v_int[i] = vapor_sodium::k(T_x_v[i], p_v[i]);
         }
 
@@ -703,15 +705,8 @@ int main() {
 
                     const data_type rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
 
-                    const data_type h_L = h_x[i - 1];
-                    const data_type h_P = h_x[i];
-                    const data_type h_R = h_x[i + 1];
-
-                    const data_type h_l = (phi_x[i] >= 0) ? h_L : h_P;
-                    const data_type h_r = (phi_x[i + 1] >= 0) ? h_P : h_R;
-
-                    const data_type C_l = phi_x[i] * h_l;   // [W/m2]
-                    const data_type C_r = phi_x[i + 1] * h_r;
+                    const data_type C_l = phi_x[i];   // [W/m2]
+                    const data_type C_r = phi_x[i + 1];
 
                     const data_type k_cond_P = k_x[i];
                     const data_type k_cond_L = k_x[i - 1];
@@ -723,8 +718,6 @@ int main() {
 
                     const data_type cp_l = 0.5 * (cp_P + cp_L);
                     const data_type cp_r = 0.5 * (cp_P + cp_R);
-
-                    const data_type cp_P_old = liquid_sodium::cp(T_x_bulk_old[i]);
 
                     const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
                     const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
@@ -768,9 +761,9 @@ int main() {
 
                 tdma_solver.solve(aXT, bXT, cXT, dXT, h_x);
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (std::size_t i = 0; i < N; i++) {
 
-                    T_x_bulk[i] = liquid_sodium::T_from_h_liquid_bisection(h_x[i]);
+                    T_x_bulk[i] = liquid_sodium::T_from_h_l_linear(h_x[i]);
                 }
 
                 #pragma endregion
@@ -1069,15 +1062,8 @@ int main() {
                     const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
                     const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
 
-                    const data_type h_L = h_v[i - 1];
-                    const data_type h_P = h_v[i];
-                    const data_type h_R = h_v[i + 1];
-
-                    const data_type h_l = (phi_v[i] >= 0) ? h_L : h_P;
-                    const data_type h_r = (phi_v[i + 1] >= 0) ? h_P : h_R;
-
-                    const data_type C_l = phi_v[i] * h_l;
-                    const data_type C_r = phi_v[i + 1] * h_r;
+                    const data_type C_l = phi_v[i];
+                    const data_type C_r = phi_v[i + 1];
 
                     const data_type dpdz_up = u_v[i] * (p_v[i + 1] - p_v[i - 1]) / 2.0;
 
@@ -1130,9 +1116,9 @@ int main() {
 
                 tdma_solver.solve(aVT, bVT, cVT, dVT, h_v);
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (std::size_t i = 0; i < N; i++) {
 
-                    T_v_bulk[i] = vapor_sodium::T_from_h_vapor(h_v[i]);
+                    T_v_bulk[i] = vapor_sodium::T_from_h_g_linear(h_v[i]);
 
                 }
 
@@ -1389,6 +1375,8 @@ int main() {
 
                 HTC[i] = HTC_multiplier * vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);    // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
 
+                /*
+                
                 // Enthalpies
                 if (Gamma_xv_vapor[i] > 0.0) {                          // Evaporation case
 
@@ -1401,6 +1389,22 @@ int main() {
                     h_xv_v = vapor_sodium::h(T_x_v_iter[i]);
                     h_vx_x = liquid_sodium::h(T_x_v_iter[i])
                         + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v_iter[i]));
+                }
+
+                */
+
+                // Enthalpies
+                if (Gamma_xv_vapor[i] > 0.0) {                          // Evaporation case
+
+                    h_xv_v = vapor_sodium::h_g_linear(T_x_v_iter[i]);
+                    h_vx_x = liquid_sodium::h_l_linear(T_x_v_iter[i]);
+
+                }
+                else {                                                  // Condensation case
+
+                    h_xv_v = vapor_sodium::h_g_linear(T_x_v_iter[i]);
+                    h_vx_x = liquid_sodium::h_l_linear(T_x_v_iter[i])
+                        + (vapor_sodium::h_g_linear(T_v_bulk[i]) - vapor_sodium::h_g_linear(T_x_v_iter[i]));
                 }
 
                 /*

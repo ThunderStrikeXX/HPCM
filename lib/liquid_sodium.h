@@ -57,6 +57,29 @@ namespace liquid_sodium {
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
     }
 
+    // From h_l(T) = al + bl * T
+    inline data_type cp_l_linear() {
+
+        return 1.256230e3;   // J/(kg·K)
+    }
+
+    inline data_type h_l_linear(data_type T) {
+
+        constexpr data_type al = -2.359582e5;   // J/kg
+        constexpr data_type bl = 1.256230e3;    // J/(kg·K)
+
+        return al + bl * T;                     // J/kg
+    }
+
+    inline data_type T_from_h_l_linear(data_type h) {
+
+        constexpr data_type al = -2.359582e5;   // J/kg
+        constexpr data_type bl = 1.256230e3;    // J/(kg·K)
+
+        return (h - al) / bl;                   // K
+    }
+
+    /*
     /// Enthalpy of liquid sodium [J/kg] (CODATA correlation)
     inline data_type h(data_type T) {
         // Numerical safety only
@@ -105,4 +128,6 @@ namespace liquid_sodium {
 
         return 0.5 * (T_lo + T_hi);
     }
+
+    */
 }

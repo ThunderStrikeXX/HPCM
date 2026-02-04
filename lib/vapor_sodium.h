@@ -75,6 +75,30 @@ namespace vapor_sodium {
         return h_liquid_sodium(T) + h_vap_sodium(T);
     }
 
+    // From h_g(T) = ag + bg * T
+    inline data_type cp_g_linear() {
+
+        return 3.589755e2;   // J/(kg·K)
+    }
+
+    inline data_type h_g_linear(data_type T) {
+
+        constexpr data_type ag = 4.683166e6;   // J/kg
+        constexpr data_type bg = 3.589755e2;   // J/(kg·K)
+
+        return ag + bg * T;   // J/kg
+    }
+
+    inline data_type T_from_h_g_linear(data_type h) {
+
+        constexpr data_type ag = 4.683166e6;   // J/kg
+        constexpr data_type bg = 3.589755e2;   // J/(kg·K)
+
+        return (h - ag) / bg; // K
+    }
+
+    /*
+
     inline data_type T_from_h_vapor(data_type h_target) {
 
         constexpr data_type T_min = 300.0;
@@ -117,6 +141,8 @@ namespace vapor_sodium {
 
         return 0.5 * (T_lo + T_hi);
     }
+
+    */
 
     /**
     * @brief Saturation pressure [Pa] as a function of temperature T
