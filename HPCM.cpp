@@ -41,7 +41,7 @@ int main() {
     const data_type T_env = 280.0;              // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const data_type eps_s = 0.1;                // Surface fraction of the liquid available for phasic interface [-]
+    const data_type eps_s = 0.01;                // Surface fraction of the liquid available for phasic interface [-]
     const data_type sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
@@ -98,20 +98,20 @@ int main() {
     std::vector<data_type> pic_tolerance(3, 1e-3);      // Picard convergence tolerance [K, K, K]
 
     // PISO Liquid parameters
-    const int tot_simple_iter_x = 5;                    // Outer iterations per time-step [-]
+    const int tot_simple_iter_x = 10;                    // Outer iterations per time-step [-]
     const int tot_piso_iter_x = 10;                     // Inner iterations per outer iteration [-]
     const data_type momentum_tol_x = 1e-6;              // Tolerance for the momentum equation [-]
     const data_type continuity_tol_x = 1e-6;            // Tolerance for the continuity equation [-]
     const data_type temperature_tol_x = 1e-2;           // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_simple_iter_v = 100;                   // Outer iterations per time-step [-]
+    const int tot_simple_iter_v = 50;                   // Outer iterations per time-step [-]
     const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
     const data_type momentum_tol_v = 1e-6;              // Tolerance for the outer iterations (velocity) [-]
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
-    const data_type T_init = 1100;                      // Initial uniform temperature [K]
+    const data_type T_init = 1000;                      // Initial uniform temperature [K]
 
     std::vector<data_type> T_o_w(N, T_init);            // Outer wall temperature [K]
     std::vector<data_type> T_w_bulk(N, T_init);         // Wall bulk temperature [K]
@@ -1221,7 +1221,7 @@ int main() {
 
                         data_type u_prev = u_v[i];
 
-                        sonic_velocity[i] = std::sqrt(vapor_sodium::gamma(T_v_bulk[i]) * Rv * T_v_bulk[i]);
+                        // sonic_velocity[i] = std::sqrt(vapor_sodium::gamma(T_v_bulk[i]) * Rv * T_v_bulk[i]);
 
                         const data_type calc_velocity = u_v[i] -
                             (p_prime_v[i + 1] - p_prime_v[i - 1]) / (2.0 * bVU[i]);

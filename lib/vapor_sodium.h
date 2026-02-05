@@ -2,78 +2,7 @@
 
 #include "numeric_types.h"
 
-/**
- * @brief Provides thermophysical and transport properties for Sodium Vapor.
- *
- * This namespace contains constant data and functions to calculate key properties
- * of sodium vapor.
- * All functions primarily accept temperature T in Kelvin [K] and return values
- * in standard SI units unless otherwise noted.
- */
 namespace vapor_sodium {
-
-    /**
-    * @brief 1D table interpolation in T over monotone grid
-    */
-    template<size_t N>
-    data_type interp_T(const std::array<data_type, N>& Tgrid, const std::array<data_type, N>& Ygrid, data_type T) {
-
-        if (T <= Tgrid.front()) return Ygrid.front();
-        if (T >= Tgrid.back())  return Ygrid.back();
-
-        size_t i = 0;
-        while (i + 1 < N && Tgrid[i + 1] < T) ++i;
-
-        if (i + 1 >= N) return Ygrid[N - 1];
-
-        // interpolazione
-        data_type T0 = Tgrid[i];
-        data_type T1 = Tgrid[i + 1];
-        data_type Y0 = Ygrid[i];
-        data_type Y1 = Ygrid[i + 1];
-
-        return Y0 + (T - T0) / (T1 - T0) * (Y1 - Y0);
-    }
-
-    /// Enthalpy of liquid sodium [J/kg] (CODATA correlation)
-    inline data_type h_liquid_sodium(data_type T) {
-        // Numerical safety only
-        if (T < 300.0)  T = 300.0;
-        if (T > 2500.0) T = 2500.0;
-
-        return (
-            -365.77
-            + 1.6582e0 * T
-            - 4.2395e-4 * T * T
-            + 1.4847e-7 * T * T * T
-            + 2992.6 / T
-            ) * 1e3;   // J/kg
-    }
-
-    /// Enthalpy of vaporization of sodium Δh_vap(T) [J/kg]
-    /// Critical-scaling correlation (vanishes at Tcrit)
-    inline data_type h_vap_sodium(data_type T) {
-
-        // Numerical safety
-        if (T < 300.0)  T = 300.0;
-        if (T > 2500.0) T = 2500.0;
-
-        // Sodium critical temperature [K]
-        constexpr data_type Tcrit = 2503.0;
-
-        const data_type theta = 1.0 - T / Tcrit;
-
-        return (
-            393.37 * theta
-            + 4398.6 * std::pow(theta, 0.29302)
-            ) * 1e3;   // J/kg
-    }
-
-    /// Enthalpy of sodium vapor [J/kg]
-    /// h_v = h_l,CODATA + h_vap,Fink95
-    inline data_type h(data_type T) {
-        return h_liquid_sodium(T) + h_vap_sodium(T);
-    }
 
     // From h_g(T) = ag + bg * T
     inline data_type cp_g_linear() {
@@ -97,53 +26,6 @@ namespace vapor_sodium {
         return (h - ag) / bg; // K
     }
 
-    /*
-
-    inline data_type T_from_h_vapor(data_type h_target) {
-
-        constexpr data_type T_min = 300.0;
-        constexpr data_type T_max = 2500.0;
-        constexpr int max_iter = 80;
-
-        // tolleranze su entalpia [J/kg]
-        constexpr data_type rel_tol = 1e-8;
-        constexpr data_type abs_tol = 1e-3;   // 1 mJ/kg: praticamente zero
-
-        data_type T_lo = T_min;
-        data_type T_hi = T_max;
-
-        const data_type h_lo = vapor_sodium::h(T_lo);
-        const data_type h_hi = vapor_sodium::h(T_hi);
-
-        // Se la tua h(T) è monotona crescente, questo deve valere.
-        // Se per qualche ragione non lo è, l'inversione non è definita.
-        if (h_hi <= h_lo) return T_min;
-
-        // Clamp su range coperto
-        if (h_target <= h_lo) return T_lo;
-        if (h_target >= h_hi) return T_hi;
-
-        for (int it = 0; it < max_iter; ++it) {
-
-            const data_type T_mid = 0.5 * (T_lo + T_hi);
-            const data_type h_mid = vapor_sodium::h(T_mid);
-
-            const data_type err = h_mid - h_target;
-            const data_type tol_h = abs_tol + rel_tol * std::max(std::abs(h_target), std::abs(h_mid));
-
-            if (std::abs(err) <= tol_h)
-                return T_mid;
-
-            // monotona crescente: se h_mid troppo grande, abbassa T_hi
-            if (err > 0.0) T_hi = T_mid;
-            else           T_lo = T_mid;
-        }
-
-        return 0.5 * (T_lo + T_hi);
-    }
-
-    */
-
     /**
     * @brief Saturation pressure [Pa] as a function of temperature T
     *   Satou-Moriyama
@@ -163,21 +45,6 @@ namespace vapor_sodium {
         const data_type val_MPa_per_K =
             (12633.73 / (T * T) - 0.4672 / T) * std::exp(11.9463 - 12633.73 / T - 0.4672 * std::log(T));
         return val_MPa_per_K * 1e6;
-    }
-
-    /**
-    * @brief Specific heat at constant pressure from table interpolation [J/(kg*K)] as a function of temperature T
-    *   Fink & Leibowitz
-    */
-    inline data_type cp(data_type T) {
-
-        static const std::array<data_type, 21> Tgrid = { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000,2100,2200,2300,2400 };
-        static const std::array<data_type, 21> Cpgrid = { 860,1250,1800,2280,2590,2720,2700,2620,2510,2430,2390,2360,2340,2410,2460,2530,2660,2910,3400,4470,8030 };
-
-        // Table also lists 2500 K = 417030; extreme near critical. If needed, extend:
-        if (T >= 2500.0) return 417030.0;
-
-        return interp_T(Tgrid, Cpgrid, T);
     }
 
     /**
@@ -363,69 +230,9 @@ namespace vapor_sodium {
         return val > 0.0 ? val : 0.0;
     }
 
-    /**
-    * @brief Specific heat at constant volume from table interpolation [J/(kg*K)]
-    *        Fink & Leibowitz
-    */
-    inline data_type cv(data_type T) {
-
-        static const std::array<data_type, 22> Tgrid =
-        { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,
-          1600,1700,1800,1900,2000,2100,2200,2300,2400, 2500 };
-
-        // valori convertiti in J/kgK (kJ/kgK * 1000)
-        static const std::array<data_type, 22> Cvgrid =
-        { 490, 840, 1310, 1710, 1930, 1980, 1920, 1810, 1680, 1580, 1510, 1440, 1390, 1380, 1360, 1300, 1300, 1300, 1340, 1760, 17030 };
-
-        // valore tabellato a 2500 K = 17.03 kJ/kgK
-        if (T >= 2500.0) return 17030.0;
-
-        return interp_T(Tgrid, Cvgrid, T);
-    }
-
     inline data_type gamma(data_type T) {
-        data_type cp_val = cp(T);
-        data_type cv_val = cv(T);
+        data_type cp_val = cp_g_linear();
+        data_type cv_val = cp_g_linear() - 361.5;
         return cp_val / cv_val;
     }
-
-
-    /**
-     * @brief Vapor enthalpy obtained by numerical integration of cp(T)
-     *        using the same reference enthalpy as liquid sodium.
-     *
-     * h_v(T) = h_l(T_ref) + ∫_{T_ref}^{T} cp(T) dT
-     *
-     * Reference:
-     *  - cp(T): Fink & Leibowitz (tabulated, interpolated)
-     *  - h_l(T): CODATA liquid sodium enthalpy
-
-    inline data_type h(data_type T) {
-        // --- reference temperature ---
-        constexpr data_type Tref = 400.0;
-
-        // clamp for numerical safety
-        if (T < Tref)  T = Tref;
-        if (T > 2500.0) T = 2500.0;
-
-        // reference enthalpy: liquid sodium
-        const data_type href = h(Tref);   // J/kg
-
-        // --- numerical integration (trapezoidal rule) ---
-        constexpr int N = 200;             // fixed quadrature resolution
-        const data_type dT = (T - Tref) / N;
-
-        data_type integral = 0.0;
-        data_type Ti = Tref;
-
-        for (int i = 0; i < N; ++i) {
-            const data_type Tj = Ti + dT;
-            integral += 0.5 * (cp(Ti) + cp(Tj)) * dT;
-            Ti = Tj;
-        }
-
-        return href + integral;            // J/kg
-    }
-         */
-
 }

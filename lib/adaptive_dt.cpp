@@ -76,7 +76,7 @@ data_type new_dt_x(
 
         data_type dt_flux =
             CSX_flux * liquid_sodium::rho(T[i]) *
-            liquid_sodium::cp(T[i]) /
+            liquid_sodium::cp_l_linear() /
             (std::abs(Qf[i]) + epsT);
 
         data_type dti = std::min(dt_mass, dt_flux);
@@ -138,7 +138,7 @@ data_type new_dt_v(
 
         data_type dt_flux =
             CSV_flux * rho[i] *
-            vapor_sodium::cp(T[i]) /
+            vapor_sodium::cp_g_linear() /
             (std::abs(Qf[i]) + epsT);
 
         data_type dt_p = 1e99;
