@@ -5,8 +5,8 @@ import sys
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
-T1 = 5000.0
-T2 = 10000.0
+T1 = 2000.0
+T2 = 5000.0
 T3 = 20000.0
 
 

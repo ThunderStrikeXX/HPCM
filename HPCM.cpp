@@ -36,7 +36,7 @@ int main() {
     const data_type Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const data_type h_conv = 1;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+    const data_type h_conv = 50;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
     const data_type power = 1000;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;              // External environmental temperature [K]
 
@@ -86,10 +86,10 @@ int main() {
     data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	data_type           dt = dt_user;                   // Current time step [s]
     data_type           time_total = 0.0;               // Total simulation time [s]
-    const data_type     time_simulation = 5000;         // Simulation total number [s]
+    const data_type     time_simulation = 2000;         // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step [-]
-    const data_type     accelerator = 0.5;              // Adaptive timestep multiplier (if too much, stability problems) [-]
+    const data_type     accelerator = 2.0;              // Adaptive timestep multiplier (if too much, stability problems) [-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -347,7 +347,7 @@ int main() {
 
     // Printing parameters
     data_type t_last_print = 0.0;                   // Time from last print [s]
-    const data_type print_interval = 0.5;           // Time interval for printing [s]
+    const data_type print_interval = 0.1;           // Time interval for printing [s]
 
     // TDMA solver
     tdma::Solver tdma_solver(N);
@@ -571,7 +571,7 @@ int main() {
 
         // Ramping for power to heat pipe
 
-        constexpr data_type T_ramp = 1000.0;   // End of the ramp [s]
+        constexpr data_type T_ramp = 100;   // End of the ramp [s]
 
         data_type ramp = 1.0;
 
@@ -704,8 +704,8 @@ int main() {
                     const data_type cp_l = 0.5 * (cp_P + cp_L);
                     const data_type cp_r = 0.5 * (cp_P + cp_R);
 
-                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
-                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
+                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
+                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
                     Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_liquid[i];
 
@@ -1041,8 +1041,8 @@ int main() {
                     const data_type k_cond_L = k_v[i - 1];
                     const data_type k_cond_R = k_v[i + 1];
 
-                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / (cp_l * dz);
-                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / (cp_r * dz);
+                    const data_type D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
+                    const data_type D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
                     const data_type C_l = phi_v[i];
                     const data_type C_r = phi_v[i + 1];

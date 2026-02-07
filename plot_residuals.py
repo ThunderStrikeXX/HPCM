@@ -76,12 +76,16 @@ for f in y_files:
 time = safe_loadtxt(time_file)
 Y = [safe_loadtxt(f) for f in y_files]
 
+stride = 100
+time = time[::stride]
+Y = [y[::stride] for y in Y]
+
 names = [
-    "Continuity\nresidual (wick)",
+    "Continuity\nresidual (liquid)",
     "Continuity\nresidual (vapor)",
-    "Momentum\nresidual (wick)",
+    "Momentum\nresidual (liquid)",
     "Momentum\nresidual (vapor)",
-    "Temperature\nresidual (wick)",
+    "Temperature\nresidual (liquid)",
     "Temperature\nresidual (vapor)",
 ]
 
