@@ -36,8 +36,8 @@ int main() {
     const data_type Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const data_type h_conv = 50;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const data_type power = 1000;               // Power at the evaporator side [W]
+    const data_type h_conv = 1;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+    const data_type power = 100;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;              // External environmental temperature [K]
 
     // Evaporation and condensation parameters
@@ -86,10 +86,10 @@ int main() {
     data_type           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
 	data_type           dt = dt_user;                   // Current time step [s]
     data_type           time_total = 0.0;               // Total simulation time [s]
-    const data_type     time_simulation = 2000;         // Simulation total number [s]
+    const data_type     time_simulation = 5000;         // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step [-]
-    const data_type     accelerator = 2.0;              // Adaptive timestep multiplier (if too much, stability problems) [-]
+    const data_type     accelerator = 0.125;              // Adaptive timestep multiplier (if too much, stability problems) [-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -111,17 +111,43 @@ int main() {
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
-    const data_type T_init = 1000;                      // Initial uniform temperature [K]
+    const data_type T_init = 700;                      // Initial uniform temperature [K]
 
-    std::vector<data_type> T_o_w(N, T_init);            // Outer wall temperature [K]
-    std::vector<data_type> T_w_bulk(N, T_init);         // Wall bulk temperature [K]
-    std::vector<data_type> T_w_x(N, T_init);            // Wall-liquid interface temperature [K]
-    std::vector<data_type> T_x_bulk(N, T_init);         // Liquid bulk temperature [K]
-    std::vector<data_type> T_x_v(N, T_init);            // Liquid-vapore interface temperature [K]
-    std::vector<data_type> T_v_bulk(N, T_init);         // Vapor bulk temperature [K]
+    const data_type dT_init = 10.0;   // Ampiezza variazione iniziale [K]
 
-    std::vector<data_type> h_x(N, liquid_sodium::h_l_linear(T_init));      // Liquid enthalpy [J/kg]
-    std::vector<data_type> h_v(N, vapor_sodium::h_g_linear(T_init));       // Liquid enthalpy [J/kg]
+    const data_type T_left = T_init + dT_init;
+    const data_type T_right = T_init - dT_init;
+
+    // Temperature vectors
+    std::vector<data_type> T_o_w(N);     // Outer wall temperature [K]
+    std::vector<data_type> T_w_bulk(N);  // Wall bulk temperature [K]
+    std::vector<data_type> T_w_x(N);     // Wall–liquid interface temperature [K]
+    std::vector<data_type> T_x_bulk(N);  // Liquid bulk temperature [K]
+    std::vector<data_type> T_x_v(N);     // Liquid–vapor interface temperature [K]
+    std::vector<data_type> T_v_bulk(N);  // Vapor bulk temperature [K]
+
+    // Enthalpy vectors
+    std::vector<data_type> h_x(N);       // Liquid enthalpy [J/kg]
+    std::vector<data_type> h_v(N);       // Vapor enthalpy [J/kg]
+
+    for (std::size_t i = 0; i < N; ++i) {
+
+        data_type xi = (N > 1)
+            ? static_cast<data_type>(i) / static_cast<data_type>(N - 1)
+            : 0.0;
+
+        data_type T_lin = T_left + (T_right - T_left) * xi;
+
+        T_o_w[i] = T_lin;
+        T_w_bulk[i] = T_lin;
+        T_w_x[i] = T_lin;
+        T_x_bulk[i] = T_lin;
+        T_x_v[i] = T_lin;
+        T_v_bulk[i] = T_lin;
+
+        h_x[i] = liquid_sodium::h_l_linear(T_lin);
+        h_v[i] = vapor_sodium::h_g_linear(T_lin);
+    }
 
     // Liquid fields
     std::vector<data_type> u_x(N, -0.0001);             // Liquid velocity field [m/s]
@@ -217,6 +243,9 @@ int main() {
     std::vector<data_type> Gamma_v_old;
 
     std::vector<data_type> phi_x_v_old;
+
+    std::vector<data_type> phi_x_old;
+    std::vector<data_type> phi_v_old;
 
     std::vector<data_type> u_x_old;
     std::vector<data_type> p_x_old;
@@ -347,7 +376,7 @@ int main() {
 
     // Printing parameters
     data_type t_last_print = 0.0;                   // Time from last print [s]
-    const data_type print_interval = 0.1;           // Time interval for printing [s]
+    const data_type print_interval = 0.000000001;           // Time interval for printing [s]
 
     // TDMA solver
     tdma::Solver tdma_solver(N);
@@ -413,6 +442,9 @@ int main() {
     Gamma_v_old = Gamma_v;
 
     phi_x_v_old = phi_x_v;
+
+    phi_x_old = phi_x;
+    phi_v_old = phi_v;
 
     u_x_old = u_x;
     p_x_old = p_x;
@@ -571,7 +603,7 @@ int main() {
 
         // Ramping for power to heat pipe
 
-        constexpr data_type T_ramp = 100;   // End of the ramp [s]
+        constexpr data_type T_ramp = 0;   // End of the ramp [s]
 
         data_type ramp = 1.0;
 
@@ -1643,6 +1675,9 @@ int main() {
 
             phi_x_v_old = phi_x_v;
 
+            phi_x_old = phi_x;
+            phi_v_old = phi_v;
+
             bXU_old = bXU;
             bVU_old = bVU;
 
@@ -1690,6 +1725,9 @@ int main() {
             Gamma_v = Gamma_v_old;
 
             phi_x_v = phi_x_v_old;
+
+            phi_x = phi_x_old;
+            phi_v = phi_v_old;
 
             bXU = bXU_old;
             bVU = bVU_old;
