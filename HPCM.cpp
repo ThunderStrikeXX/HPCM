@@ -37,7 +37,7 @@ int main() {
     
     // Environmental boundary conditions
     const data_type h_conv = 1;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const data_type power = 100;               // Power at the evaporator side [W]
+    const data_type power = 1000;               // Power at the evaporator side [W]
     const data_type T_env = 280.0;              // External environmental temperature [K]
 
     // Evaporation and condensation parameters
@@ -111,7 +111,7 @@ int main() {
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
-    const data_type T_init = 700;                      // Initial uniform temperature [K]
+    const data_type T_init = 600;                      // Initial uniform temperature [K]
 
     const data_type dT_init = 10.0;   // Ampiezza variazione iniziale [K]
 
@@ -376,7 +376,7 @@ int main() {
 
     // Printing parameters
     data_type t_last_print = 0.0;                   // Time from last print [s]
-    const data_type print_interval = 0.000000001;           // Time interval for printing [s]
+    const data_type print_interval = 0.5;           // Time interval for printing [s]
 
     // TDMA solver
     tdma::Solver tdma_solver(N);
