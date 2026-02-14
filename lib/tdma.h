@@ -2,8 +2,6 @@
 #include <vector>
 #include <cstddef>
 
-#include "numeric_types.h"
-
 namespace tdma {
 
     class Solver {
@@ -13,15 +11,15 @@ namespace tdma {
         }
 
         void solve(
-            const std::vector<data_type>& a,
-            const std::vector<data_type>& b,
-            const std::vector<data_type>& c,
-            const std::vector<data_type>& d,
-            std::vector<data_type>& x);
+            const std::vector<double>& a,
+            const std::vector<double>& b,
+            const std::vector<double>& c,
+            const std::vector<double>& d,
+            std::vector<double>& x);
 
     private:
-        std::vector<data_type> c_star_;
-        std::vector<data_type> d_star_;
+        std::vector<double> c_star_;
+        std::vector<double> d_star_;
         std::size_t n_;
     };
 

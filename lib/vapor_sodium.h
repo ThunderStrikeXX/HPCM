@@ -1,27 +1,25 @@
 ﻿#pragma once
 
-#include "numeric_types.h"
-
 namespace vapor_sodium {
 
     // From h_g(T) = ag + bg * T
-    inline data_type cp_g_linear() {
+    inline double cp_g_linear() {
 
         return 3.589755e2;   // J/(kg·K)
     }
 
-    inline data_type h_g_linear(data_type T) {
+    inline double h_g_linear(double T) {
 
-        constexpr data_type ag = 4.683166e6;   // J/kg
-        constexpr data_type bg = 3.589755e2;   // J/(kg·K)
+        constexpr double ag = 4.683166e6;   // J/kg
+        constexpr double bg = 3.589755e2;   // J/(kg·K)
 
         return ag + bg * T;   // J/kg
     }
 
-    inline data_type T_from_h_g_linear(data_type h) {
+    inline double T_from_h_g_linear(double h) {
 
-        constexpr data_type ag = 4.683166e6;   // J/kg
-        constexpr data_type bg = 3.589755e2;   // J/(kg·K)
+        constexpr double ag = 4.683166e6;   // J/kg
+        constexpr double bg = 3.589755e2;   // J/(kg·K)
 
         return (h - ag) / bg; // K
     }
@@ -30,9 +28,9 @@ namespace vapor_sodium {
     * @brief Saturation pressure [Pa] as a function of temperature T
     *   Satou-Moriyama
     */
-    inline data_type P_sat(data_type T) {
+    inline double P_sat(double T) {
 
-        const data_type val_MPa = std::exp(11.9463 - 12633.7 / T - 0.4672 * std::log(T));
+        const double val_MPa = std::exp(11.9463 - 12633.7 / T - 0.4672 * std::log(T));
         return val_MPa * 1e6;
     }
 
@@ -40,9 +38,9 @@ namespace vapor_sodium {
     * @brief Derivative of saturation pressure with respect to temperature [Pa/K] as a function of temperature T
     *   Satou-Moriyama
     */
-    inline data_type dP_sat_dT(data_type T) {
+    inline double dP_sat_dT(double T) {
 
-        const data_type val_MPa_per_K =
+        const double val_MPa_per_K =
             (12633.73 / (T * T) - 0.4672 / T) * std::exp(11.9463 - 12633.73 / T - 0.4672 * std::log(T));
         return val_MPa_per_K * 1e6;
     }
@@ -51,7 +49,7 @@ namespace vapor_sodium {
     * @brief Dynamic viscosity of sodium vapor [Pa·s] as a function of temperature T
     *   Linear fit ANL
     */
-    inline data_type mu(data_type T) { return 6.083e-9 * T + 1.2606e-5; }
+    inline double mu(double T) { return 6.083e-9 * T + 1.2606e-5; }
 
     /**
      * @brief Thermal conductivity [W/(m*K)] of sodium vapor over an extended range.
@@ -63,12 +61,12 @@ namespace vapor_sodium {
      * @param T Temperature [K]
      * @param P Pressure [Pa]
      */
-    inline data_type k(data_type T, data_type P) {
+    inline double k(double T, double P) {
 
-        static const std::array<data_type, 7> Tgrid = { 900,1000,1100,1200,1300,1400,1500 };
-        static const std::array<data_type, 5> Pgrid = { 981,4903,9807,49033,98066 };
+        static const std::array<double, 7> Tgrid = { 900,1000,1100,1200,1300,1400,1500 };
+        static const std::array<double, 5> Pgrid = { 981,4903,9807,49033,98066 };
 
-        static const data_type Ktbl[7][5] = {
+        static const double Ktbl[7][5] = {
             // P = 981,   4903,    9807,    49033,   98066  [Pa]
             {0.035796, 0.0379,  0.0392,  0.0415,  0.0422},   // 900 K
             {0.034053, 0.043583,0.049627,0.0511,  0.0520},   // 1000 K
@@ -80,52 +78,52 @@ namespace vapor_sodium {
         };
 
         // Clamping function
-        auto clamp_val = [](data_type x, data_type minv, data_type maxv) {
+        auto clamp_val = [](double x, double minv, double maxv) {
             return (x < minv) ? minv : ((x > maxv) ? maxv : x);
             };
 
-        auto idz = [](data_type x, const auto& grid) {
+        auto idz = [](double x, const auto& grid) {
             size_t i = 0;
             while (i + 1 < grid.size() && x > grid[i + 1]) ++i;
             return i;
             };
 
-        const data_type Tmin = Tgrid.front(), Tmax = Tgrid.back();
-        const data_type Pmin = Pgrid.front(), Pmax = Pgrid.back();
+        const double Tmin = Tgrid.front(), Tmax = Tgrid.back();
+        const double Pmin = Pgrid.front(), Pmax = Pgrid.back();
 
         bool Tlow = (T < Tmin);
         bool Thigh = (T > Tmax);
         bool Plow = (P < Pmin);
         bool Phigh = (P > Pmax);
 
-        data_type Tc = clamp_val(T, Tmin, Tmax);
-        data_type Pc = clamp_val(P, Pmin, Pmax);
+        double Tc = clamp_val(T, Tmin, Tmax);
+        double Pc = clamp_val(P, Pmin, Pmax);
 
         const size_t iT = idz(Tc, Tgrid);
         const size_t iP = idz(Pc, Pgrid);
 
-        const data_type T0 = Tgrid[iT], T1 = Tgrid[std::min(iT + 1ul, Tgrid.size() - 1)];
-        const data_type P0 = Pgrid[iP], P1 = Pgrid[std::min(iP + 1ul, Pgrid.size() - 1)];
+        const double T0 = Tgrid[iT], T1 = Tgrid[std::min(iT + 1ul, Tgrid.size() - 1)];
+        const double P0 = Pgrid[iP], P1 = Pgrid[std::min(iP + 1ul, Pgrid.size() - 1)];
 
-        const data_type q11 = Ktbl[iT][iP];
-        const data_type q21 = Ktbl[std::min(iT + 1ul, Tgrid.size() - 1)][iP];
-        const data_type q12 = Ktbl[iT][std::min(iP + 1ul, Pgrid.size() - 1)];
-        const data_type q22 = Ktbl[std::min(iT + 1ul, Tgrid.size() - 1)][std::min(iP + 1ul, Pgrid.size() - 1)];
+        const double q11 = Ktbl[iT][iP];
+        const double q21 = Ktbl[std::min(iT + 1ul, Tgrid.size() - 1)][iP];
+        const double q12 = Ktbl[iT][std::min(iP + 1ul, Pgrid.size() - 1)];
+        const double q22 = Ktbl[std::min(iT + 1ul, Tgrid.size() - 1)][std::min(iP + 1ul, Pgrid.size() - 1)];
 
-        data_type k_interp = 0.0;
+        double k_interp = 0.0;
 
         // Bilinear interpolation
         if ((T1 != T0) && (P1 != P0)) {
-            const data_type t = (Tc - T0) / (T1 - T0);
-            const data_type u = (Pc - P0) / (P1 - P0);
+            const double t = (Tc - T0) / (T1 - T0);
+            const double u = (Pc - P0) / (P1 - P0);
             k_interp = (1 - t) * (1 - u) * q11 + t * (1 - u) * q21 + (1 - t) * u * q12 + t * u * q22;
         }
         else if (T1 != T0) {
-            const data_type t = (Tc - T0) / (T1 - T0);
+            const double t = (Tc - T0) / (T1 - T0);
             k_interp = q11 + t * (q21 - q11);
         }
         else if (P1 != P0) {
-            const data_type u = (Pc - P0) / (P1 - P0);
+            const double u = (Pc - P0) / (P1 - P0);
             k_interp = q11 + u * (q12 - q11);
         }
         else {
@@ -135,9 +133,9 @@ namespace vapor_sodium {
         // Extrapolation handling
         if (Tlow || Thigh || Plow || Phigh) {
             
-            data_type Tref = (Tlow ? Tmin : (Thigh ? Tmax : Tc));
-            data_type k_ref = k_interp;
-            data_type k_extrap = k_ref * std::sqrt(T / Tref);
+            double Tref = (Tlow ? Tmin : (Thigh ? Tmax : Tc));
+            double k_ref = k_interp;
+            double k_extrap = k_ref * std::sqrt(T / Tref);
             return k_extrap;
         }
 
@@ -148,7 +146,7 @@ namespace vapor_sodium {
      * @brief Darcy friction factor (Petukhov correlation, smooth pipe)
      *        Valid for 3e3 < Re < 5e6
      */
-    inline data_type friction_factor(data_type Re) {
+    inline double friction_factor(double Re) {
         if (Re <= 0.0)
             throw std::invalid_argument("Re <= 0 in friction_factor");
 
@@ -160,9 +158,9 @@ namespace vapor_sodium {
      *        Laminar + Petukhov–Gnielinski turbulent
      *        Smooth logarithmic blending
      */
-    inline data_type Nusselt(
-        data_type Re,
-        data_type Pr
+    inline double Nusselt(
+        double Re,
+        double Pr
     ) {
         if (Re < 0.0 || Pr < 0.0)
             throw std::invalid_argument("Re or Pr <= 0 in Nusselt");
@@ -170,15 +168,15 @@ namespace vapor_sodium {
         // -----------------------------
         // Laminar fully developed
         // -----------------------------
-        constexpr data_type Nu_lam = 4.36;
+        constexpr double Nu_lam = 4.36;
 
         // -----------------------------
         // Turbulent (Petukhov–Gnielinski)
         // -----------------------------
-        auto Nu_turb = [&](data_type Re_loc) {
-            const data_type f = friction_factor(Re_loc);
-            const data_type num = (f / 8.0) * (Re_loc - 1000.0) * Pr;
-            const data_type den = 1.0 + 12.7 * std::sqrt(f / 8.0)
+        auto Nu_turb = [&](double Re_loc) {
+            const double f = friction_factor(Re_loc);
+            const double num = (f / 8.0) * (Re_loc - 1000.0) * Pr;
+            const double den = 1.0 + 12.7 * std::sqrt(f / 8.0)
                 * (std::pow(Pr, 2.0 / 3.0) - 1.0);
             return num / den;
             };
@@ -186,8 +184,8 @@ namespace vapor_sodium {
         // -----------------------------
         // Transition limits
         // -----------------------------
-        constexpr data_type Re_lam = 2300.0;
-        constexpr data_type Re_turb = 4000.0;
+        constexpr double Re_lam = 2300.0;
+        constexpr double Re_turb = 4000.0;
 
         // -----------------------------
         // Regime selection
@@ -201,7 +199,7 @@ namespace vapor_sodium {
         // -----------------------------
         // Logarithmic blending
         // -----------------------------
-        const data_type chi =
+        const double chi =
             (std::log(Re) - std::log(Re_lam)) /
             (std::log(Re_turb) - std::log(Re_lam));
 
@@ -212,11 +210,11 @@ namespace vapor_sodium {
      * @brief Convective heat transfer coefficient [W/m2/K]
      *        Sodium vapor – internal flow in heat pipe
      */
-    inline data_type h_conv(
-        data_type Re,
-        data_type Pr,
-        data_type k,
-        data_type Dh
+    inline double h_conv(
+        double Re,
+        double Pr,
+        double k,
+        double Dh
     ) {
         if (Dh <= 0.0 || k <= 0.0)
             throw std::invalid_argument("Dh or k <= 0 in h_conv");
@@ -224,15 +222,15 @@ namespace vapor_sodium {
         return Nusselt(Re, Pr) * k / Dh;
     }
 
-    inline data_type surf_ten(data_type T) {
-        constexpr data_type Tm = 371.0;
-        data_type val = 0.196 - 2.48e-4 * (T - Tm);
+    inline double surf_ten(double T) {
+        constexpr double Tm = 371.0;
+        double val = 0.196 - 2.48e-4 * (T - Tm);
         return val > 0.0 ? val : 0.0;
     }
 
-    inline data_type gamma(data_type T) {
-        data_type cp_val = cp_g_linear();
-        data_type cv_val = cp_g_linear() - 361.5;
+    inline double gamma(double T) {
+        double cp_val = cp_g_linear();
+        double cv_val = cp_g_linear() - 361.5;
         return cp_val / cv_val;
     }
 }
