@@ -41,7 +41,7 @@ int main() {
     const data_type T_env = 280.0;              // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const data_type eps_s = 0.01;                // Surface fraction of the liquid available for phasic interface [-]
+    const data_type eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
     const data_type sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
     const data_type sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	data_type Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
@@ -89,7 +89,7 @@ int main() {
     const data_type     time_simulation = 5000;         // Simulation total number [s]
 	data_type           dt_code = dt_user;              // Time step used in the code [s]
     data_type           halves = 0;                     // Number of halvings of the time step [-]
-    const data_type     accelerator = 0.125;              // Adaptive timestep multiplier (if too much, stability problems) [-]
+    const data_type     accelerator = 0.1;              // Adaptive timestep multiplier (if too much, stability problems) [-]
 
 	// Picard iteration parameters
 	const data_type max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -111,7 +111,7 @@ int main() {
     const data_type continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
     const data_type temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
 
-    const data_type T_init = 600;                      // Initial uniform temperature [K]
+    const data_type T_init = 1000;                      // Initial uniform temperature [K]
 
     const data_type dT_init = 10.0;   // Ampiezza variazione iniziale [K]
 
