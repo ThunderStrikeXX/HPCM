@@ -30,19 +30,19 @@ int main() {
     const double pi = 3.141592;              // Pi [-]
 
     // Physical properties
-    const double emissivity = 0.5;           // Wall emissivity [-]
+    const double emissivity_HP = 0.5;        // Wall emissivity [-]
     const double sigma = 5.67e-8;            // Stefan-Boltzmann constant [W/(m2K4)]
     const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const double h_conv = 1;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const double power = 1000;               // Power at the evaporator side [W]
-    const double T_env = 280.0;              // External environmental temperature [K]
+    const double h_conv = 2;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+    const double power = 1700;               // Power at the evaporator side [W]
+    const double T_env = 305;                // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const double eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 0.1;                // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.1;              // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.1;              // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Liquid permeability parameters
@@ -51,35 +51,54 @@ int main() {
             
     // Geometric parameters
     const std::size_t N = 22;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
-    const double L = 1; 			                                    // Length of the heat pipe [m]
+    const double L = 1.016; 			                                    // Length of the heat pipe [m]
     const double dz = L / (N - 2);                                   // Axial discretization step [m]
-    const double r_o = 0.01335;                                      // Outer wall radius [m]
-    const double r_i = 0.0112;                                       // Wall-liquid interface radius [m]
-    const double r_v = 0.01075;                                      // Vapor-liquid interface radius [m]
+    const double r_o = 0.0127;                                      // Outer wall radius [m]
+    const double r_i = 0.01095;                                       // Wall-liquid interface radius [m]
+    const double r_v = 0.00895;                                      // Vapor-liquid interface radius [m]
     const double Dh_v = 2.0 * r_v;                                   // Hydraulic diameter of the vapor core [m]
     const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;  // Volume of the wall cell [m3]
     const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;  // Volume of the liquid cell [m3]
     const double vol_vapor_cell = r_v * r_v * pi * dz;               // Volume of the vapor cell [m3]
     const double A_interface_cell = 2 * pi * r_i * dz;               // Interfacial area between vapor and liquid for a cell [m2]     
 
-    // Evaporator region parameters
-    const double evaporator_start = 0.020;                           // Evaporator begin [m]
-    const double evaporator_end = 0.073;                             // Evaporator end [m]
-    const double condenser_length = 0.292;                           // Condenser length [m]
+    // Evaporator and condenser region parameters
+    const double evaporator_start = 0.0;                             // Evaporator begin [m]
+    const double evaporator_end = 0.254;                             // Evaporator end [m]
+    const double condenser_start = L - 0.254;                        // Condenser begin [m]
+    const double condenser_end = L;                                  // Condenser end [m]
     const double Lh = evaporator_end - evaporator_start;             // Evaporator length [m]
-    const double delta_h = 0.01;                                     // Evaporator ramp [m]
+    const double Lc = condenser_end - condenser_start;               // Condenser lenfth
+    const double delta_h = 0.05;                                     // Evaporator spatial ramp [m]
+    const double delta_c = 0.05;                                     // Condenser spatial ramp [m]
     const double Lh_eff = Lh + delta_h;                              // Evaporator effective length [m]
-    const double q0 = power / (2.0 * pi * r_o * Lh_eff);             // Evaporator heat flux [W/m2]
+    const double Lc_eff = Lc + delta_c;                              // Condenser effective length [m]
 
-    // Condenser region parameters
-    const double delta_c = 0.05;                                     // Condenser ramp [m]
-    const double condenser_start = L - condenser_length;             // Condenser begin [m]
+    // Evaporator parameters
+    double T_inf_air = 20.0 + 273.15;           // Air ambient temperature at the heater [K]
+    double r_h1 = 0.0199;                       // Heater internal radius [m]
+    double r_h2 = 0.0254;                       // Heater external radius [m]
+    double r_isol = 0.1016;                        // Isolation external radius [m]
+    double A_HP = 2.0 * pi * r_o * Lh_eff;      // Heat pipe evaporator region external surface [m2]
+    double A_h1 = 2.0 * pi * r_h1 * Lh_eff;     // Heater internal surface [m2]
+    double k_a = 0.030;                         // Air thermal conductivity @ 100 C [W/mK]
+    double k_h = 3.8;                           // Heater thermal conductivity [W/mK]
+    double k_i = 0.16;                          // Isolation thermal conductivity [W/mK]
+    double h_a = 5.0;                           // Heat transfer coefficient of air outside evaporator [W/m2K]
+    double emissivity_h = 0.8;                  // Heater emissivity [-]   
 
     // Coefficients for the parabolic temperature profiles in wall and liquid
     const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));    // [m]
     const double E2w = 0.5 * (r_o * r_o + r_i * r_i);                        // [m2]
     const double E1x = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));    // [m]
     const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                        // [m2]
+
+    // Heater resistances
+    double R_cond_left = std::log(r_h1 / r_o) / (2.0 * pi * k_a * Lh_eff);
+    double R_cond_heater = std::log(r_h2 / r_h1) / (2.0 * pi * k_h * Lh_eff);
+    double R_cond_insul = std::log(r_isol / r_h2) / (2.0 * pi * k_i * Lh_eff);
+    double R_conv_air = 1.0 / (h_a * 2.0 * pi * r_isol * Lh_eff);
+    double R_right = R_cond_heater + R_cond_insul + R_conv_air;
 
     // Time-stepping parameters
     double           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
@@ -88,7 +107,7 @@ int main() {
     const double     time_simulation = 5000;         // Simulation total number [s]
 	double           dt_code = dt_user;              // Time step used in the code [s]
     double           halves = 0;                     // Number of halvings of the time step [-]
-    const double     accelerator = 0.1;              // Adaptive timestep multiplier (if too much, stability problems) [-]
+    const double     accelerator = 1.0;              // Adaptive timestep multiplier (if too much, stability problems) [-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
@@ -570,6 +589,23 @@ int main() {
 
     reynolds_output << std::setprecision(output_precision);
     HTC_output << std::setprecision(output_precision);
+
+    int nodes_evap = 0;
+    int nodes_cond = 0;
+
+    for (std::size_t i = 0; i < N; ++i) {
+        if (mesh_center[i] >= evaporator_start - delta_h &&
+            mesh_center[i] <= evaporator_end + delta_h) {
+
+            nodes_evap++;
+
+        }
+        else  if (mesh_center[i] >= condenser_start - delta_h &&
+            mesh_center[i] <= condenser_end + delta_h) {
+
+            nodes_cond++;
+        }
+    }
 
     #pragma endregion
 
@@ -1369,6 +1405,153 @@ int main() {
 
             #pragma region interfaces 
 
+            // Calculating average evaporator and condenser heat pipe outer wall temperature
+
+            double T_evap_aver = 0.0;
+            double T_cond_aver = 0.0;
+
+            for (std::size_t i = 0; i < N; ++i) {
+                if (mesh_center[i] >= evaporator_start - delta_h &&
+                    mesh_center[i] <= evaporator_end + delta_h) {
+
+                    T_evap_aver += T_o_w_iter[i];
+
+                }
+                else  if (mesh_center[i] >= condenser_start - delta_h &&
+                    mesh_center[i] <= condenser_end + delta_h) {
+
+                    T_cond_aver += T_o_w_iter[i];
+                }
+            }
+
+            T_evap_aver /= nodes_evap;          // Average evaporator temperature [K]
+            T_cond_aver /= nodes_cond;          // Average condenser temperature [K]
+
+            // Individual wall cell volumetric heat flux due to evaporator
+            double Q_HP_condenser = -h_conv * (T_cond_aver - T_env) * (2 * r_o * Lc_eff) / ((r_o * r_o - r_i * r_i) * dz);
+
+            // Condenser distribution
+
+            double sum_c = 0.0;
+
+            for (std::size_t i = 0; i < N; ++i) {
+
+                double c = 0.0;
+
+                if (mesh_center[i] >= condenser_start - delta_c &&
+                    mesh_center[i] <= condenser_end + delta_c) {
+
+                    if (mesh_center[i] >= condenser_start - delta_c &&
+                        mesh_center[i] < condenser_start) {
+
+                        double x = (mesh_center[i] - (condenser_start - delta_c)) / delta_c;
+                        c = 0.5 * (1.0 - std::cos(pi * x));
+                    }
+                    else if (mesh_center[i] >= condenser_start &&
+                        mesh_center[i] <= condenser_end) {
+
+                        c = 1.0;
+                    }
+                    else if (mesh_center[i] > condenser_end &&
+                        mesh_center[i] <= condenser_end + delta_c) {
+
+                        double x = (mesh_center[i] - condenser_end) / delta_c;
+                        c = 0.5 * (1.0 + std::cos(pi * x));
+                    }
+
+                    Q_ow[i] = c * Q_HP_condenser;
+                    sum_c += c;
+                }
+            }
+
+            // Condenser normalization 
+            for (std::size_t i = 0; i < N; ++i) Q_ow[i] /= sum_c;
+
+            double T_h1 = T_evap_aver + 10.0;   // Initial guess for internal heater temperature [K]
+            double tol = 1e-6;
+            double err = 1.0;
+
+            double R_left;
+
+            while (err > tol) {
+
+                // Radiation coefficient
+                double h_rad =
+                    sigma * (T_h1 * T_h1 + T_evap_aver * T_evap_aver) * (T_h1 + T_evap_aver) /
+                    ((1.0 / emissivity_HP) +
+                        (A_HP / A_h1) * (1.0 / emissivity_h - 1.0));
+
+                double R_rad = 1.0 / (A_HP * h_rad);
+
+                // Parallel equivalent
+                R_left = 1.0 / (1.0 / R_cond_left + 1.0 / R_rad);
+
+                // Energy balance
+                double A = (1.0 / R_left + 1.0 / R_right);
+                double B = power + T_evap_aver / R_left + T_inf_air / R_right;
+
+                double T_new = B / A;
+
+                err = std::fabs(T_new - T_h1);
+                T_h1 = T_new;
+            }
+
+            // Individual wall cell volumetric heat flux due to condenser
+            double Q_HP_heater = (T_h1 - T_evap_aver) / R_left / (pi * (r_o * r_o - r_i * r_i) * dz);
+
+            double sum_w = 0.0;
+
+            // Evaporator distribution
+            for (std::size_t i = 0; i < N; ++i) {
+
+                double w = 0.0;
+
+                if (mesh_center[i] >= evaporator_start - delta_h &&
+                    mesh_center[i] <= evaporator_end + delta_h) {
+
+                    if (mesh_center[i] >= evaporator_start - delta_h &&
+                        mesh_center[i] < evaporator_start) {
+
+                        double x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
+                        w = 0.5 * (1.0 - std::cos(pi * x));
+                    }
+                    else if (mesh_center[i] >= evaporator_start &&
+                        mesh_center[i] <= evaporator_end) {
+
+                        w = 1.0;
+                    }
+                    else if (mesh_center[i] > evaporator_end &&
+                        mesh_center[i] <= evaporator_end + delta_h) {
+
+                        double x = (mesh_center[i] - evaporator_end) / delta_h;
+                        w = 0.5 * (1.0 + std::cos(pi * x));
+                    }
+
+                    Q_ow[i] = w * Q_HP_heater;                  // Evaporator weight
+                    sum_w += w;
+                }
+            }
+
+            // Evaporator normalization 
+            for (std::size_t i = 0; i < N; ++i) {
+
+                if (mesh_center[i] >= evaporator_start - delta_h &&
+                    mesh_center[i] <= evaporator_end + delta_h) {
+
+                    Q_ow[i] /= sum_w;
+                }
+            }
+
+            // Evaporator time power ramp
+            for (std::size_t i = 0; i < N; ++i) {
+
+                if (mesh_center[i] >= evaporator_start - delta_h &&
+                    mesh_center[i] <= evaporator_end + delta_h) {
+
+                    Q_ow[i] *= ramp;
+                }
+            }
+
             for (std::size_t i = 1; i < N - 1; ++i) {
 
                 // Physical properties
@@ -1427,76 +1610,6 @@ int main() {
                 T_o_w[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_o + ABC[6 * i + 2] * r_o * r_o; // Temperature at the outer wall [K]
                 T_w_x[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_i + ABC[6 * i + 2] * r_i * r_i; // Temperature at the wall liquid interface [K]
                 T_x_v[i] = ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v; // Temperature at the liquid vapor interface [K]
-
-                double conv = h_conv * (T_o_w[i] - T_env);       // [W/m2]
-                double irr = emissivity * sigma * (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));   // [W/m2]
-               
-                double sum_w = 0.0;
-                std::size_t n_evap = 0;
-
-                // Evaporator
-                for (std::size_t i = 0; i < N; ++i) {
-                    double w = 0.0;
-
-                    if (mesh_center[i] >= evaporator_start - delta_h &&
-                        mesh_center[i] <= evaporator_end + delta_h) {
-
-                        ++n_evap;
-
-                        if (mesh_center[i] >= evaporator_start - delta_h &&
-                            mesh_center[i] < evaporator_start) {
-
-                            double x = (mesh_center[i] - (evaporator_start - delta_h)) / delta_h;
-                            w = 0.5 * (1.0 - std::cos(pi * x));
-                        }
-                        else if (mesh_center[i] >= evaporator_start &&
-                            mesh_center[i] <= evaporator_end) {
-
-                            w = 1.0;
-                        }
-                        else if (mesh_center[i] > evaporator_end &&
-                            mesh_center[i] <= evaporator_end + delta_h) {
-
-                            double x = (mesh_center[i] - evaporator_end) / delta_h;
-                            w = 0.5 * (1.0 + std::cos(pi * x));
-                        }
-                    }
-
-                    q_ow[i] = w;        // Evaporator weight
-                    sum_w += w;
-                }
-
-                // Evaporator normalization 
-                const double s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
-                for (std::size_t i = 0; i < N; ++i) {
-
-                    q_ow[i] *= s;
-                    Q_ow[i] = q_ow[i] * 2 * r_o * Lh_eff / ((r_o * r_o - r_i * r_i) * dz);
-                }
-
-
-                // Evaporator power ramp
-                for (std::size_t i = 0; i < N; ++i) {
-
-                    q_ow[i] *= ramp;
-                    Q_ow[i] *= ramp;
-                }
-
-                // Condenser
-                for (std::size_t i = 0; i < N; ++i) {
-
-                    if (mesh_center[i] >= condenser_start &&
-                        mesh_center[i] < condenser_start + delta_c) {
-
-                        double x = (mesh_center[i] - condenser_start) / delta_c;
-                        q_ow[i] = -(conv + irr) * 0.5 * (1.0 - std::cos(pi * x));
-                        Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);
-                    }
-                    else if (mesh_center[i] >= condenser_start + delta_c) {
-                        q_ow[i] = -(conv + irr);
-                        Q_ow[i] = q_ow[i] * 2 * r_o / (r_o * r_o - r_i * r_i);
-                    }
-                }
 
                 // Liquid to wall, heat source due to heat flux [W/m3]
                 Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           
