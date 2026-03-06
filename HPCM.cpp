@@ -35,14 +35,14 @@ int main() {
     const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const double h_conv = 2;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const double power = 1700;               // Power at the evaporator side [W]
-    const double T_env = 305;                // External environmental temperature [K]
+    const double h_conv = 83;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+    const double power = 1500;               // Power at the evaporator side [W]
+    const double T_env = 344;                // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const double eps_s = 0.1;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.1;              // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.1;              // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 0.5;                // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.01;              // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.01;              // Condensation accomodation coefficient [-]. 1 means optimal condensation
 	double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Liquid permeability parameters
@@ -85,7 +85,7 @@ int main() {
     double k_h = 3.8;                           // Heater thermal conductivity [W/mK]
     double k_i = 0.16;                          // Isolation thermal conductivity [W/mK]
     double h_a = 5.0;                           // Heat transfer coefficient of air outside evaporator [W/m2K]
-    double emissivity_h = 0.8;                  // Heater emissivity [-]   
+    double emissivity_h = 0.5;                  // Heater emissivity [-]   
 
     // Coefficients for the parabolic temperature profiles in wall and liquid
     const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));    // [m]
@@ -950,24 +950,11 @@ int main() {
                     for (int i = 1; i < N; ++i) {
 
                         const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
+                        
+                        // Correzione incrementale coerente con la matrice p'
+                        const double rho_face = (phi_x[i] >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                        phi_x[i] -= rho_face * avgInvbXU * (p_prime_x[i] - p_prime_x[i - 1]) / dz;
 
-                        double rc = 0.0;
-
-                        // Rhie–Chow corrections for face velocities
-                        if ((i != 1) && (i != N - 1)) {
-
-                            rc = -avgInvbXU / 4.0 *
-                                (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]); // [m/s]
-
-                        }
-
-                        // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc;    // [m/s]
-
-                        // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];       // [kg/m3]
-
-                        phi_x[i] = rho * u_face;
                     }
 
                     phi_x[0] = u_outlet_x * rho_x[0];
@@ -984,6 +971,10 @@ int main() {
                     continuity_res_x = 0.0;
 
                     for (std::size_t i = 1; i < N - 1; ++i) {
+
+                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
+                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
+                        dXP[i] = + mass_flux - mass_imbalance;       // [kg/(m2s)]
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
                     }
@@ -1007,6 +998,16 @@ int main() {
                 #pragma endregion
 
                 simple_iter_x++;
+            }
+
+            // Apply Rhie and Chow correction OUTSIDE loops
+            for (int i = 1; i < N; ++i) {
+                const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);
+                double rc = -avgInvbXU / 4.0 * (p_padded_x[i - 2] - 3 * p_padded_x[i - 1]
+                    + 3 * p_padded_x[i] - p_padded_x[i + 1]);
+                const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rc;
+                const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                phi_x[i] = rho_face * u_face;
             }
                 
             #pragma endregion
@@ -1310,23 +1311,10 @@ int main() {
 
                         const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
 
-                        double rc = 0.0;
+                        // Correzione incrementale coerente con la matrice p'
+                        const double rho_face = (phi_v[i] >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                        phi_v[i] -= rho_face * avgInvbVU * (p_prime_v[i] - p_prime_v[i - 1]) / dz;
 
-                        // Rhie–Chow corrections for face velocities
-                        if ((i != 1) && (i != N - 1)) {
-
-                            rc = -avgInvbVU / 4.0 *
-                                (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]); // [m/s]
-
-                        }
-
-                        // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc;    // [m/s]
-
-                        // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];       // [kg/m3]
-
-                        phi_v[i] = rho * u_face;
                     }
 
                     phi_v[0] = u_inlet_v * rho_v[0];
@@ -1361,6 +1349,10 @@ int main() {
 
                     for (std::size_t i = 1; i < N - 1; ++i) {
 
+                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const double mass_flux = Gamma_v[i] * dz;         // [kg/(m2s)]
+                        dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
+
                         continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
                     }
 
@@ -1392,6 +1384,16 @@ int main() {
                 #pragma endregion
 
                 simple_iter_v++;
+            }
+
+            // Apply Rhie and Chow correction OUTSIDE loops
+            for (int i = 1; i < N; ++i) {
+                const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);
+                double rc = -avgInvbVU / 4.0 * (p_padded_v[i - 2] - 3 * p_padded_v[i - 1]
+                    + 3 * p_padded_v[i] - p_padded_v[i + 1]);
+                const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rc;
+                const double rho_face = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                phi_v[i] = rho_face * u_face;
             }
 
             // Update density with new p,T
