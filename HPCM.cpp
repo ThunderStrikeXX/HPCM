@@ -637,8 +637,8 @@ int main() {
         for (pic = 0; pic < max_picard; pic++) {
 
             // =======================================================================
-            //                                [WICK]
-            // =======================================================================
+           //                                [WICK]
+           // =======================================================================
 
             #pragma region liquid
 
@@ -649,16 +649,16 @@ int main() {
             // Outer iterations reset
             simple_iter_x = 0;
 
-			// Outer "PISO" iterations
+            // Outer "PISO" iterations
             while ((simple_iter_x < tot_simple_iter_x) && (momentum_res_x > momentum_tol_x || temperature_res_x > temperature_tol_x)) {
 
-				// ==========  MOMENTUM PREDICTOR 
+                // ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
                 for (std::size_t i = 1; i < N - 1; i++) {
 
-				    // Physical properties
-                    const double rho_P = rho_x[i];    
+                    // Physical properties
+                    const double rho_P = rho_x[i];
                     const double rho_L = rho_x[i - 1];
                     const double rho_R = rho_x[i + 1];
 
@@ -668,24 +668,24 @@ int main() {
                     const double mu_L = mu_x[i - 1];
                     const double mu_R = mu_x[i + 1];
 
-                    const double D_l = 0.5 * (mu_P + mu_L) / dz;   
+                    const double D_l = 0.5 * (mu_P + mu_L) / dz;
                     const double D_r = 0.5 * (mu_P + mu_R) / dz;
 
-                    aXU[i] = 
-                        - std::max(phi_x[i], static_cast<double>(0.0))
+                    aXU[i] =
+                        -std::max(phi_x[i], static_cast<double>(0.0))
                         - D_l;
-                    cXU[i] = 
-                        - std::max(-phi_x[i + 1], static_cast<double>(0.0))
+                    cXU[i] =
+                        -std::max(-phi_x[i + 1], static_cast<double>(0.0))
                         - D_r;
-                    bXU[i] = 
-                        + std::max(phi_x[i + 1], static_cast<double>(0.0))
+                    bXU[i] =
+                        +std::max(phi_x[i + 1], static_cast<double>(0.0))
                         + std::max(-phi_x[i], static_cast<double>(0.0))
-                        + rho_P * dz / dt 
-                        + D_l + D_r 
-                        + mu_P / K * dz 
+                        + rho_P * dz / dt
+                        + D_l + D_r
+                        + mu_P / K * dz
                         + CF * mu_P * dz / sqrt(K) * abs(u_x[i]);
-                    dXU[i] = 
-                        - 0.5 * (p_x[i + 1] - p_x[i - 1])
+                    dXU[i] =
+                        -0.5 * (p_x[i + 1] - p_x[i - 1])
                         + rho_P_old * u_x_old[i] * dz / dt;
                 }
 
@@ -694,15 +694,15 @@ int main() {
                 const double D_last = mu_x[N - 1] / dz;
 
                 // Velocity BCs: fixed (zero) velocity on the first face
-			    aXU[0] = 0.0;
+                aXU[0] = 0.0;
                 bXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
                 cXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
                 dXU[0] = 0.0;
-            
+
                 // Velocity BCs: fixed (zero) velocity on the last face
                 aXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
                 bXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
-			    cXU[N - 1] = 0.0;
+                cXU[N - 1] = 0.0;
                 dXU[N - 1] = 0.0;
 
                 tdma_solver.solve(aXU, bXU, cXU, dXU, u_x);
@@ -741,21 +741,21 @@ int main() {
                     Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_liquid[i];
 
                     aXT[i] =
-                        - D_l
+                        -D_l
                         - std::max(C_l, static_cast<double>(0.0));       // [W/(m2 K)]
 
                     cXT[i] =
-                        - D_r
+                        -D_r
                         - std::max(-C_r, static_cast<double>(0.0));      // [W/(m2 K)]
 
                     bXT[i] =
-                        + std::max(C_r, static_cast<double>(0.0))
+                        +std::max(C_r, static_cast<double>(0.0))
                         + std::max(-C_l, static_cast<double>(0.0))
                         + D_l + D_r
                         + rho_P * dz / dt;                                  // [W/(m2 K)]
 
                     dXT[i] =
-                        + rho_P_old * dz / dt * h_x_old[i]
+                        +rho_P_old * dz / dt * h_x_old[i]
                         + Q_wx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mass_liquid[i] * dz;        // [W/m2]       
@@ -805,16 +805,16 @@ int main() {
                 // Inner iterations reset
                 piso_iter_x = 0;
 
-				// Inner "SIMPLE" iterations
+                // Inner "SIMPLE" iterations
                 while ((piso_iter_x < tot_piso_iter_x) && (continuity_res_x > continuity_tol_x)) {
 
                     // =========== CONTINUITY SATIFACTOR
                     #pragma region continuity_satisfactor
 
-					// Loop to assemble the linear system for the pressure correction
+                    // Loop to assemble the linear system for the pressure correction
                     for (std::size_t i = 1; i < N - 1; i++) {
 
-					    // Physical properties
+                        // Physical properties
                         const double rho_P = rho_x[i];
                         const double rho_L = rho_x[i - 1];
                         const double rho_R = rho_x[i + 1];
@@ -824,7 +824,7 @@ int main() {
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
 
-                        const double mass_flux = - Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
 
                         const double rho_l_cd = 0.5 * (rho_L + rho_P);      // [kg/m3]
                         const double rho_r_cd = 0.5 * (rho_P + rho_R);      // [kg/m3]
@@ -835,21 +835,21 @@ int main() {
                         aXP[i] = -E_l;              // [s/m]
                         cXP[i] = -E_r;              // [s/m]
                         bXP[i] = E_l + E_r;         // [s/m]
-                        dXP[i] = 
-                            + mass_flux 
+                        dXP[i] =
+                            +mass_flux
                             - mass_imbalance;       // [kg/(m2s)]
                     }
 
                     // BCs for the correction of pressure: zero gradient at first face
-				    aXP[0] = 0.0;
-                    bXP[0] = 1.0; 
-                    cXP[0] = -1.0; 
+                    aXP[0] = 0.0;
+                    bXP[0] = 1.0;
+                    cXP[0] = -1.0;
                     dXP[0] = 0.0;
 
                     // BCs for the correction of pressure: zero at first face
                     aXP[N - 1] = 1.0;
-                    bXP[N - 1] = 1.0; 
-				    cXP[N - 1] = 0.0;
+                    bXP[N - 1] = 1.0;
+                    cXP[N - 1] = 0.0;
                     dXP[N - 1] = 0.0;
 
                     tdma_solver.solve(aXP, bXP, cXP, dXP, p_prime_x);
@@ -915,23 +915,10 @@ int main() {
 
                         const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
 
-                        double rc = 0.0;
+                        // Correzione incrementale coerente con la matrice p'
+                        const double rho_face = (phi_x[i] >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                        phi_x[i] -= rho_face * avgInvbXU * (p_prime_x[i] - p_prime_x[i - 1]) / dz;
 
-                        // Rhie–Chow corrections for face velocities
-                        if ((i != 1) && (i != N - 1)) {
-
-                            rc = -avgInvbXU / 4.0 *
-                                (p_padded_x[i - 2] - 3.0 * p_padded_x[i - 1] + 3.0 * p_padded_x[i] - p_padded_x[i + 1]); // [m/s]
-
-                        }
-
-                        // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rhie_chow_on_off_x * rc;    // [m/s]
-
-                        // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];       // [kg/m3]
-
-                        phi_x[i] = rho * u_face;
                     }
 
                     phi_x[0] = u_outlet_x * rho_x[0];
@@ -948,6 +935,10 @@ int main() {
                     continuity_res_x = 0.0;
 
                     for (std::size_t i = 1; i < N - 1; ++i) {
+
+                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
+                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
+                        dXP[i] = +mass_flux - mass_imbalance;       // [kg/(m2s)]
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
                     }
@@ -972,7 +963,17 @@ int main() {
 
                 simple_iter_x++;
             }
-                
+
+            // Apply Rhie and Chow correction OUTSIDE loops
+            for (int i = 1; i < N; ++i) {
+                const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);
+                double rc = -avgInvbXU / 4.0 * (p_padded_x[i - 2] - 3 * p_padded_x[i - 1]
+                    + 3 * p_padded_x[i] - p_padded_x[i + 1]);
+                const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rc;
+                const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                phi_x[i] = rho_face * u_face;
+            }
+
             #pragma endregion
 
             // =======================================================================
@@ -996,7 +997,7 @@ int main() {
 
                 for (std::size_t i = 1; i < N - 1; i++) {
 
-				    // Physical properties
+                    // Physical properties
                     const double rho_P = rho_v[i];
                     const double rho_L = rho_v[i - 1];
                     const double rho_R = rho_v[i + 1];
@@ -1008,26 +1009,26 @@ int main() {
                     const double mu_R = mu_v[i + 1];
 
                     const double D_l = 4.0 / 3.0 * 0.5 * (mu_P + mu_L) / dz;
-                    const double D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;    
+                    const double D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;
 
                     const double Re = u_v[i] * (2 * r_v) * rho_P / mu_P;
-                    const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);  
+                    const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);
                     const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
 
-                    aVU[i] = 
-                        - std::max(phi_v[i], static_cast<double>(0.0))
+                    aVU[i] =
+                        -std::max(phi_v[i], static_cast<double>(0.0))
                         - D_l;                              // [kg/(m2 s)]
-                    cVU[i] = 
-                        - std::max(-phi_v[i + 1], static_cast<double>(0.0))
+                    cVU[i] =
+                        -std::max(-phi_v[i + 1], static_cast<double>(0.0))
                         - D_r;                              // [kg/(m2 s)]
-                    bVU[i] = 
-                        + std::max(phi_v[i + 1], static_cast<double>(0.0))
+                    bVU[i] =
+                        +std::max(phi_v[i + 1], static_cast<double>(0.0))
                         + std::max(-phi_v[i], static_cast<double>(0.0))
-                        + rho_P * dz / dt 
-                        + D_l + D_r 
+                        + rho_P * dz / dt
+                        + D_l + D_r
                         + F * dz;                           // [kg/(m2 s)]
-                    dVU[i] = 
-                        - 0.5 * (p_v[i + 1] - p_v[i - 1])
+                    dVU[i] =
+                        -0.5 * (p_v[i + 1] - p_v[i - 1])
                         + rho_P_old * u_v_old[i] * dz / dt; // [kg/(m s2)]
                 }
 
@@ -1036,15 +1037,15 @@ int main() {
                 const double D_last = (4.0 / 3.0) * mu_v[N - 1] / dz;
 
                 // Velocity BCs: zero velocity on the first node
-			    aVU[0] = 0.0;
-                bVU[0] = + (rho_v[0] * dz / dt + 2 * D_first);
-                cVU[0] = + (rho_v[0] * dz / dt + 2 * D_first);
+                aVU[0] = 0.0;
+                bVU[0] = +(rho_v[0] * dz / dt + 2 * D_first);
+                cVU[0] = +(rho_v[0] * dz / dt + 2 * D_first);
                 dVU[0] = 0.0;
 
                 // Velocity BCs: zero velocity on the last node
-                aVU[N - 1] = + (rho_v[N - 1] * dz / dt + 2 * D_last);
-                bVU[N - 1] = + (rho_v[N - 1] * dz / dt + 2 * D_last);
-			    cVU[N - 1] = 0.0;
+                aVU[N - 1] = +(rho_v[N - 1] * dz / dt + 2 * D_last);
+                bVU[N - 1] = +(rho_v[N - 1] * dz / dt + 2 * D_last);
+                cVU[N - 1] = 0.0;
                 dVU[N - 1] = 0.0;
 
                 tdma_solver.solve(aVU, bVU, cVU, dVU, u_v);
@@ -1089,27 +1090,27 @@ int main() {
                     Q_tot_v[i] = /*dp_dt / dz + dpdz_up / dz + viscous_dissipation +*/ Q_xm[i] + Q_mass_vapor[i];
 
                     aVT[i] =
-                        - D_l
+                        -D_l
                         - std::max(C_l, static_cast<double>(0.0))
                         ;                                   /// [W/(m2K)]
 
                     cVT[i] =
-                        - D_r
+                        -D_r
                         - std::max(-C_r, static_cast<double>(0.0))
                         ;                                   /// [W/(m2K)]
 
                     bVT[i] =
-                        + std::max(C_r, static_cast<double>(0.0))
+                        +std::max(C_r, static_cast<double>(0.0))
                         + std::max(-C_l, static_cast<double>(0.0))
                         + D_l + D_r
                         + rho_v[i] * dz / dt;               /// [W/(m2 K)]
 
                     dVT[i] =
-                        + rho_v_old[i] * dz / dt * h_v_old[i]
+                        +rho_v_old[i] * dz / dt * h_v_old[i]
                         // + dp_dt
                         // + dpdz_up
                         // + viscous_dissipation * dz
-                        + Q_xm[i] * dz                      // Positive if heat from liquid to vapor
+                        +Q_xm[i] * dz                      // Positive if heat from liquid to vapor
                         + Q_mass_vapor[i] * dz;             // [W/m2]
                 }
 
@@ -1159,7 +1160,7 @@ int main() {
                 // Inner iterations reset
                 piso_iter_v = 0;
 
-				// Inner iterations for the vapor continuity equation
+                // Inner iterations for the vapor continuity equation
                 while ((piso_iter_v < tot_piso_iter_v) && (continuity_res_v > continuity_tol_v)) {
 
                     // =========== CONTINUITY SATIFACTOR
@@ -1186,34 +1187,34 @@ int main() {
                         const double E_r = 0.5 * (rho_v[i] * (1.0 / bVU[i]) + rho_v[i + 1] * (1.0 / bVU[i + 1])) / dz; // [s/m]
 
                         aVP[i] =
-                            - E_l
+                            -E_l
                             - std::max(C_l, static_cast<double>(0.0))
                             ;                                   /// [s/m]
 
                         cVP[i] =
-                            - E_r
+                            -E_r
                             - std::max(-C_r, static_cast<double>(0.0))
                             ;                                   /// [s/m]
 
                         bVP[i] =
-                            + E_l + E_r
+                            +E_l + E_r
                             + std::max(C_r, static_cast<double>(0.0))
                             + std::max(-C_l, static_cast<double>(0.0))
                             + psi_i * dz / dt;                  /// [s/m]
 
-                        dVP[i] = + mass_flux - mass_imbalance;  /// [kg/(m2s)]
+                        dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
                     }
 
                     // BCs for the correction of pressure: zero gradient at first node
-				    aVP[0] = 0.0;
-                    bVP[0] = 1.0; 
-                    cVP[0] = -1.0; 
+                    aVP[0] = 0.0;
+                    bVP[0] = 1.0;
+                    cVP[0] = -1.0;
                     dVP[0] = 0.0;
 
                     // BCs for the correction of pressure: zero at last node
                     aVP[N - 1] = -1.0;
-                    bVP[N - 1] = 1.0;  
-				    cVP[N - 1] = 0.0;
+                    bVP[N - 1] = 1.0;
+                    cVP[N - 1] = 0.0;
                     dVP[N - 1] = 0.0;
 
                     tdma_solver.solve(aVP, bVP, cVP, dVP, p_prime_v);
@@ -1269,28 +1270,15 @@ int main() {
 
                     // =========== FLUX CORRECTOR
                     #pragma region flux_corrector
-                    
+
                     for (int i = 1; i < N; ++i) {
 
                         const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
 
-                        double rc = 0.0;
+                        // Correzione incrementale coerente con la matrice p'
+                        const double rho_face = (phi_v[i] >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                        phi_v[i] -= rho_face * avgInvbVU * (p_prime_v[i] - p_prime_v[i - 1]) / dz;
 
-                        // Rhie–Chow corrections for face velocities
-                        if ((i != 1) && (i != N - 1)) {
-
-                            rc = -avgInvbVU / 4.0 *
-                                (p_padded_v[i - 2] - 3.0 * p_padded_v[i - 1] + 3.0 * p_padded_v[i] - p_padded_v[i + 1]); // [m/s]
-
-                        }
-
-                        // Face velocities (avg + RC)
-                        const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rhie_chow_on_off_v * rc;    // [m/s]
-
-                        // Upwind densities at faces
-                        const double rho = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];       // [kg/m3]
-
-                        phi_v[i] = rho * u_face;
                     }
 
                     phi_v[0] = u_inlet_v * rho_v[0];
@@ -1325,6 +1313,10 @@ int main() {
 
                     for (std::size_t i = 1; i < N - 1; ++i) {
 
+                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const double mass_flux = Gamma_v[i] * dz;         // [kg/(m2s)]
+                        dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
+
                         continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
                     }
 
@@ -1356,6 +1348,16 @@ int main() {
                 #pragma endregion
 
                 simple_iter_v++;
+            }
+
+            // Apply Rhie and Chow correction OUTSIDE loops
+            for (int i = 1; i < N; ++i) {
+                const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);
+                double rc = -avgInvbVU / 4.0 * (p_padded_v[i - 2] - 3 * p_padded_v[i - 1]
+                    + 3 * p_padded_v[i] - p_padded_v[i + 1]);
+                const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rc;
+                const double rho_face = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                phi_v[i] = rho_face * u_face;
             }
 
             // Update density with new p,T
