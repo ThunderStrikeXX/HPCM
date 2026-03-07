@@ -82,33 +82,33 @@ int main() {
     const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                        // [m2]
 
     // Time-stepping parameters
-    double           dt_user = 1e-1;                 // Initial time step [s] (then it is updated according to the limits)
+    double           dt_user = 1e-4;                 // Initial time step [s] (then it is updated according to the limits)
 	double           dt = dt_user;                   // Current time step [s]
     double           time_total = 0.0;               // Total simulation time [s]
     const double     time_simulation = 5000;         // Simulation total number [s]
 	double           dt_code = dt_user;              // Time step used in the code [s]
     double           halves = 0;                     // Number of halvings of the time step [-]
-    const double     accelerator = 0.1;              // Adaptive timestep multiplier (if too much, stability problems) [-]
+    const double     accelerator = 1;                // Adaptive timestep multiplier (TO BE FIXED, WHEN r_down IT ACCUMULATES) [-]
 
 	// Picard iteration parameters
 	const double max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
     int pic = 0;                                        // Outside to check if convergence is reached [-]
     std::vector<double> pic_error(3, 0.0);           // L1 error for picard convergence [K, K, K]
-    std::vector<double> pic_tolerance(3, 1e-3);      // Picard convergence tolerance [K, K, K]
+    std::vector<double> pic_tolerance(3, 1e-2);      // Picard convergence tolerance [K, K, K]
 
     // PISO Liquid parameters
     const int tot_simple_iter_x = 10;                    // Outer iterations per time-step [-]
     const int tot_piso_iter_x = 10;                     // Inner iterations per outer iteration [-]
-    const double momentum_tol_x = 1e-6;              // Tolerance for the momentum equation [-]
-    const double continuity_tol_x = 1e-6;            // Tolerance for the continuity equation [-]
-    const double temperature_tol_x = 1e-2;           // Tolerance for the energy equation [-]
+    const double momentum_tol_x = 1e-8;              // Tolerance for the momentum equation [-]
+    const double continuity_tol_x = 1e-8;            // Tolerance for the continuity equation [-]
+    const double temperature_tol_x = 1e-3;           // Tolerance for the energy equation [-]
 
     // PISO Vapor parameters
-    const int tot_simple_iter_v = 50;                   // Outer iterations per time-step [-]
+    const int tot_simple_iter_v = 10;                   // Outer iterations per time-step [-]
     const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
-    const double momentum_tol_v = 1e-6;              // Tolerance for the outer iterations (velocity) [-]
-    const double continuity_tol_v = 1e-6;            // Tolerance for the inner iterations (pressure) [-]
-    const double temperature_tol_v = 1e-2;           // Tolerance for the energy equation [-]
+    const double momentum_tol_v = 1e-8;              // Tolerance for the outer iterations (velocity) [-]
+    const double continuity_tol_v = 1e-8;            // Tolerance for the inner iterations (pressure) [-]
+    const double temperature_tol_v = 1e-3;           // Tolerance for the energy equation [-]
 
     const double T_init = 1000;                      // Initial uniform temperature [K]
 
@@ -593,8 +593,20 @@ int main() {
 		dt = std::min(dt_user, dt_code);                        // Choosing the minimum between user and calculated timestep
 		dt *= std::pow(0.5, halves);                            // Halving the timestep if Picard failed
         dt *= accelerator;                                      // Accelerator multiplier
-        if (dt < 1e-12) return 1;                               // No convergence means the simulation is crashed
+        if (dt < 1e-12) {
 
+            std::cout << "Time " << time_total << ", convergence not achieved. \n";
+            std::cout << "Timestep " << dt << " < 1e-12 \n";
+
+            std::cout << "Absolute error outer wall temperature: " << pic_error[0] << "\n";
+            std::cout << "Absolute error wall-wick temperature: " << pic_error[1] << "\n";
+            std::cout << "Absolute error wick-vapor temperature: " << pic_error[2] << "\n";
+
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cin.get();
+
+            return 1;
+        }
 		// Iter = old (for Picard loops)
         T_o_w_iter = T_o_w_old;
         T_w_x_iter = T_w_x_old;
@@ -636,7 +648,7 @@ int main() {
 
         for (pic = 0; pic < max_picard; pic++) {
 
-            // =======================================================================
+           // =======================================================================
            //                                [WICK]
            // =======================================================================
 
@@ -920,12 +932,6 @@ int main() {
                         phi_x[i] -= rho_face * avgInvbXU * (p_prime_x[i] - p_prime_x[i - 1]) / dz;
 
                     }
-
-                    phi_x[0] = u_outlet_x * rho_x[0];
-                    phi_x[1] = u_outlet_x * rho_x[0];
-
-                    phi_x[N - 1] = u_outlet_x * rho_x[N - 1];
-                    phi_x[N] = u_outlet_x * rho_x[N - 1];
 
                     #pragma endregion
 

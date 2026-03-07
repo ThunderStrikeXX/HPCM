@@ -108,9 +108,9 @@ double new_dt_v(
 {
 	const double Rv = static_cast<double>(361.5);                // Gas constant for the sodium vapor [J/(kgK)]
 
-    const double CSV_mass = static_cast<double>(500);            // Maximum Drho tolerated per timestep [kg/m3]  
-    const double CSV_flux = static_cast<double>(500);            // Maximum DT tolerated per timestep [K]
-    const double CP  = static_cast<double>(100);                // Maximum DP tolerated per timestep [Pa]
+    const double CSV_mass = static_cast<double>(50);            // Maximum Drho tolerated per timestep [kg/m3]  
+    const double CSV_flux = static_cast<double>(50);            // Maximum DT tolerated per timestep [K]
+    const double CP  = static_cast<double>(10);                // Maximum DP tolerated per timestep [Pa]
 
     const double epsS  = static_cast<double>(1e-12);             // Lower mass source boundary [kg/m3s]
     const double epsT  = static_cast<double>(1e-12);             // Lower heat source boundary [W/m3]
