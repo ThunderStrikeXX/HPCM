@@ -76,7 +76,7 @@ for f in y_files:
 time = safe_loadtxt(time_file)
 Y = [safe_loadtxt(f) for f in y_files]
 
-stride = 100
+stride = 10
 time = time[::stride]
 Y = [y[::stride] for y in Y]
 
