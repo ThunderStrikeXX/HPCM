@@ -27,53 +27,54 @@ int main() {
     #pragma region constants_and_variables
 
     // Mathematical constants
-    const double pi = 3.141592;              // Pi [-]
+    const double pi = 3.141592;                 // Pi [-]
 
     // Physical properties
-    const double emissivity = 0.5;           // Wall emissivity [-]
-    const double sigma = 5.67e-8;            // Stefan-Boltzmann constant [W/(m2K4)]
-    const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
+    const double emissivity = 0.5;              // Wall emissivity [-]
+    const double sigma = 5.67e-8;               // Stefan-Boltzmann constant [W/(m2K4)]
+    const double Rv = 361.5;                    // Gas constant for the sodium vapor [J/(kgK)]
     
     // Environmental boundary conditions
-    const double h_conv = 1;                 // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const double power = 1000;               // Power at the evaporator side [W]
-    const double T_env = 280.0;              // External environmental temperature [K]
+    const double h_conv = 1;                    // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+    const double power = 1000;                  // Power at the evaporator side [W]
+    const double T_env = 280.0;                 // External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const double eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
-	double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
+    const double eps_s = 1.0;                   // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.05;                // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.05;                // Condensation accomodation coefficient [-]. 1 means optimal condensation
+	double Omega = 1.0;                         // Initialization of Omega parameter for evaporation/condensation model [-]
 
-    // Liquid permeability parameters
-    const double K = 1e-10;                  // Permeability [m2]
-    const double CF = 1e5;                   // Forchheimer coefficient [1/m]
-            
+    // Wick permeability parameters
+    const double K = 1e-10;                     // Permeability [m^2]
+    const double CF = 1e5;                      // Forchheimer coefficient [1/m]
+    double const eps_v = 1.0;                   // Surface fraction of the wick available for liquid passage [-]
+
     // Geometric parameters
-    const std::size_t N = 22;                                           // Number of axial nodes (two cells are ghost boundaries) [-]
-    const double L = 1; 			                                    // Length of the heat pipe [m]
-    const double dz = L / (N - 2);                                   // Axial discretization step [m]
-    const double r_o = 0.01335;                                      // Outer wall radius [m]
-    const double r_i = 0.0112;                                       // Wall-liquid interface radius [m]
-    const double r_v = 0.01075;                                      // Vapor-liquid interface radius [m]
-    const double Dh_v = 2.0 * r_v;                                   // Hydraulic diameter of the vapor core [m]
-    const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;  // Volume of the wall cell [m3]
-    const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;  // Volume of the liquid cell [m3]
-    const double vol_vapor_cell = r_v * r_v * pi * dz;               // Volume of the vapor cell [m3]
-    const double A_interface_cell = 2 * pi * r_i * dz;               // Interfacial area between vapor and liquid for a cell [m2]     
+    const int N = 22;                                                   // Number of axial nodes (two cells are ghost boundaries) [-]
+    const double length = 1; 			                                // Length of the heat pipe [m]
+    const double dz = length / (N - 2);                                 // Axial discretization step [m]
+    const double r_o = 0.01335;                                         // Outer wall radius [m]
+    const double r_i = 0.0112;                                          // Wall-liquid interface radius [m]
+    const double r_v = 0.01075;                                         // Vapor-liquid interface radius [m]
+    const double Dh_v = 2.0 * r_v;                                      // Hydraulic diameter of the vapor core [m]
+    const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;     // Volume of the wall cell [m3]
+    const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;   // Volume of the liquid cell [m3]
+    const double vol_vapor_cell = r_v * r_v * pi * dz;                  // Volume of the vapor cell [m3]
+    const double A_interface_cell = 2 * pi * r_i * dz;                  // Interfacial area between vapor and liquid for a cell [m2]     
 
     // Evaporator region parameters
     const double evaporator_start = 0.020;                           // Evaporator begin [m]
     const double evaporator_end = 0.073;                             // Evaporator end [m]
     const double condenser_length = 0.292;                           // Condenser length [m]
-    const double Lh = evaporator_end - evaporator_start;             // Evaporator length [m]
+    const double evaporator_length = evaporator_end - evaporator_start;             // Evaporator length [m]
     const double delta_h = 0.01;                                     // Evaporator ramp [m]
-    const double Lh_eff = Lh + delta_h;                              // Evaporator effective length [m]
-    const double q0 = power / (2.0 * pi * r_o * Lh_eff);             // Evaporator heat flux [W/m2]
+    const double evaporator_length_eff = evaporator_length + delta_h;                              // Evaporator effective length [m]
+    const double q0 = power / (2.0 * pi * r_o * evaporator_length_eff);             // Evaporator heat flux [W/m2]
 
     // Condenser region parameters
     const double delta_c = 0.05;                                     // Condenser ramp [m]
-    const double condenser_start = L - condenser_length;             // Condenser begin [m]
+    const double condenser_start = length - condenser_length;             // Condenser begin [m]
 
     // Coefficients for the parabolic temperature profiles in wall and liquid
     const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));    // [m]
@@ -82,19 +83,19 @@ int main() {
     const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                        // [m2]
 
     // Time-stepping parameters
-    double           dt_user = 1e-4;                 // Initial time step [s] (then it is updated according to the limits)
-	double           dt = dt_user;                   // Current time step [s]
-    double           time_total = 0.0;               // Total simulation time [s]
-    const double     time_simulation = 5000;         // Simulation total number [s]
-	double           dt_code = dt_user;              // Time step used in the code [s]
-    double           halves = 0;                     // Number of halvings of the time step [-]
-    const double     accelerator = 1;                // Adaptive timestep multiplier (TO BE FIXED, WHEN r_down IT ACCUMULATES) [-]
+    double           dt_user = 1e-4;                // Initial time step [s] (then it is updated according to the limits)
+	double           dt = dt_user;                  // Current time step [s]
+    double           time_total = 0.0;              // Total simulation time [s]
+    const double     time_simulation = 5000;        // Simulation total number [s]
+	double           dt_code = dt_user;             // Time step used in the code [s]
+    int              halves = 0;                    // Number of halvings of the time step [-]
+    const double     accelerator = 1;               // Adaptive timestep multiplier (TO BE FIXED, WHEN r_down IT ACCUMULATES) [-]
 
 	// Picard iteration parameters
-	const double max_picard = 100;                   // Maximum number of Picard iterations per time step [-]
-    int pic = 0;                                        // Outside to check if convergence is reached [-]
-    std::vector<double> pic_error(3, 0.0);           // L1 error for picard convergence [K, K, K]
-    std::vector<double> pic_tolerance(3, 1e-2);      // Picard convergence tolerance [K, K, K]
+    int pic = 0;                                    // Outside to check if convergence is reached [-]
+    const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
+    std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
+    std::vector<double> pic_tolerance(3, 1e-2);     // Picard convergence tolerance [K, K, K]
 
     // PISO Liquid parameters
     const int tot_simple_iter_x = 10;                    // Outer iterations per time-step [-]
@@ -129,7 +130,7 @@ int main() {
     std::vector<double> h_x(N);       // Liquid enthalpy [J/kg]
     std::vector<double> h_v(N);       // Vapor enthalpy [J/kg]
 
-    for (std::size_t i = 0; i < N; ++i) {
+    for (int i = 0; i < N; ++i) {
 
         double xi = (N > 1)
             ? static_cast<double>(i) / static_cast<double>(N - 1)
@@ -156,8 +157,8 @@ int main() {
     std::vector<double> p_storage_x(N + 2);          // Liquid padded pressure vector for R&C correction [Pa]
     double* p_padded_x = &p_storage_x[1];            // Pointer to work on the liquid pressure padded storage with the same indexes
 
-    for (std::size_t i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the liquid pressure
-    for (std::size_t i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]); // Initialization of the liquid density
+    for (int i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the liquid pressure
+    for (int i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]); // Initialization of the liquid density
 
     // Vapor fields
     std::vector<double> u_v(N, 10.0);                // Vapor velocity field [m/s]
@@ -167,12 +168,12 @@ int main() {
     std::vector<double> p_storage_v(N + 2);          // Vapor padded pressure vector for R&C correction [Pa]
     double* p_padded_v = &p_storage_v[1];            // Pointer to work on the storage with the same indexes
 
-    for (std::size_t i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the vapor pressure
+    for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the vapor pressure
 
     // Vapor Equation of State update function. Updates density
     auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
 
-        for (std::size_t i = 0; i < N; i++) { rho_[i] = std::max(static_cast<double>(1e-6), p_[i] / (Rv * T_[i])); }
+        for (int i = 0; i < N; i++) { rho_[i] = std::max(static_cast<double>(1e-6), p_[i] / (Rv * T_[i])); }
 
     }; eos_update(rho_v, p_v, T_v_bulk);
 
@@ -205,11 +206,11 @@ int main() {
 	std::vector<double> sonic_velocity(N, 0.0);          // Sonic velocity field [m/s]
 
     // Padding pressure storages
-    for (std::size_t i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
+    for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
     p_storage_x[0] = p_storage_x[1];
     p_storage_x[N + 1] = p_storage_x[N];
 
-    for (std::size_t i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
+    for (int i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
     p_storage_v[0] = p_storage_v[1];
     p_storage_v[N + 1] = p_storage_v[N];
 
@@ -413,7 +414,7 @@ int main() {
     std::ofstream mesh_output(case_chosen + "/mesh.txt", std::ios::app);
     mesh_output << std::setprecision(output_precision);
 
-    for (std::size_t i = 1; i < N - 1; ++i) mesh_output << mesh_center[i] << " ";
+    for (int i = 1; i < N - 1; ++i) mesh_output << mesh_center[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
@@ -629,7 +630,7 @@ int main() {
         }
 
         // Updating all properties
-        for (std::size_t i = 0; i < N; ++i) {
+        for (int i = 0; i < N; ++i) {
 
             cp_w[i] = steel::cp(T_w_bulk[i]);
             rho_w[i] = steel::rho(T_w_bulk[i]);
@@ -667,7 +668,7 @@ int main() {
                 // ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_x[i];
@@ -724,7 +725,7 @@ int main() {
                 // =========== TEMPERATURE CALCULATOR
                 #pragma region temperature_calculator
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_x[i];
@@ -790,7 +791,7 @@ int main() {
                 tdma_solver.solve(aXT, bXT, cXT, dXT, h_x);
 
                 // Recovering temperature from enthalpy
-                for (std::size_t i = 0; i < N; i++) {
+                for (int i = 0; i < N; i++) {
 
                     T_x_bulk[i] = liquid_sodium::T_from_h_l_linear(h_x[i]);
                 }
@@ -801,7 +802,7 @@ int main() {
                 #pragma region temperature_residual_calculator
                 temperature_res_x = 0.0;
 
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
 
                     temperature_res_x = std::max(
                         temperature_res_x,
@@ -824,7 +825,7 @@ int main() {
                     #pragma region continuity_satisfactor
 
                     // Loop to assemble the linear system for the pressure correction
-                    for (std::size_t i = 1; i < N - 1; i++) {
+                    for (int i = 1; i < N - 1; i++) {
 
                         // Physical properties
                         const double rho_P = rho_x[i];
@@ -874,7 +875,7 @@ int main() {
                     // Initialization maximum pressure variation
                     p_error_x = 0.0;
 
-                    for (std::size_t i = 0; i < N; i++) {
+                    for (int i = 0; i < N; i++) {
 
                         double p_prev_x = p_x[i];
                         p_x[i] += p_prime_x[i];         // PIMPLE does not require an under-relaxation factor
@@ -892,15 +893,15 @@ int main() {
 
                     // Calculating average on p_x (gauge pressure)
                     double p_mean = 0.0;
-                    for (std::size_t i = 0; i < N; ++i)
+                    for (int i = 0; i < N; ++i)
                         p_mean += p_x[i];
                     p_mean /= static_cast<double>(N);
 
                     // Removing average on p_x (gauge pressure)
-                    for (std::size_t i = 0; i < N; ++i)
+                    for (int i = 0; i < N; ++i)
                         p_x[i] -= p_mean;
 
-                    for (std::size_t i = 0; i <= N; ++i)
+                    for (int i = 0; i <= N; ++i)
                         p_storage_x[i] -= p_mean;
 
                     #pragma endregion
@@ -910,7 +911,7 @@ int main() {
 
                     u_error_x = 0.0;
 
-                    for (std::size_t i = 1; i < N - 1; i++) {
+                    for (int i = 1; i < N - 1; i++) {
 
                         double u_prev = u_x[i];
                         u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
@@ -940,7 +941,7 @@ int main() {
 
                     continuity_res_x = 0.0;
 
-                    for (std::size_t i = 1; i < N - 1; ++i) {
+                    for (int i = 1; i < N - 1; ++i) {
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
                         const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
@@ -959,7 +960,7 @@ int main() {
 
                 momentum_res_x = 0.0;
 
-                for (std::size_t i = 1; i < N - 1; ++i) {
+                for (int i = 1; i < N - 1; ++i) {
                     momentum_res_x = std::max(momentum_res_x, std::abs(aXU[i] * u_x[i - 1] + bXU[i] * u_x[i] + cXU[i] * u_x[i + 1] - dXU[i]));
                 }
 
@@ -1001,7 +1002,7 @@ int main() {
                 // ==========  MOMENTUM PREDICTOR 
                 #pragma region momentum_predictor
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_v[i];
@@ -1061,7 +1062,7 @@ int main() {
                 // ==========  TEMPERATURE CALCULATOR 
                 #pragma region temperature_calculator
 
-                for (std::size_t i = 1; i < N - 1; i++) {
+                for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
                     const double rho_P = rho_v[i];
@@ -1137,7 +1138,7 @@ int main() {
                 tdma_solver.solve(aVT, bVT, cVT, dVT, h_v);
 
                 // Recovering temperture from enthalpy
-                for (std::size_t i = 0; i < N; i++) {
+                for (int i = 0; i < N; i++) {
 
                     T_v_bulk[i] = vapor_sodium::T_from_h_g_linear(h_v[i]);
 
@@ -1150,7 +1151,7 @@ int main() {
 
                 temperature_res_v = 0.0;
 
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
 
                     temperature_res_v = std::max(
                         temperature_res_v,
@@ -1172,7 +1173,7 @@ int main() {
                     // =========== CONTINUITY SATIFACTOR
                     #pragma region continuity_satisfactor
 
-                    for (std::size_t i = 1; i < N - 1; ++i) {
+                    for (int i = 1; i < N - 1; ++i) {
 
                         const double psi_i = 1.0 / (Rv * T_v_bulk[i]); // [kg/J]
 
@@ -1232,7 +1233,7 @@ int main() {
 
                     p_error_v = 0.0;
 
-                    for (std::size_t i = 0; i < N; i++) {
+                    for (int i = 0; i < N; i++) {
 
                         double p_prev = p_v[i];
                         p_v[i] += p_prime_v[i];        // PISO does not require an under-relaxation factor
@@ -1255,7 +1256,7 @@ int main() {
 
                     u_error_v = 0.0;
 
-                    for (std::size_t i = 1; i < N - 1; ++i) {
+                    for (int i = 1; i < N - 1; ++i) {
 
                         double u_prev = u_v[i];
 
@@ -1300,7 +1301,7 @@ int main() {
 
                     rho_error_v = 0.0;
 
-                    for (std::size_t i = 0; i < N; ++i) {
+                    for (int i = 0; i < N; ++i) {
                         double rho_prev = rho_v[i];
                         rho_v[i] += p_prime_v[i] / (Rv * T_v_bulk[i]);
                         rho_error_v = std::max(rho_error_v, std::abs(rho_v[i] - rho_prev));
@@ -1317,7 +1318,7 @@ int main() {
 
                     continuity_res_v = 0.0;
 
-                    for (std::size_t i = 1; i < N - 1; ++i) {
+                    for (int i = 1; i < N - 1; ++i) {
 
                         const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
                         const double mass_flux = Gamma_v[i] * dz;         // [kg/(m2s)]
@@ -1336,7 +1337,7 @@ int main() {
 
                 momentum_res_v = 0.0;
 
-                for (std::size_t i = 1; i < N - 1; ++i) {
+                for (int i = 1; i < N - 1; ++i) {
                     momentum_res_v = std::max(momentum_res_v, std::abs(aVU[i] * u_v[i - 1] + bVU[i] * u_v[i] + cVU[i] * u_v[i + 1] - dVU[i]));
                 }
 
@@ -1347,7 +1348,7 @@ int main() {
 
                 temperature_res_v = 0.0;
 
-                for (std::size_t i = 1; i < N - 1; ++i) {
+                for (int i = 1; i < N - 1; ++i) {
                     temperature_res_v = std::max(temperature_res_v, std::abs(T_v_bulk[i] - T_prev_v[i]));
                 }
 
@@ -1377,7 +1378,7 @@ int main() {
 
             #pragma region interfaces 
 
-            for (std::size_t i = 1; i < N - 1; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
                 // Physical properties
                 Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];         // Reynolds number [-]
@@ -1440,10 +1441,10 @@ int main() {
                 double irr = emissivity * sigma * (std::pow(T_o_w[i], 4) - std::pow(T_env, 4));   // [W/m2]
                
                 double sum_w = 0.0;
-                std::size_t n_evap = 0;
+                int n_evap = 0;
 
                 // Evaporator
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
                     double w = 0.0;
 
                     if (mesh_center[i] >= evaporator_start - delta_h &&
@@ -1476,22 +1477,22 @@ int main() {
 
                 // Evaporator normalization 
                 const double s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
 
                     q_ow[i] *= s;
-                    Q_ow[i] = q_ow[i] * 2 * r_o * Lh_eff / ((r_o * r_o - r_i * r_i) * dz);
+                    Q_ow[i] = q_ow[i] * 2 * r_o * evaporator_length_eff / ((r_o * r_o - r_i * r_i) * dz);
                 }
 
 
                 // Evaporator power ramp
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
 
                     q_ow[i] *= ramp;
                     Q_ow[i] *= ramp;
                 }
 
                 // Condenser
-                for (std::size_t i = 0; i < N; ++i) {
+                for (int i = 0; i < N; ++i) {
 
                     if (mesh_center[i] >= condenser_start &&
                         mesh_center[i] < condenser_start + delta_c) {
@@ -1557,7 +1558,7 @@ int main() {
             pic_error[1] = 0.0;
             pic_error[2] = 0.0;
 
-            for (std::size_t i = 0; i < N; ++i) {
+            for (int i = 0; i < N; ++i) {
 
                 Aold = T_o_w_iter[i];
                 Anew = T_o_w[i];
@@ -1588,8 +1589,8 @@ int main() {
                 pic_error[1] < pic_tolerance[1] &&
                 pic_error[2] < pic_tolerance[2]) {
 
-				halves = 0;     // Reset halves if Picard converged
-                break;          // Picard converged
+                halves = std::max(0, --halves);     // Double timestep if converged
+                break;                              // Picard converged
             }
 
             // Iter = new
@@ -1607,7 +1608,7 @@ int main() {
         #pragma region wall
 
         // Loop to assembly the linear system for the wall bulk temperature
-        for (std::size_t i = 1; i < N - 1; ++i) {
+        for (int i = 1; i < N - 1; ++i) {
 
             // Physical properties
             const double cp = cp_w[i];
@@ -1752,7 +1753,7 @@ int main() {
         #pragma region output
 
         if (time_total >= t_last_print + print_interval) {
-            for (std::size_t i = 1; i < N - 1; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
                 v_velocity_output << u_v[i] << " ";
                 v_pressure_output << p_v[i] << " ";
@@ -1815,7 +1816,7 @@ int main() {
 
             double global_heat_balance = 0.0;
 
-            for (std::size_t i = 1; i < N - 1; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
                 wall_liquid_heat_balance[i] = Q_wx[i] * (r_i * r_i - r_v * r_v) + Q_xw[i] * (r_o * r_o - r_i * r_i);
                 liquid_vapor_heat_balance[i] = (Q_xm[i] + Q_mass_vapor[i]) * (r_v * r_v) + (Q_mx[i] + Q_mass_liquid[i]) * (r_i * r_i - r_v * r_v);
