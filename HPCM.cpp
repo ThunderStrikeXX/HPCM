@@ -49,6 +49,8 @@ int main() {
     const double K = 1e-10;                     // Permeability [m^2]
     const double CF = 1e5;                      // Forchheimer coefficient [1/m]
     double const eps_v = 1.0;                   // Surface fraction of the wick available for liquid passage [-]
+    const double p_ref = 1e4;                   // Absolute reference pressure for bulk correlation [Pa]
+    const double K_l = 5e9;                     // Liquid sodium bulk modulus [Pa]
 
     // Geometric parameters
     const int N = 22;                                                   // Number of axial nodes (two cells are ghost boundaries) [-]
@@ -158,7 +160,6 @@ int main() {
     double* p_padded_x = &p_storage_x[1];            // Pointer to work on the liquid pressure padded storage with the same indexes
 
     for (int i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the liquid pressure
-    for (int i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]); // Initialization of the liquid density
 
     // Vapor fields
     std::vector<double> u_v(N, 10.0);                // Vapor velocity field [m/s]
@@ -171,11 +172,18 @@ int main() {
     for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the vapor pressure
 
     // Vapor Equation of State update function. Updates density
-    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
+    auto eos_update_v = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
 
         for (int i = 0; i < N; i++) { rho_[i] = std::max(static_cast<double>(1e-6), p_[i] / (Rv * T_[i])); }
 
-    }; eos_update(rho_v, p_v, T_v_bulk);
+    }; eos_update_v(rho_v, p_v, T_v_bulk);
+
+    // Liquid Equation of State update function. Updates density
+    auto eos_update_x = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
+
+        for (int i = 0; i < N; i++) { rho_[i] = liquid_sodium::rho(T_[i]) * (1 + (p_[i] - p_ref) / K_l); }
+
+    }; eos_update_x(rho_x, p_x, T_x_bulk);
 
     // Heat sources/fluxes at the interfaces
     std::vector<double> q_ow(N);                         // Outer wall heat flux [W/m2]
@@ -249,6 +257,7 @@ int main() {
 
     std::vector<double> u_x_old;
     std::vector<double> p_x_old;
+    std::vector<double> rho_x_old;
     std::vector<double> p_storage_x_old;
 
     std::vector<double> u_v_old;
@@ -355,6 +364,7 @@ int main() {
     // Errors for liquid pressure and velocity
     double p_error_x = 0.0;
 	double u_error_x = 0.0;
+    double rho_error_x = 0.0;
 
     // Residuals for mass, monentum and enthalpy equations
     double momentum_res_v = 1.0;
@@ -449,6 +459,7 @@ int main() {
     u_x_old = u_x;
     p_x_old = p_x;
     p_storage_x_old = p_storage_x;
+    rho_x_old = rho_x;
     bXU = bXU_old;
 
     u_v_old = u_v;
@@ -574,6 +585,9 @@ int main() {
 
     #pragma endregion
 
+    std::vector<double> rho_T_x = rho_x;
+    std::vector<double> rho_T_x_old = rho_x;
+
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
 
@@ -649,11 +663,11 @@ int main() {
 
         for (pic = 0; pic < max_picard; pic++) {
 
-           // =======================================================================
-           //                                [WICK]
-           // =======================================================================
+            // =======================================================================
+            //                                [WICK]
+            // =======================================================================
 
-            #pragma region liquid
+            #pragma region wick
 
             // Momentum and energy residual initialization to access outer loop
             momentum_res_x = 1.0;
@@ -671,50 +685,51 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_x[i];
-                    const double rho_L = rho_x[i - 1];
-                    const double rho_R = rho_x[i + 1];
-
-                    const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
                     const double mu_P = mu_x[i];
                     const double mu_L = mu_x[i - 1];
                     const double mu_R = mu_x[i + 1];
 
-                    const double D_l = 0.5 * (mu_P + mu_L) / dz;
-                    const double D_r = 0.5 * (mu_P + mu_R) / dz;
+                    const double D_l = 4.0 / 3.0 * 0.5 * (mu_P + mu_L) / dz;
+                    const double D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;
+
+                    /*
+
+                    const double Re = u_x[i] * (2 * r_v) * rho_P / mu_P;
+                    const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);
+                    const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
+
+                    */
 
                     aXU[i] =
-                        -std::max(phi_x[i], static_cast<double>(0.0))
-                        - D_l;
+                        - std::max(phi_x[i], static_cast<double>(0.0))
+                        - D_l;                              // [kg/(m2 s)]
                     cXU[i] =
-                        -std::max(-phi_x[i + 1], static_cast<double>(0.0))
-                        - D_r;
+                        - std::max(-phi_x[i + 1], static_cast<double>(0.0))
+                        - D_r;                              // [kg/(m2 s)]
                     bXU[i] =
-                        +std::max(phi_x[i + 1], static_cast<double>(0.0))
+                        + std::max(phi_x[i + 1], static_cast<double>(0.0))
                         + std::max(-phi_x[i], static_cast<double>(0.0))
-                        + rho_P * dz / dt
-                        + D_l + D_r
-                        + mu_P / K * dz
-                        + CF * mu_P * dz / sqrt(K) * abs(u_x[i]);
+                        + rho_x[i] * dz / dt
+                        + D_l + D_r;
+                        // + F * dz;                           // [kg/(m2 s)]
                     dXU[i] =
                         -0.5 * (p_x[i + 1] - p_x[i - 1])
-                        + rho_P_old * u_x_old[i] * dz / dt;
+                        + rho_x_old[i] * u_x_old[i] * dz / dt; // [kg/(m s2)]
                 }
 
-                // Diffusion coefficients for the first and last node to define BCs
-                const double D_first = mu_x[0] / dz;
-                const double D_last = mu_x[N - 1] / dz;
+                /// Diffusion coefficients for the first and last node to define BCs
+                const double D_first = (4.0 / 3.0) * mu_x[0] / dz;
+                const double D_last = (4.0 / 3.0) * mu_x[N - 1] / dz;
 
-                // Velocity BCs: fixed (zero) velocity on the first face
+                // Velocity BCs: zero velocity on the first node
                 aXU[0] = 0.0;
-                bXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
-                cXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
+                bXU[0] = +(rho_x[0] * dz / dt + 2 * D_first);
+                cXU[0] = +(rho_x[0] * dz / dt + 2 * D_first);
                 dXU[0] = 0.0;
 
-                // Velocity BCs: fixed (zero) velocity on the last face
-                aXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
-                bXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
+                // Velocity BCs: zero velocity on the last node
+                aXU[N - 1] = +(rho_x[N - 1] * dz / dt + 2 * D_last);
+                bXU[N - 1] = +(rho_x[N - 1] * dz / dt + 2 * D_last);
                 cXU[N - 1] = 0.0;
                 dXU[N - 1] = 0.0;
 
@@ -722,56 +737,60 @@ int main() {
 
                 #pragma endregion
 
-                // =========== TEMPERATURE CALCULATOR
+                // ==========  TEMPERATURE CALCULATOR 
                 #pragma region temperature_calculator
 
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_x[i];
-                    const double rho_L = rho_x[i - 1];
-                    const double rho_R = rho_x[i + 1];
-
-                    const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
-                    const double C_l = phi_x[i];   // [W/m2]
-                    const double C_r = phi_x[i + 1];
-
                     const double k_cond_P = k_x[i];
                     const double k_cond_L = k_x[i - 1];
                     const double k_cond_R = k_x[i + 1];
 
-                    const double cp_P = cp_x[i];
-                    const double cp_L = cp_x[i - 1];
-                    const double cp_R = cp_x[i + 1];
-
-                    const double cp_l = 0.5 * (cp_P + cp_L);
-                    const double cp_r = 0.5 * (cp_P + cp_R);
-
                     const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
                     const double D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
 
-                    Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_liquid[i];
+                    const double C_l = phi_x[i];
+                    const double C_r = phi_x[i + 1];
+
+                    /*
+
+                    const double dpdz_up = u_x[i] * (p_x[i + 1] - p_x[i - 1]) / 2.0;
+
+                    const double dp_dt = (p_x[i] - p_x_old[i]) / dt * dz;
+
+                    const double viscous_dissipation =
+                        4.0 / 3.0 * 0.25 * mu_v[i] * ((u_v[i + 1] - u_v[i]) * (u_v[i + 1] - u_v[i])
+                            + (u_v[i] + u_v[i - 1]) * (u_v[i] + u_v[i - 1])) / dz;
+
+                    */
+
+                    Q_tot_x[i] = /*dp_dt / dz + dpdz_up / dz + viscous_dissipation +*/ Q_mx[i] + Q_wx[i] + Q_mass_liquid[i];
 
                     aXT[i] =
-                        -D_l
-                        - std::max(C_l, static_cast<double>(0.0));       // [W/(m2 K)]
+                        - D_l
+                        - std::max(C_l, static_cast<double>(0.0))
+                        ;                                   /// [W/(m2K)]
 
                     cXT[i] =
-                        -D_r
-                        - std::max(-C_r, static_cast<double>(0.0));      // [W/(m2 K)]
+                        - D_r
+                        - std::max(-C_r, static_cast<double>(0.0))
+                        ;                                   /// [W/(m2K)]
 
                     bXT[i] =
-                        +std::max(C_r, static_cast<double>(0.0))
+                        + std::max(C_r, static_cast<double>(0.0))
                         + std::max(-C_l, static_cast<double>(0.0))
                         + D_l + D_r
-                        + rho_P * dz / dt;                                  // [W/(m2 K)]
+                        + rho_x[i] * dz / dt;               /// [W/(m2 K)]
 
                     dXT[i] =
-                        +rho_P_old * dz / dt * h_x_old[i]
-                        + Q_wx[i] * dz                  // Positive if heat is added to the liquid
-                        + Q_mx[i] * dz                  // Positive if heat is added to the liquid
-                        + Q_mass_liquid[i] * dz;        // [W/m2]       
+                        + rho_x_old[i] * dz / dt * h_x_old[i]
+                        // + dp_dt
+                        // + dpdz_up
+                        // + viscous_dissipation * dz
+                        + Q_mx[i] * dz                      // Positive if heat from liquid to vapor
+                        + Q_wx[i] * dz
+                        + Q_mass_liquid[i] * dz;             // [W/m2]
                 }
 
                 // Temperature BCs: zero gradient on the first node
@@ -790,16 +809,23 @@ int main() {
 
                 tdma_solver.solve(aXT, bXT, cXT, dXT, h_x);
 
-                // Recovering temperature from enthalpy
+                // Recovering temperture from enthalpy
                 for (int i = 0; i < N; i++) {
 
                     T_x_bulk[i] = liquid_sodium::T_from_h_l_linear(h_x[i]);
+
+                }
+
+                // Densità "target" puramente termica (senza correzione di pressione)
+                for (int i = 0; i < N; i++) {
+                    rho_T_x[i] = liquid_sodium::rho(T_x_bulk[i]);
                 }
 
                 #pragma endregion
 
                 // =========== TEMPERATURE RESIDUAL CALCULATOR
                 #pragma region temperature_residual_calculator
+
                 temperature_res_x = 0.0;
 
                 for (int i = 0; i < N; ++i) {
@@ -818,49 +844,59 @@ int main() {
                 // Inner iterations reset
                 piso_iter_x = 0;
 
-                // Inner "SIMPLE" iterations
+                // Inner iterations for the liquid continuity equation
                 while ((piso_iter_x < tot_piso_iter_x) && (continuity_res_x > continuity_tol_x)) {
 
                     // =========== CONTINUITY SATIFACTOR
                     #pragma region continuity_satisfactor
 
-                    // Loop to assemble the linear system for the pressure correction
-                    for (int i = 1; i < N - 1; i++) {
+                    for (int i = 1; i < N - 1; ++i) {
 
-                        // Physical properties
-                        const double rho_P = rho_x[i];
-                        const double rho_L = rho_x[i - 1];
-                        const double rho_R = rho_x[i + 1];
+                        const double psi_i = rho_T_x[i] / K_l; // [kg/J]
 
-                        const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
-                        const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
+                        const double Crho_l = phi_x[i] >= 0 ? rho_x[i - 1] / K_l : rho_x[i] / K_l;  // [s2/m2]
+                        const double Crho_r = phi_x[i + 1] >= 0 ? rho_x[i] / K_l : rho_x[i + 1] / K_l;  // [s2/m2]
 
-                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
+                        const double C_l = Crho_l * phi_x[i] / rho_x[i];       // [s/m]
+                        const double C_r = Crho_r * phi_x[i + 1] / rho_x[i + 1];       // [s/m]
 
-                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double rho_l_upwind = (phi_x[i] >= 0.0) ? rho_x[i - 1] : rho_x[i];    // [kg/m3]
+                        const double rho_r_upwind = (phi_x[i + 1] >= 0.0) ? rho_x[i] : rho_x[i + 1];    // [kg/m3]
 
-                        const double rho_l_cd = 0.5 * (rho_L + rho_P);      // [kg/m3]
-                        const double rho_r_cd = 0.5 * (rho_P + rho_R);      // [kg/m3]
+                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]) + (rho_T_x[i] - rho_T_x_old[i]) * dz / dt;
 
-                        const double E_l = rho_l_cd * avgInvbLU_L / dz;     // [s/m]
-                        const double E_r = rho_r_cd * avgInvbLU_R / dz;     // [s/m]
+                        const double mass_flux = -Gamma_x[i] * dz;         // [kg/(m2s)]
 
-                        aXP[i] = -E_l;              // [s/m]
-                        cXP[i] = -E_r;              // [s/m]
-                        bXP[i] = E_l + E_r;         // [s/m]
-                        dXP[i] =
-                            +mass_flux
-                            - mass_imbalance;       // [kg/(m2s)]
+                        const double E_l = 0.5 * (rho_x[i - 1] * (1.0 / bXU[i - 1]) + rho_x[i] * (1.0 / bXU[i])) / dz; // [s/m]
+                        const double E_r = 0.5 * (rho_x[i] * (1.0 / bXU[i]) + rho_x[i + 1] * (1.0 / bXU[i + 1])) / dz; // [s/m]
+
+                        aXP[i] =
+                            - E_l
+                            - std::max(C_l, static_cast<double>(0.0))
+                            ;                                   /// [s/m]
+
+                        cXP[i] =
+                            - E_r
+                            - std::max(-C_r, static_cast<double>(0.0))
+                            ;                                   /// [s/m]
+
+                        bXP[i] =
+                            + E_l + E_r
+                            + std::max(C_r, static_cast<double>(0.0))
+                            + std::max(-C_l, static_cast<double>(0.0))
+                            + psi_i * dz / dt;                  /// [s/m]
+
+                        dXP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
                     }
 
-                    // BCs for the correction of pressure: zero gradient at first face
+                    // BCs for the correction of pressure: zero gradient at first node
                     aXP[0] = 0.0;
                     bXP[0] = 1.0;
                     cXP[0] = -1.0;
                     dXP[0] = 0.0;
 
-                    // BCs for the correction of pressure: zero at first face
-                    aXP[N - 1] = 1.0;
+                    // BCs for the correction of pressure: zero gradient at last node
+                    aXP[N - 1] = -1.0;
                     bXP[N - 1] = 1.0;
                     cXP[N - 1] = 0.0;
                     dXP[N - 1] = 0.0;
@@ -872,16 +908,15 @@ int main() {
                     // =========== PRESSURE CORRECTOR
                     #pragma region pressure_corrector
 
-                    // Initialization maximum pressure variation
                     p_error_x = 0.0;
 
                     for (int i = 0; i < N; i++) {
 
-                        double p_prev_x = p_x[i];
-                        p_x[i] += p_prime_x[i];         // PIMPLE does not require an under-relaxation factor
+                        double p_prev = p_x[i];
+                        p_x[i] += p_prime_x[i];        // PISO does not require an under-relaxation factor
                         p_storage_x[i + 1] = p_x[i];
 
-                        p_error_x = std::max(p_error_x, std::abs(p_x[i] - p_prev_x));
+                        p_error_x = std::max(p_error_x, std::abs(p_x[i] - p_prev));
                     }
 
                     // Enforcing boundary conditions
@@ -891,30 +926,21 @@ int main() {
                     p_x[N - 1] = p_x[N - 2];
                     p_storage_x[N + 1] = p_storage_x[N];
 
-                    // Calculating average on p_x (gauge pressure)
-                    double p_mean = 0.0;
-                    for (int i = 0; i < N; ++i)
-                        p_mean += p_x[i];
-                    p_mean /= static_cast<double>(N);
-
-                    // Removing average on p_x (gauge pressure)
-                    for (int i = 0; i < N; ++i)
-                        p_x[i] -= p_mean;
-
-                    for (int i = 0; i <= N; ++i)
-                        p_storage_x[i] -= p_mean;
-
-                    #pragma endregion
+                   #pragma endregion
 
                     // =========== VELOCITY CORRECTOR
                     #pragma region velocity_corrector
 
                     u_error_x = 0.0;
 
-                    for (int i = 1; i < N - 1; i++) {
+                    for (int i = 1; i < N - 1; ++i) {
 
                         double u_prev = u_x[i];
-                        u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
+
+                        const double calc_velocity = u_x[i] -
+                            (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
+
+                        u_x[i] = calc_velocity;
 
                         u_error_x = std::max(u_error_x, std::abs(u_x[i] - u_prev));
                     }
@@ -934,6 +960,41 @@ int main() {
 
                     }
 
+                    phi_x[0] = u_inlet_x * rho_x[0];
+                    phi_x[1] = u_inlet_x * rho_x[0];
+
+                    phi_x[N - 1] = u_outlet_x * rho_x[N - 1];
+                    phi_x[N] = u_outlet_x * rho_x[N - 1];
+
+                    #pragma endregion
+
+                    // =========== DENSITY CORRECTOR
+                    #pragma region density_corrector
+
+                    rho_error_x = 0.0;
+
+                    for (int i = 0; i < N; ++i) {
+
+                        double rho_prev = rho_x[i];
+
+                        /*
+
+                        double rhoT = liquid_sodium::rho(T_x_bulk[i]);
+                        double psi = rhoT / K_l;
+                        rho_x[i] += psi * p_prime_x[i];
+
+                        */
+
+                        // double rhoT = liquid_sodium::rho(T_x_bulk[i]);
+                        // rho_x[i] = rho_T_x[i] * (1.0 + (p_x[i] - p_ref) / K_l);
+
+                        // rho_error_x = std::max(rho_error_x, std::abs(rho_x[i] - rho_prev));
+                    }
+
+                    // Enforcing density BCs on ghost cells
+                    rho_x[0] = rho_x[1];
+                    rho_x[N - 1] = rho_x[N - 2];
+
                     #pragma endregion
 
                     // =========== CONTINUITY RESIDUAL CALCULATOR
@@ -943,9 +1004,9 @@ int main() {
 
                     for (int i = 1; i < N - 1; ++i) {
 
-                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
-                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
-                        dXP[i] = +mass_flux - mass_imbalance;       // [kg/(m2s)]
+                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]) + (rho_T_x[i] - rho_T_x_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const double mass_flux = -Gamma_x[i] * dz;         // [kg/(m2s)]
+                        dXP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
                     }
@@ -964,7 +1025,16 @@ int main() {
                     momentum_res_x = std::max(momentum_res_x, std::abs(aXU[i] * u_x[i - 1] + bXU[i] * u_x[i] + cXU[i] * u_x[i + 1] - dXU[i]));
                 }
 
-                momentum_res_x /= N;
+                #pragma endregion
+
+                // =========== TEMPERATURE RESIDUAL CALCULATOR
+                #pragma region temperature_residual_calculator
+
+                temperature_res_x = 0.0;
+
+                for (int i = 1; i < N - 1; ++i) {
+                    temperature_res_x = std::max(temperature_res_x, std::abs(T_x_bulk[i] - T_prev_x[i]));
+                }
 
                 #pragma endregion
 
@@ -980,6 +1050,9 @@ int main() {
                 const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
                 phi_x[i] = rho_face * u_face;
             }
+
+            // Update density with new p,T
+            eos_update_x(rho_x, p_x, T_x_bulk);
 
             #pragma endregion
 
@@ -1005,12 +1078,6 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_v[i];
-                    const double rho_L = rho_v[i - 1];
-                    const double rho_R = rho_v[i + 1];
-
-                    const double rho_P_old = rho_v_old[i];
-
                     const double mu_P = mu_v[i];
                     const double mu_L = mu_v[i - 1];
                     const double mu_R = mu_v[i + 1];
@@ -1018,9 +1085,9 @@ int main() {
                     const double D_l = 4.0 / 3.0 * 0.5 * (mu_P + mu_L) / dz;
                     const double D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;
 
-                    const double Re = u_v[i] * (2 * r_v) * rho_P / mu_P;
+                    const double Re = u_v[i] * (2 * r_v) * rho_v[i] / mu_P;
                     const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);
-                    const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
+                    const double F = 0.25 * f * rho_v[i] * std::abs(u_v[i]) / r_v;
 
                     aVU[i] =
                         -std::max(phi_v[i], static_cast<double>(0.0))
@@ -1031,12 +1098,12 @@ int main() {
                     bVU[i] =
                         +std::max(phi_v[i + 1], static_cast<double>(0.0))
                         + std::max(-phi_v[i], static_cast<double>(0.0))
-                        + rho_P * dz / dt
+                        + rho_v[i] * dz / dt
                         + D_l + D_r
                         + F * dz;                           // [kg/(m2 s)]
                     dVU[i] =
                         -0.5 * (p_v[i + 1] - p_v[i - 1])
-                        + rho_P_old * u_v_old[i] * dz / dt; // [kg/(m s2)]
+                        + rho_v_old[i] * u_v_old[i] * dz / dt; // [kg/(m s2)]
                 }
 
                 /// Diffusion coefficients for the first and last node to define BCs
@@ -1068,13 +1135,6 @@ int main() {
                     const double rho_P = rho_v[i];
                     const double rho_L = rho_v[i - 1];
                     const double rho_R = rho_v[i + 1];
-
-                    const double cp_P = cp_v[i];
-                    const double cp_L = cp_v[i - 1];
-                    const double cp_R = cp_v[i + 1];
-
-                    const double cp_l = (phi_v[i] >= 0) ? cp_L : cp_P;
-                    const double cp_r = (phi_v[i + 1] >= 0) ? cp_P : cp_R;
 
                     const double k_cond_P = k_v[i];
                     const double k_cond_L = k_v[i - 1];
@@ -1218,7 +1278,7 @@ int main() {
                     cVP[0] = -1.0;
                     dVP[0] = 0.0;
 
-                    // BCs for the correction of pressure: zero at last node
+                    // BCs for the correction of pressure: zero gradient at last node
                     aVP[N - 1] = -1.0;
                     bVP[N - 1] = 1.0;
                     cVP[N - 1] = 0.0;
@@ -1368,7 +1428,7 @@ int main() {
             }
 
             // Update density with new p,T
-            eos_update(rho_v, p_v, T_v_bulk);
+            eos_update_v(rho_v, p_v, T_v_bulk);
 
             #pragma endregion
 
@@ -1659,6 +1719,8 @@ int main() {
             u_v_old = u_v;
             u_x_old = u_x;
             rho_v_old = rho_v;
+            rho_x_old = rho_x;
+            rho_T_x_old = rho_T_x;
 
             p_storage_x_old = p_storage_x;
             p_storage_v_old = p_storage_v;
@@ -1710,6 +1772,8 @@ int main() {
             u_v = u_v_old;
             p_v = p_v_old;
             rho_v = rho_v_old;
+            rho_x = rho_x_old;
+            rho_T_x = rho_T_x_old;
 
             p_storage_x = p_storage_x_old;
             p_storage_v = p_storage_v_old;
