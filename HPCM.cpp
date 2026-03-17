@@ -60,11 +60,12 @@ const double D_v = 2 * r_v;                                         // Inner wic
 const double D_i = 2 * r_i;                                         // Outer wick diameter [m]
 const double Dh_v = 2.0 * r_v;                                      // Hydraulic diameter of the vapor core [m]
 const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;     // Volume of the wall cell [m3]
-const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;   // Volume of the liquid cell [m3]
-const double vol_vapor_cell = r_v * r_v * pi * dz;                  // Volume of the vapor cell [m3]
-const double A_interface_cell = 2 * pi * r_i * dz;                  // Interfacial area between vapor and liquid for a cell [m2]     
-const double core_section = pi * r_v * r_v;
-const double wick_section = eps_v * pi * (r_i * r_i - r_v * r_v);
+const double vol_inner_cell = r_i * r_i * pi * dz;                  // Volume of the wick + core cell [m3]
+const double interface_wall_outer_cell = 2 * pi * r_o * dz;         // Area of the outer wall surface for one cell [m2]
+const double interface_wall_inner_cell = 2 * pi * r_i * dz;         // Area of the inner wall surface for one cell [m2]
+const double interface_wick_inner_cell = 2 * pi * r_v * dz;         // Area of the inner wick surface for one cell [m2]
+const double core_section = pi * r_v * r_v;                         // Area of the vapor core section [m2]
+const double wick_section = eps_v * pi * (r_i * r_i - r_v * r_v);   // Flow area of the wick [m2]
 
 // Pore geometry (assumed known constants)
 const double R_pore = 1e-6;                                                 // Pore radius [m]
@@ -960,7 +961,7 @@ int main() {
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
 
-                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double mass_flux = Gamma_x[i] * dz;   // [kg/(m2s)]
 
                         const double rho_l_cd = 0.5 * (rho_L + rho_P);      // [kg/m3]
                         const double rho_r_cd = 0.5 * (rho_P + rho_R);      // [kg/m3]
@@ -1060,7 +1061,7 @@ int main() {
                     for (int i = 1; i < N - 1; ++i) {
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
-                        const double mass_flux = -Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double mass_flux = Gamma_x[i] * dz;   // [kg/(m2s)]
                         dXP[i] = +mass_flux - mass_imbalance;       // [kg/(m2s)]
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
@@ -1645,6 +1646,11 @@ int main() {
                 // ABC[6 * i + 4] = b_x
                 // ABC[6 * i + 5] = c_x
 
+                heat_balance_surface[i] =
+                    -k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
+                    + HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
+                    + enthalpy_difference * phi_x_v[i];
+
                 // Update temperatures at the interfaces
                 T_o_w[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_o + ABC[6 * i + 2] * r_o * r_o; // Temperature at the outer wall [K]
                 T_w_x[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_i + ABC[6 * i + 2] * r_i * r_i; // Temperature at the wall liquid interface [K]
@@ -1721,22 +1727,22 @@ int main() {
                 }
 
                 // Liquid to wall, heat source due to heat flux [W/m3]
-                Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_o * r_o - r_i * r_i);           
+                Q_xw[i] = -k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * interface_wall_inner_cell / vol_wall_cell;           
 
                 // Wall to liquid, heat source due to heat flux [W/m3]
-                Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * 2 * r_i / (r_i * r_i - r_v * r_v);
+                Q_wx[i] = k_w[i] * (ABC[6 * i + 1] + 2.0 * ABC[6 * i + 2] * r_i) * interface_wall_inner_cell / vol_inner_cell;
                 
                 // Liquid to mixture, heat source due to heat flux [W/m3] 
-                Q_xm[i] = HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * 2.0 / r_v;  
+                Q_xm[i] = HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i]) * interface_wick_inner_cell / vol_inner_cell;  
                 
                 // Mixture to liquid, heat source due to heat flux [W/m3] 
-                Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * 2.0 * r_v / (r_i * r_i - r_v * r_v);
+                Q_mx[i] = -k_x[i] * (ABC[6 * i + 4] + 2.0 * ABC[6 * i + 5] * r_v) * interface_wick_inner_cell / vol_inner_cell;
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the vapor)
-                Q_mass_vapor[i] = +Gamma_v[i] * h_v_phase; 
+                Q_mass_vapor[i] = Gamma_v[i] * h_v_phase; 
 
                 // Volumetric heat source [W/m3] due to evaporation/condensation (to be summed to the liquid)
-                Q_mass_liquid[i] = -Gamma_x[i] * h_x_phase;
+                Q_mass_liquid[i] = Gamma_x[i] * h_x_phase;
 
                 // Real evaporation mass flux [kg/(m2s)]
                 phi_x_v[i] = eps_s * (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
@@ -1744,15 +1750,10 @@ int main() {
                     std::sqrt(2 * pi * Rv);   
 
                 // Volumetric mass source [kg/m3s] to vapor
-                Gamma_v[i] = phi_x_v[i] * 2.0 / r_v;
+                Gamma_v[i] = phi_x_v[i] * interface_wick_inner_cell / vol_inner_cell;
 
                 // Volumetric mass source [kg/m3s] to liquid
-                Gamma_x[i] = phi_x_v[i] * (2.0 * r_v) / (r_i * r_i - r_v * r_v);
-
-                heat_balance_surface[i] =
-                    - k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
-                    + HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
-                    + enthalpy_difference * phi_x_v[i];
+                Gamma_x[i] = -phi_x_v[i] * interface_wick_inner_cell / vol_inner_cell;
             }
 
             #pragma endregion
@@ -1985,16 +1986,16 @@ int main() {
                 o_w_temperature_output << T_o_w[i] << " ";
                 w_bulk_temperature_output << T_w_bulk[i] << " ";
 
-                x_v_mass_flux_output << phi_x_v[i] * A_interface_cell << " ";
+                x_v_mass_flux_output << phi_x_v[i] * interface_wall_inner_cell << " ";
 
                 Q_ow_output << Q_ow[i] * vol_wall_cell << " ";
-                Q_wx_output << Q_wx[i] * vol_liquid_cell << " ";
+                Q_wx_output << Q_wx[i] * vol_inner_cell << " ";
                 Q_xw_output << Q_xw[i] * vol_wall_cell << " ";
-                Q_xm_output << Q_xm[i] * vol_vapor_cell << " ";
-                Q_mx_output << Q_mx[i] * vol_liquid_cell << " ";
+                Q_xm_output << Q_xm[i] * vol_inner_cell << " ";
+                Q_mx_output << Q_mx[i] * vol_inner_cell << " ";
 
-                Q_mass_vapor_output << Q_mass_vapor[i] * vol_vapor_cell << " ";
-                Q_mass_liquid_output << Q_mass_liquid[i] * vol_liquid_cell << " ";
+                Q_mass_vapor_output << Q_mass_vapor[i] * vol_inner_cell << " ";
+                Q_mass_liquid_output << Q_mass_liquid[i] * vol_inner_cell << " ";
 
                 saturation_pressure[i] = vapor_sodium::P_sat(T_x_v_iter[i]);            // Saturation pressure [Pa] 
 
@@ -2037,8 +2038,8 @@ int main() {
 
             for (int i = 1; i < N - 1; ++i) {
 
-                wall_liquid_heat_balance[i] = Q_wx[i] * (r_i * r_i - r_v * r_v) + Q_xw[i] * (r_o * r_o - r_i * r_i);
-                liquid_vapor_heat_balance[i] = (Q_xm[i] + Q_mass_vapor[i]) * (r_v * r_v) + (Q_mx[i] + Q_mass_liquid[i]) * (r_i * r_i - r_v * r_v);
+                wall_liquid_heat_balance[i] = Q_wx[i] * vol_inner_cell + Q_xw[i] * vol_wall_cell;
+                liquid_vapor_heat_balance[i] = (Q_xm[i] + Q_mass_vapor[i] + Q_mx[i] + Q_mass_liquid[i]) * vol_inner_cell;
 
                 global_heat_balance += Q_ow[i];
                 total_heat_source_wall += Q_tot_w[i];
@@ -2051,15 +2052,15 @@ int main() {
 
             global_heat_balance *= vol_wall_cell;
             total_heat_source_wall *= vol_wall_cell;
-            total_heat_source_liquid *= vol_liquid_cell;
-            total_heat_source_vapor *= vol_vapor_cell;
+            total_heat_source_liquid *= vol_inner_cell;
+            total_heat_source_vapor *= vol_inner_cell;
 
             total_heat_source_wall_output << total_heat_source_wall << " ";
             total_heat_source_liquid_output << total_heat_source_liquid << " ";
             total_heat_source_vapor_output << total_heat_source_vapor << " ";
 
-            total_mass_source_liquid *= vol_liquid_cell;
-            total_mass_source_vapor *= vol_vapor_cell;
+            total_mass_source_liquid *= vol_inner_cell;
+            total_mass_source_vapor *= vol_inner_cell;
 
             total_mass_source_liquid_output << total_mass_source_liquid << " ";
             total_mass_source_vapor_output << total_mass_source_vapor << " ";
