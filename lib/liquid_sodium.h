@@ -56,4 +56,12 @@ namespace liquid_sodium {
 
         return (h - al) / bl;                   // K
     }
+
+    // Surface tension [N/m]
+    inline double surf_ten(double T) {
+        const double Tc = 2503.7; // K
+        double tau = 1.0 - T / Tc;
+
+        return 0.2358 * std::pow(tau, 1.256); // N/m
+    }
 }

@@ -18,123 +18,450 @@
 #include "vapor_sodium.h"
 #include "adaptive_dt.h"
 
+
+// =======================================================================
+//                       [CONSTANTS AND VARIABLES]
+// =======================================================================
+
+#pragma region constants_and_variables
+
+// Mathematical constants
+const double pi = 3.141592;                 // Pi [-]
+
+// Physical properties
+const double emissivity = 0.5;              // Wall emissivity [-]
+const double sigma = 5.67e-8;               // Stefan-Boltzmann constant [W/(m2K4)]
+const double Rv = 361.5;                    // Gas constant for the sodium vapor [J/(kgK)]
+const double gamma = 1.67;                  // Vapor sodium gamma constant
+
+// Environmental boundary conditions
+const double h_conv = 1;                    // Convective heat transfer coefficient for external heat removal [W/(m2K)]
+const double power = 1000;                  // Power at the evaporator side [W]
+const double T_env = 280.0;                 // External environmental temperature [K]
+
+// Evaporation and condensation parameters
+const double eps_s = 1.0;                   // Surface fraction of the liquid available for phasic interface [-]
+const double sigma_e = 0.05;                // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+const double sigma_c = 0.05;                // Condensation accomodation coefficient [-]. 1 means optimal condensation
+double Omega = 1.0;                         // Initialization of Omega parameter for evaporation/condensation model [-]
+
+// Wick permeability parameters
+const double K = 1e-10;                     // Permeability [m^2]
+const double CF = 1e5;                      // Forchheimer coefficient [1/m]
+double const eps_v = 1.0;                   // Surface fraction of the wick available for liquid passage [-]
+
+// Geometric parameters
+const int N = 22;                                                   // Number of axial nodes (two cells are ghost boundaries) [-]
+const double length = 1; 			                                // Length of the heat pipe [m]
+const double dz = length / (N - 2);                                 // Axial discretization step [m]
+const double r_o = 0.01335;                                         // Outer wall radius [m]
+const double r_i = 0.0112;                                          // Wall-liquid interface radius [m]
+const double r_v = 0.01075;                                         // Vapor-liquid interface radius [m]
+const double Dh_v = 2.0 * r_v;                                      // Hydraulic diameter of the vapor core [m]
+const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;     // Volume of the wall cell [m3]
+const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;   // Volume of the liquid cell [m3]
+const double vol_vapor_cell = r_v * r_v * pi * dz;                  // Volume of the vapor cell [m3]
+const double A_interface_cell = 2 * pi * r_i * dz;                  // Interfacial area between vapor and liquid for a cell [m2]     
+const double core_section = pi * r_v * r_v;
+const double wick_section = eps_v * pi * (r_i * r_i - r_v * r_v);
+
+// Evaporator region parameters
+const double evaporator_start = 0.020;                           // Evaporator begin [m]
+const double evaporator_end = 0.073;                             // Evaporator end [m]
+const double condenser_length = 0.292;                           // Condenser length [m]
+const double evaporator_length = evaporator_end - evaporator_start;             // Evaporator length [m]
+const double delta_h = 0.01;                                     // Evaporator ramp [m]
+const double evaporator_length_eff = evaporator_length + delta_h;                              // Evaporator effective length [m]
+const double q0 = power / (2.0 * pi * r_o * evaporator_length_eff);             // Evaporator heat flux [W/m2]
+
+// Condenser region parameters
+const double delta_c = 0.05;                                     // Condenser ramp [m]
+const double condenser_start = length - condenser_length;             // Condenser begin [m]
+
+// Coefficients for the parabolic temperature profiles in wall and liquid
+const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));    // [m]
+const double E2w = 0.5 * (r_o * r_o + r_i * r_i);                        // [m2]
+const double E1x = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));    // [m]
+const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                        // [m2]
+
+// Time-stepping parameters
+double           dt_user = 1e-4;                // Initial time step [s] (then it is updated according to the limits)
+double           dt = dt_user;                  // Current time step [s]
+double           time_total = 0.0;              // Total simulation time [s]
+const double     time_simulation = 5000;        // Simulation total number [s]
+double           dt_code = dt_user;             // Time step used in the code [s]
+int              halves = 0;                    // Number of halvings of the time step [-]
+const double     accelerator = 1;               // Adaptive timestep multiplier (TO BE FIXED, WHEN r_down IT ACCUMULATES) [-]
+
+// Picard iteration parameters
+int pic = 0;                                    // Outside to check if convergence is reached [-]
+const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
+std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
+std::vector<double> pic_tolerance(3, 1e-2);     // Picard convergence tolerance [K, K, K]
+
+// PISO Liquid parameters
+const int tot_simple_iter_x = 10;                    // Outer iterations per time-step [-]
+const int tot_piso_iter_x = 10;                     // Inner iterations per outer iteration [-]
+const double momentum_tol_x = 1e-8;              // Tolerance for the momentum equation [-]
+const double continuity_tol_x = 1e-8;            // Tolerance for the continuity equation [-]
+const double temperature_tol_x = 1e-3;           // Tolerance for the energy equation [-]
+
+// PISO Vapor parameters
+const int tot_simple_iter_v = 10;                   // Outer iterations per time-step [-]
+const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
+const double momentum_tol_v = 1e-8;              // Tolerance for the outer iterations (velocity) [-]
+const double continuity_tol_v = 1e-8;            // Tolerance for the inner iterations (pressure) [-]
+const double temperature_tol_v = 1e-3;           // Tolerance for the energy equation [-]
+
+const double T_init = 1000;                      // Initial uniform temperature [K]
+
+const double dT_init = 10.0;   // Ampiezza variazione iniziale [K]
+
+const double T_left = T_init + dT_init;
+const double T_right = T_init - dT_init;
+
+// Temperature vectors
+std::vector<double> T_o_w(N);     // Outer wall temperature [K]
+std::vector<double> T_w_bulk(N);  // Wall bulk temperature [K]
+std::vector<double> T_w_x(N);     // Wall–liquid interface temperature [K]
+std::vector<double> T_x_bulk(N);  // Liquid bulk temperature [K]
+std::vector<double> T_x_v(N);     // Liquid–vapor interface temperature [K]
+std::vector<double> T_v_bulk(N);  // Vapor bulk temperature [K]
+
+// Enthalpy vectors
+std::vector<double> h_x(N);       // Liquid enthalpy [J/kg]
+std::vector<double> h_v(N);       // Vapor enthalpy [J/kg]
+
+// Liquid fields
+std::vector<double> u_x(N, -0.0001);             // Liquid velocity field [m/s]
+std::vector<double> p_x(N);                      // Liquid pressure field [Pa]
+std::vector<double> p_prime_x(N, 0.0);           // Liquid correction pressure field [Pa]
+std::vector<double> rho_x(N);                    // Liquid density field [Pa]
+std::vector<double> p_storage_x(N + 2);          // Liquid padded pressure vector for R&C correction [Pa]
+double* p_padded_x = &p_storage_x[1];            // Pointer to work on the liquid pressure padded storage with the same indexes
+
+// Vapor fields
+std::vector<double> u_v(N, 10.0);                // Vapor velocity field [m/s]
+std::vector<double> p_v(N);                      // Vapor pressure field [Pa]
+std::vector<double> p_prime_v(N, 0.0);           // Vapor correction pressure field [Pa]
+std::vector<double> rho_v(N);                    // Vapor density field [Pa]
+std::vector<double> p_storage_v(N + 2);          // Vapor padded pressure vector for R&C correction [Pa]
+double* p_padded_v = &p_storage_v[1];            // Pointer to work on the storage with the same indexes
+
+std::vector<double> DPcap(N, 0.0);
+
+std::vector<double> alpha_l(N, 0.1);
+std::vector<double> alpha_v(N, 0.9);
+
+std::vector<double> c_l(N, 0.0);
+std::vector<double> c_v(N, 0.0);
+
+std::vector<double> mesh(N, 0.0);
+std::vector<double> mesh_center(N, 0.0);
+
+// Heat sources/fluxes at the interfaces
+std::vector<double> q_ow(N);                         // Outer wall heat flux [W/m2]
+std::vector<double> Q_ow(N, 0.0);                    // Outer wall heat source [W/m3]
+std::vector<double> Q_wx(N, 0.0);                    // Wall heat source due to fluxes [W/m3]
+std::vector<double> Q_xw(N, 0.0);                    // Liquid heat source due to fluxes [W/m3]
+std::vector<double> Q_xm(N, 0.0);                    // Vapor heat source due to fluxes [W/m3]
+std::vector<double> Q_mx(N, 0.0);                    // Liquid heat source due to fluxes [W/m3]
+
+std::vector<double> Q_tot_w(N, 0.0);                 // Total heat flux in the wall [W/m3]
+std::vector<double> Q_tot_x(N, 0.0);                 // Total heat flux in the liquid [W/m3]
+std::vector<double> Q_tot_v(N, 0.0);                 // Total heat flux in the vapor [W/m3]
+
+std::vector<double> heat_balance_surface(N, 0.0);       // Flux balance at vapor-liquid interface post-linearization [W/m2] 
+std::vector<double> wall_liquid_heat_balance(N, 0.0);   // Wall-liquid interface heat fluxes difference (should be zero) [W/m2]
+std::vector<double> liquid_vapor_heat_balance(N, 0.0);  // Vapor-liquid interface heat fluxes difference (should be zero) [W/m2]
+
+std::vector<double> Q_mass_vapor(N, 0.0);            // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
+std::vector<double> Q_mass_liquid(N, 0.0);           // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the liquid
+
+// Mass sources/fluxes at the interfaces
+std::vector<double> phi_x_v(N, 0.0);                 // Mass flux [kg/(m2s)] at the liquid-vapor interface (positive if evaporation)
+std::vector<double> Gamma_v(N, 0.0);          // Volumetric mass source [kg/(m3s)] (positive if evaporation)
+std::vector<double> Gamma_x(N, 0.0);         // Volumetric mass source [kg/(m3s)] (positive if evaporation)
+
+// Secondary useful variables
+std::vector<double> saturation_pressure(N, 0.0);     // Saturation pressure field [Pa]
+std::vector<double> sonic_velocity(N, 0.0);          // Sonic velocity field [m/s]
+
+std::vector<double> phi_x(N + 1, 0.0);           // Liquid face mass flux [kg/m2s]
+std::vector<double> phi_v(N + 1, 0.0);           // Vapor face mass flux [kg/m2s]
+
+// Old values declaration
+std::vector<double> T_o_w_old;
+std::vector<double> T_w_bulk_old;
+std::vector<double> T_w_x_old;
+std::vector<double> T_x_bulk_old;
+std::vector<double> T_x_v_old;
+std::vector<double> T_v_bulk_old;
+
+std::vector<double> alpha_l_old;
+std::vector<double> alpha_v_old;
+
+std::vector<double> h_x_old = h_x;
+std::vector<double> h_v_old = h_v;
+
+std::vector<double> q_ow_old;
+
+std::vector<double> Q_ow_old;
+std::vector<double> Q_wx_old;
+std::vector<double> Q_xw_old;
+std::vector<double> Q_xm_old;
+std::vector<double> Q_mx_old;
+
+std::vector<double> Q_mass_liquid_old;
+std::vector<double> Q_mass_vapor_old;
+
+std::vector<double> Gamma_x_old;
+std::vector<double> Gamma_v_old;
+
+std::vector<double> phi_x_old;
+std::vector<double> phi_v_old;
+
+std::vector<double> u_x_old;
+std::vector<double> p_x_old;
+std::vector<double> p_storage_x_old;
+
+std::vector<double> u_v_old;
+std::vector<double> p_v_old;
+std::vector<double> rho_v_old;
+std::vector<double> p_storage_v_old;
+
+// Wall physical properties
+std::vector<double> cp_w(N);         // Wall specific heat at constant pressure [J/kgK]
+std::vector<double> rho_w(N);        // Wall density [kg/m3]
+std::vector<double> k_w(N);          // Wall thermal conductivity [W/mK]
+
+// Liquid physical properties 
+std::vector<double> mu_x(N);         // Liquid dynamic viscosity [Pa s]
+std::vector<double> cp_x(N);         // Liquid specific heat at constant pressure [J/kgK]
+std::vector<double> k_x(N);          // Liquid thermal conductivity [W/mK]
+
+// Vapor physical properties
+std::vector<double> mu_v(N);         // Vapor dynamic viscosity [Pa s]
+std::vector<double> cp_v(N);         // Vapor specific heat at constant pressure [J/kgK]
+std::vector<double> k_v(N);          // Vapor thermal conductivity in the vapor bulk [W/mK]
+std::vector<double> k_v_int(N);      // Vapor thermal conductivity at the vapor-liquid interface [W/mK]
+std::vector<double> Re_v(N);         // Vapor Reynolds number [-]
+std::vector<double> HTC(N);          // Vapor heat transfer coefficient [W/m2K]
+
+double h_x_phase;               // Specific enthalpy [J/kg] of liquid upon phase change between vapor and liquid
+double h_v_phase;               // Specific enthalpy [J/kg] of vapor upon phase change between liquid and vapor
+
+// Iter values (only for Picard loops)
+std::vector<double> T_o_w_iter(N, 0.0);
+std::vector<double> T_w_x_iter(N, 0.0);
+std::vector<double> T_x_v_iter(N, 0.0);
+
+// Parabolas coefficients vector 
+std::vector<double> ABC(6 * N);
+
+// Liquid BCs
+const double u_inlet_x = 0.0;                               // Liquid inlet velocity [m/s]
+const double u_outlet_x = 0.0;                              // Liquid outlet velocity [m/s]
+double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);      // Liquid outlet pressure [Pa]
+
+// Vapor BCs
+const double u_inlet_v = 0.0;                               // Vapor inlet velocity [m/s]
+const double u_outlet_v = 0.0;                              // Vapor outlet velocity [m/s]
+double p_outlet_v = vapor_sodium::P_sat(T_v_bulk[N - 1]);   // Vapor outlet pressure [Pa]
+
+// Models
+const int rhie_chow_on_off_x = 1;             // 0: no liquid RC correction, 1: liquid with RC correction
+const int rhie_chow_on_off_v = 1;             // 0: no vapor RC correction, 1: vapor with RC correction
+
+// Tridiagonal coefficients for the liquid velocity predictor
+std::vector<double> aXU(N, 0.0);
+std::vector<double> bXU(N, 0.0);
+std::vector<double> bXU_old(N, 0.0);
+std::vector<double> cXU(N, 0.0);
+std::vector<double> dXU(N, 0.0);
+
+// Tridiagonal coefficients for the vapor velocity predictor
+std::vector<double> aVU(N, 0.0);
+std::vector<double> bVU(N, 0.0);
+std::vector<double> bVU_old(N, 0.0);
+std::vector<double> cVU(N, 0.0);
+std::vector<double> dVU(N, 0.0);
+
+// Tridiagonal coefficients for the wall temperature
+std::vector<double> aTW(N, 0.0);
+std::vector<double> bTW(N, 0.0);
+std::vector<double> cTW(N, 0.0);
+std::vector<double> dTW(N, 0.0);
+
+// Tridiagonal coefficients for the liquid pressure correction
+std::vector<double> aXP(N, 0.0);
+std::vector<double> bXP(N, 0.0);
+std::vector<double> cXP(N, 0.0);
+std::vector<double> dXP(N, 0.0);
+
+// Tridiagonal coefficients for the vapor pressure correction
+std::vector<double> aVP(N, 0.0);
+std::vector<double> bVP(N, 0.0);
+std::vector<double> cVP(N, 0.0);
+std::vector<double> dVP(N, 0.0);
+
+// Tridiagonal coefficients for the liquid temperature
+std::vector<double> aXT(N, 0.0);
+std::vector<double> bXT(N, 0.0);
+std::vector<double> cXT(N, 0.0);
+std::vector<double> dXT(N, 0.0);
+
+// Tridiagonal coefficients for the vapor temperature
+std::vector<double> aVT(N, 0.0);
+std::vector<double> bVT(N, 0.0);
+std::vector<double> cVT(N, 0.0);
+std::vector<double> dVT(N, 0.0);
+
+// Tridiagonal coefficients for the alpha_l
+std::vector<double> aXA(N, 0.0);
+std::vector<double> bXA(N, 0.0);
+std::vector<double> cXA(N, 0.0);
+std::vector<double> dXA(N, 0.0);
+
+// Residuals for liquid loops
+double momentum_res_x = 1.0;
+double temperature_res_x = 1.0;
+double continuity_res_x = 1.0;
+
+// Index for liquid outer and inner iterations
+int simple_iter_x = 0;
+int piso_iter_x = 0;
+
+// Errors for liquid pressure and velocity
+double p_error_x = 0.0;
+double u_error_x = 0.0;
+
+// Residuals for mass, monentum and enthalpy equations
+double momentum_res_v = 1.0;
+double temperature_res_v = 1.0;
+double continuity_res_v = 1.0;
+
+// Index for vapor outer and inner iterations
+int simple_iter_v = 0;
+int piso_iter_v = 0;
+
+// Errors for vapor pressure, velocity and density
+double p_error_v = 0.0;
+double u_error_v = 0.0;
+double rho_error_v = 0.0;
+
+// Previous values for residuals calculations
+std::vector<double> T_prev_x(N);
+std::vector<double> T_prev_v(N);
+
+// Printing parameters
+double t_last_print = 0.0;                   // Time from last print [s]
+const double print_interval = 1e-3;           // Time interval for printing [s]
+
+// TDMA solver
+tdma::Solver tdma_solver(N);
+
+#pragma endregion
+
+// =======================================================================
+//  WICK GEOMETRY & VOID FRACTION BOUNDS
+// =======================================================================
+
+// Pore geometry (assumed known constants)
+const double R_pore = 1e-6;                                                 // Pore radius [m]
+const double D_v = 2 * r_v;                                                 // Inner wick diameter [m]
+const double D_i = 2 * r_i;                                                 // Outer wick diameter [m]
+const double V_pore_hemi = (2.0 / 3.0) * pi * R_pore * R_pore * R_pore;     // Volume of a pore [m3]
+const double A_pore = pi * R_pore * R_pore;                                 // Surface of a pore [m2]
+const double flow_section = core_section + wick_section;                    // Flow section [m2]
+const double alpha_wick_i_0 = core_section / flow_section;
+
+inline double N_pore(double D) {
+
+    return eps_v * pi * D / (A_pore * flow_section);
+}
+
+const double alpha_wick_i_plus = alpha_wick_i_0 + N_pore(D_i) * V_pore_hemi;
+
+// =======================================================================
+//  CONTACT ANGLE & CAPILLARY RADIUS
+// =======================================================================
+
+inline double compute_xi(double alpha_v) {
+
+    if (alpha_v <= alpha_wick_i_0 || alpha_v >= alpha_wick_i_plus) {  // Overflow or dryout → flat surface
+        return 1.0;
+    }
+    else if (alpha_v < alpha_wick_i_plus) {
+
+        const double C1_arg = 3.0 * (alpha_v - alpha_wick_i_0)
+            / (pi * R_pore * R_pore * R_pore * N_pore(D_v));
+        const double C1 = C1_arg * C1_arg;
+
+        const double inner = C1 * (1.0 + C1 * (3.0 + C1 * (3.0 + C1)));
+        const double C2 = std::cbrt((C1 + 1.0) * (C1 + 1.0) + std::sqrt(inner));
+
+        return 1.0 / C2 + C2 / (C1 + 1.0) - 1.0;
+    }
+    else {
+        return 0.0;
+    }
+}
+
+inline double compute_R_cap(double xi) {
+
+    const double cos_theta = std::sqrt(1.0 - xi * xi);
+
+    if (cos_theta < 1e-12) return 1e12;
+    return R_pore / cos_theta;
+}
+
+// =======================================================================
+//  CAPILLARY PRESSURE
+// =======================================================================
+
+double compute_Dpcap(double alpha_v, double T_x_v) {
+
+    const double xi = compute_xi(alpha_v);
+    const double surf_ten = liquid_sodium::surf_ten(T_x_v);
+
+    if (std::abs(xi - 1.0) < 1e-12) {
+
+        return 0.0;
+    }
+
+    const double R_cap = compute_R_cap(xi);
+    return 2.0 * surf_ten / R_cap;
+}
+
+// =======================================================================
+//  INTERFACIAL AREA DENSITY
+// =======================================================================
+
+double compute_a_int(double alpha_v) {
+
+    if (alpha_v <= alpha_wick_i_0) {
+
+        return (2.0 * pi / flow_section) * std::sqrt(alpha_v * flow_section / pi);
+    }
+    else if (alpha_v <= alpha_wick_i_plus) {
+
+        const double xi = compute_xi(alpha_v);
+        return (2.0 * pi * R_pore * R_pore * N_pore(D_v)) / (1.0 + xi);
+    }
+    else {
+
+        return (pi / flow_section) * (D_i * D_i - 4.0 * (1.0 - alpha_v) * flow_section / pi);
+    }
+}
+
 int main() {
 
-    // =======================================================================
-    //                       [CONSTANTS AND VARIABLES]
-    // =======================================================================
-
-    #pragma region constants_and_variables
-
-    // Mathematical constants
-    const double pi = 3.141592;                 // Pi [-]
-
-    // Physical properties
-    const double emissivity = 0.5;              // Wall emissivity [-]
-    const double sigma = 5.67e-8;               // Stefan-Boltzmann constant [W/(m2K4)]
-    const double Rv = 361.5;                    // Gas constant for the sodium vapor [J/(kgK)]
-    
-    // Environmental boundary conditions
-    const double h_conv = 1;                    // Convective heat transfer coefficient for external heat removal [W/(m2K)]
-    const double power = 1000;                  // Power at the evaporator side [W]
-    const double T_env = 280.0;                 // External environmental temperature [K]
-
-    // Evaporation and condensation parameters
-    const double eps_s = 1.0;                   // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.05;                // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;                // Condensation accomodation coefficient [-]. 1 means optimal condensation
-	double Omega = 1.0;                         // Initialization of Omega parameter for evaporation/condensation model [-]
-
-    // Wick permeability parameters
-    const double K = 1e-10;                     // Permeability [m^2]
-    const double CF = 1e5;                      // Forchheimer coefficient [1/m]
-    double const eps_v = 1.0;                   // Surface fraction of the wick available for liquid passage [-]
-
-    // Geometric parameters
-    const int N = 22;                                                   // Number of axial nodes (two cells are ghost boundaries) [-]
-    const double length = 1; 			                                // Length of the heat pipe [m]
-    const double dz = length / (N - 2);                                 // Axial discretization step [m]
-    const double r_o = 0.01335;                                         // Outer wall radius [m]
-    const double r_i = 0.0112;                                          // Wall-liquid interface radius [m]
-    const double r_v = 0.01075;                                         // Vapor-liquid interface radius [m]
-    const double Dh_v = 2.0 * r_v;                                      // Hydraulic diameter of the vapor core [m]
-    const double vol_wall_cell = (r_o * r_o - r_i * r_i) * pi * dz;     // Volume of the wall cell [m3]
-    const double vol_liquid_cell = (r_i * r_i - r_v * r_v) * pi * dz;   // Volume of the liquid cell [m3]
-    const double vol_vapor_cell = r_v * r_v * pi * dz;                  // Volume of the vapor cell [m3]
-    const double A_interface_cell = 2 * pi * r_i * dz;                  // Interfacial area between vapor and liquid for a cell [m2]     
-
-    // Evaporator region parameters
-    const double evaporator_start = 0.020;                           // Evaporator begin [m]
-    const double evaporator_end = 0.073;                             // Evaporator end [m]
-    const double condenser_length = 0.292;                           // Condenser length [m]
-    const double evaporator_length = evaporator_end - evaporator_start;             // Evaporator length [m]
-    const double delta_h = 0.01;                                     // Evaporator ramp [m]
-    const double evaporator_length_eff = evaporator_length + delta_h;                              // Evaporator effective length [m]
-    const double q0 = power / (2.0 * pi * r_o * evaporator_length_eff);             // Evaporator heat flux [W/m2]
-
-    // Condenser region parameters
-    const double delta_c = 0.05;                                     // Condenser ramp [m]
-    const double condenser_start = length - condenser_length;             // Condenser begin [m]
-
-    // Coefficients for the parabolic temperature profiles in wall and liquid
-    const double E1w = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));    // [m]
-    const double E2w = 0.5 * (r_o * r_o + r_i * r_i);                        // [m2]
-    const double E1x = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));    // [m]
-    const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                        // [m2]
-
-    // Time-stepping parameters
-    double           dt_user = 1e-4;                // Initial time step [s] (then it is updated according to the limits)
-	double           dt = dt_user;                  // Current time step [s]
-    double           time_total = 0.0;              // Total simulation time [s]
-    const double     time_simulation = 5000;        // Simulation total number [s]
-	double           dt_code = dt_user;             // Time step used in the code [s]
-    int              halves = 0;                    // Number of halvings of the time step [-]
-    const double     accelerator = 1;               // Adaptive timestep multiplier (TO BE FIXED, WHEN r_down IT ACCUMULATES) [-]
-
-	// Picard iteration parameters
-    int pic = 0;                                    // Outside to check if convergence is reached [-]
-    const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
-    std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
-    std::vector<double> pic_tolerance(3, 1e-2);     // Picard convergence tolerance [K, K, K]
-
-    // PISO Liquid parameters
-    const int tot_simple_iter_x = 10;                    // Outer iterations per time-step [-]
-    const int tot_piso_iter_x = 10;                     // Inner iterations per outer iteration [-]
-    const double momentum_tol_x = 1e-8;              // Tolerance for the momentum equation [-]
-    const double continuity_tol_x = 1e-8;            // Tolerance for the continuity equation [-]
-    const double temperature_tol_x = 1e-3;           // Tolerance for the energy equation [-]
-
-    // PISO Vapor parameters
-    const int tot_simple_iter_v = 10;                   // Outer iterations per time-step [-]
-    const int tot_piso_iter_v = 10;                     // Inner iterations per outer iteration [-]
-    const double momentum_tol_v = 1e-8;              // Tolerance for the outer iterations (velocity) [-]
-    const double continuity_tol_v = 1e-8;            // Tolerance for the inner iterations (pressure) [-]
-    const double temperature_tol_v = 1e-3;           // Tolerance for the energy equation [-]
-
-    const double T_init = 1000;                      // Initial uniform temperature [K]
-
-    const double dT_init = 10.0;   // Ampiezza variazione iniziale [K]
-
-    const double T_left = T_init + dT_init;
-    const double T_right = T_init - dT_init;
-
-    // Temperature vectors
-    std::vector<double> T_o_w(N);     // Outer wall temperature [K]
-    std::vector<double> T_w_bulk(N);  // Wall bulk temperature [K]
-    std::vector<double> T_w_x(N);     // Wall–liquid interface temperature [K]
-    std::vector<double> T_x_bulk(N);  // Liquid bulk temperature [K]
-    std::vector<double> T_x_v(N);     // Liquid–vapor interface temperature [K]
-    std::vector<double> T_v_bulk(N);  // Vapor bulk temperature [K]
-
-    // Enthalpy vectors
-    std::vector<double> h_x(N);       // Liquid enthalpy [J/kg]
-    std::vector<double> h_v(N);       // Vapor enthalpy [J/kg]
+    // Variables initialization
 
     for (int i = 0; i < N; ++i) {
 
-        double xi = (N > 1)
-            ? static_cast<double>(i) / static_cast<double>(N - 1)
-            : 0.0;
+        double xi = (N > 1) ? static_cast<double>(i) / (N - 1) : 0.0;
 
         double T_lin = T_left + (T_right - T_left) * xi;
 
@@ -147,247 +474,43 @@ int main() {
 
         h_x[i] = liquid_sodium::h_l_linear(T_lin);
         h_v[i] = vapor_sodium::h_g_linear(T_lin);
+
+        p_x[i] = vapor_sodium::P_sat(T_x_v[i]);
+        p_v[i] = vapor_sodium::P_sat(T_x_v[i]);
+
+        rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);
+        rho_v[i] = std::max(1e-6, p_v[i] / (Rv * T_v_bulk[i]));
+
+        p_storage_x[i + 1] = p_x[i];
+        p_storage_v[i + 1] = p_v[i];
+
+        cp_w[i] = steel::cp(T_w_bulk[i]);
+        rho_w[i] = steel::rho(T_w_bulk[i]);
+        k_w[i] = steel::k(T_w_bulk[i]);
+
+        mu_x[i] = liquid_sodium::mu(T_x_bulk[i]);
+        cp_x[i] = liquid_sodium::cp_l_linear();
+        k_x[i] = liquid_sodium::k(T_x_bulk[i]);
+
+        mu_v[i] = vapor_sodium::mu(T_v_bulk[i]);
+        k_v[i] = vapor_sodium::k(T_v_bulk[i], p_v[i]);
+        cp_v[i] = vapor_sodium::cp_g_linear();
+        k_v_int[i] = vapor_sodium::k(T_x_v[i], p_v[i]);
+
+        bXU[i] = 2 * mu_x[i] / dz + rho_x[i] * dz / dt;
+        bVU[i] = 2 * (4.0 / 3.0 * mu_v[i] / dz) + rho_v[i] * dz / dt;
+
+        mesh[i] = (i - 1) * dz;
+        mesh_center[i] = (i - 0.5) * dz;
     }
 
-    // Liquid fields
-    std::vector<double> u_x(N, -0.0001);             // Liquid velocity field [m/s]
-    std::vector<double> p_x(N);                      // Liquid pressure field [Pa]
-    std::vector<double> p_prime_x(N, 0.0);           // Liquid correction pressure field [Pa]
-    std::vector<double> rho_x(N);                    // Liquid density field [Pa]
-    std::vector<double> p_storage_x(N + 2);          // Liquid padded pressure vector for R&C correction [Pa]
-    double* p_padded_x = &p_storage_x[1];            // Pointer to work on the liquid pressure padded storage with the same indexes
-
-    for (int i = 0; i < N; ++i) p_x[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the liquid pressure
-    for (int i = 0; i < N; ++i) rho_x[i] = liquid_sodium::rho(T_x_bulk[i]); // Initialization of the liquid density
-
-    // Vapor fields
-    std::vector<double> u_v(N, 10.0);                // Vapor velocity field [m/s]
-    std::vector<double> p_v(N);                      // Vapor pressure field [Pa]
-    std::vector<double> p_prime_v(N, 0.0);           // Vapor correction pressure field [Pa]
-    std::vector<double> rho_v(N);                    // Vapor density field [Pa]
-    std::vector<double> p_storage_v(N + 2);          // Vapor padded pressure vector for R&C correction [Pa]
-    double* p_padded_v = &p_storage_v[1];            // Pointer to work on the storage with the same indexes
-
-    for (int i = 0; i < N; ++i) p_v[i] = vapor_sodium::P_sat(T_x_v[i]);     // Initialization of the vapor pressure
-
-    // Vapor Equation of State update function. Updates density
-    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
-
-        for (int i = 0; i < N; i++) { rho_[i] = std::max(static_cast<double>(1e-6), p_[i] / (Rv * T_[i])); }
-
-    }; eos_update(rho_v, p_v, T_v_bulk);
-
-    // Heat sources/fluxes at the interfaces
-    std::vector<double> q_ow(N);                         // Outer wall heat flux [W/m2]
-	std::vector<double> Q_ow(N, 0.0);                    // Outer wall heat source [W/m3]
-    std::vector<double> Q_wx(N, 0.0);                    // Wall heat source due to fluxes [W/m3]
-    std::vector<double> Q_xw(N, 0.0);                    // Liquid heat source due to fluxes [W/m3]
-    std::vector<double> Q_xm(N, 0.0);                    // Vapor heat source due to fluxes [W/m3]
-	std::vector<double> Q_mx(N, 0.0);                    // Liquid heat source due to fluxes [W/m3]
-
-    std::vector<double> Q_tot_w(N, 0.0);                 // Total heat flux in the wall [W/m3]
-    std::vector<double> Q_tot_x(N, 0.0);                 // Total heat flux in the liquid [W/m3]
-    std::vector<double> Q_tot_v(N, 0.0);                 // Total heat flux in the vapor [W/m3]
-
-    std::vector<double> heat_balance_surface(N, 0.0);       // Flux balance at vapor-liquid interface post-linearization [W/m2] 
-    std::vector<double> wall_liquid_heat_balance(N, 0.0);   // Wall-liquid interface heat fluxes difference (should be zero) [W/m2]
-    std::vector<double> liquid_vapor_heat_balance(N, 0.0);  // Vapor-liquid interface heat fluxes difference (should be zero) [W/m2]
-
-    std::vector<double> Q_mass_vapor(N, 0.0);            // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the vapor
-    std::vector<double> Q_mass_liquid(N, 0.0);           // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the liquid
-
-	// Mass sources/fluxes at the interfaces
-    std::vector<double> phi_x_v(N, 0.0);                 // Mass flux [kg/(m2s)] at the liquid-vapor interface (positive if evaporation)
-    std::vector<double> Gamma_v(N, 0.0);          // Volumetric mass source [kg/(m3s)] (positive if evaporation)
-    std::vector<double> Gamma_x(N, 0.0);         // Volumetric mass source [kg/(m3s)] (positive if evaporation)
-
-    // Secondary useful variables
-	std::vector<double> saturation_pressure(N, 0.0);     // Saturation pressure field [Pa]
-	std::vector<double> sonic_velocity(N, 0.0);          // Sonic velocity field [m/s]
-
-    // Padding pressure storages
-    for (int i = 0; i < N; i++) p_storage_x[i + 1] = p_x[i];
+    // Enforcing boundary conditions
+    
     p_storage_x[0] = p_storage_x[1];
     p_storage_x[N + 1] = p_storage_x[N];
 
-    for (int i = 0; i < N; i++) p_storage_v[i + 1] = p_v[i];
     p_storage_v[0] = p_storage_v[1];
     p_storage_v[N + 1] = p_storage_v[N];
-
-    std::vector<double> phi_x(N + 1, 0.0);           // Liquid face mass flux [kg/m2s]
-    std::vector<double> phi_v(N + 1, 0.0);           // Vapor face mass flux [kg/m2s]
-
-    // Old values declaration
-    std::vector<double> T_o_w_old;
-    std::vector<double> T_w_bulk_old;
-    std::vector<double> T_w_x_old;
-    std::vector<double> T_x_bulk_old;
-    std::vector<double> T_x_v_old;
-    std::vector<double> T_v_bulk_old;
-
-    std::vector<double> h_x_old = h_x;
-    std::vector<double> h_v_old = h_v;
-
-    std::vector<double> q_ow_old;
-
-    std::vector<double> Q_ow_old;               
-    std::vector<double> Q_wx_old;            
-    std::vector<double> Q_xw_old;               
-    std::vector<double> Q_xm_old;               
-    std::vector<double> Q_mx_old;   
-
-    std::vector<double> Q_mass_liquid_old;
-    std::vector<double> Q_mass_vapor_old;
-
-    std::vector<double> Gamma_x_old;
-    std::vector<double> Gamma_v_old;
-
-    std::vector<double> phi_x_v_old;
-
-    std::vector<double> phi_x_old;
-    std::vector<double> phi_v_old;
-
-    std::vector<double> u_x_old;
-    std::vector<double> p_x_old;
-    std::vector<double> p_storage_x_old;
-
-    std::vector<double> u_v_old;
-    std::vector<double> p_v_old;
-    std::vector<double> rho_v_old;
-    std::vector<double> p_storage_v_old;
-
-	// Wall physical properties
-    std::vector<double> cp_w(N);         // Wall specific heat at constant pressure [J/kgK]
-    std::vector<double> rho_w(N);        // Wall density [kg/m3]
-    std::vector<double> k_w(N);          // Wall thermal conductivity [W/mK]
-
-	// Liquid physical properties 
-    std::vector<double> mu_x(N);         // Liquid dynamic viscosity [Pa s]
-    std::vector<double> cp_x(N);         // Liquid specific heat at constant pressure [J/kgK]
-    std::vector<double> k_x(N);          // Liquid thermal conductivity [W/mK]
-
-    // Vapor physical properties
-    std::vector<double> mu_v(N);         // Vapor dynamic viscosity [Pa s]
-    std::vector<double> cp_v(N);         // Vapor specific heat at constant pressure [J/kgK]
-    std::vector<double> k_v(N);          // Vapor thermal conductivity in the vapor bulk [W/mK]
-    std::vector<double> k_v_int(N);      // Vapor thermal conductivity at the vapor-liquid interface [W/mK]
-    std::vector<double> Re_v(N);         // Vapor Reynolds number [-]
-    std::vector<double> HTC(N);          // Vapor heat transfer coefficient [W/m2K]
-
-    double h_x_phase;               // Specific enthalpy [J/kg] of liquid upon phase change between vapor and liquid
-    double h_v_phase;               // Specific enthalpy [J/kg] of vapor upon phase change between liquid and vapor
-
-    // Iter values (only for Picard loops)
-    std::vector<double> T_o_w_iter(N, 0.0);
-    std::vector<double> T_w_x_iter(N, 0.0);
-    std::vector<double> T_x_v_iter(N, 0.0);
-
-    // Parabolas coefficients vector 
-    std::vector<double> ABC(6 * N);
-
-    // Liquid BCs
-    const double u_inlet_x = 0.0;                               // Liquid inlet velocity [m/s]
-    const double u_outlet_x = 0.0;                              // Liquid outlet velocity [m/s]
-    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);      // Liquid outlet pressure [Pa]
-
-    // Vapor BCs
-    const double u_inlet_v = 0.0;                               // Vapor inlet velocity [m/s]
-    const double u_outlet_v = 0.0;                              // Vapor outlet velocity [m/s]
-    double p_outlet_v = vapor_sodium::P_sat(T_v_bulk[N - 1]);   // Vapor outlet pressure [Pa]
-
-    // Models
-    const int rhie_chow_on_off_x = 1;             // 0: no liquid RC correction, 1: liquid with RC correction
-    const int rhie_chow_on_off_v = 1;             // 0: no vapor RC correction, 1: vapor with RC correction
-
-    // Tridiagonal coefficients for the liquid velocity predictor
-    std::vector<double> aXU(N, 0.0);                                      
-    std::vector<double> bXU(N, rho_x[0] * dz / dt + 2 * mu_x[0] / dz);             
-    std::vector<double> bXU_old = bXU;
-    std::vector<double> cXU(N, 0.0);                                       
-    std::vector<double> dXU(N, 0.0);                                    
-
-	// Tridiagonal coefficients for the vapor velocity predictor
-    std::vector<double> aVU(N, 0.0);                                                  
-    std::vector<double> bVU(N, 2 * (4.0 / 3.0 * mu_v[0] / dz) + dz / dt * rho_v[0]);
-    std::vector<double> bVU_old = bVU;
-    std::vector<double> cVU(N, 0.0);                                                   
-    std::vector<double> dVU(N, 0.0);                                                    
-
-    // Tridiagonal coefficients for the wall temperature
-    std::vector<double> aTW(N, 0.0);
-    std::vector<double> bTW(N, 0.0);
-    std::vector<double> cTW(N, 0.0);
-    std::vector<double> dTW(N, 0.0);
-
-    // Tridiagonal coefficients for the liquid pressure correction
-    std::vector<double> aXP(N, 0.0);
-    std::vector<double> bXP(N, 0.0);
-    std::vector<double> cXP(N, 0.0);
-    std::vector<double> dXP(N, 0.0);
-
-    // Tridiagonal coefficients for the vapor pressure correction
-    std::vector<double> aVP(N, 0.0);
-    std::vector<double> bVP(N, 0.0);
-    std::vector<double> cVP(N, 0.0);
-    std::vector<double> dVP(N, 0.0);
-
-    // Tridiagonal coefficients for the liquid temperature
-    std::vector<double> aXT(N, 0.0);
-    std::vector<double> bXT(N, 0.0);
-    std::vector<double> cXT(N, 0.0);
-    std::vector<double> dXT(N, 0.0);
-
-    // Tridiagonal coefficients for the vapor temperature
-    std::vector<double> aVT(N, 0.0);
-    std::vector<double> bVT(N, 0.0);
-    std::vector<double> cVT(N, 0.0);
-    std::vector<double> dVT(N, 0.0);
-
-	// Residuals for liquid loops
-    double momentum_res_x = 1.0;
-    double temperature_res_x = 1.0;
-	double continuity_res_x = 1.0;
-
-    // Index for liquid outer and inner iterations
-    int simple_iter_x = 0;
-    int piso_iter_x = 0;
-
-    // Errors for liquid pressure and velocity
-    double p_error_x = 0.0;
-	double u_error_x = 0.0;
-
-    // Residuals for mass, monentum and enthalpy equations
-    double momentum_res_v = 1.0;
-    double temperature_res_v = 1.0;
-    double continuity_res_v = 1.0;
-
-    // Index for vapor outer and inner iterations
-    int simple_iter_v = 0;
-    int piso_iter_v = 0;
-
-    // Errors for vapor pressure, velocity and density
-    double p_error_v = 0.0;
-    double u_error_v = 0.0;
-	double rho_error_v = 0.0;
-
-    // Previous values for residuals calculations
-    std::vector<double> T_prev_x(N);
-    std::vector<double> T_prev_v(N);
-
-    // Printing parameters
-    double t_last_print = 0.0;                   // Time from last print [s]
-    const double print_interval = 0.5;           // Time interval for printing [s]
-
-    // TDMA solver
-    tdma::Solver tdma_solver(N);
-
-    // Mesh z positions of the begin of the cells (ghost cells included)
-    std::vector<double> mesh(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh[i] = (i - 1) * dz;
-
-    // Mesh z positions of the center of the cells (ghost cells included)
-    std::vector<double> mesh_center(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh_center[i] = (i - 0.5) * dz;
 
     const int output_precision = 6;                             // Output precision [-]
 
@@ -427,6 +550,12 @@ int main() {
     T_x_v_old = T_x_v;
     T_v_bulk_old = T_v_bulk;
 
+    h_v_old = h_v;
+    h_x_old = h_x;
+
+    alpha_l_old = alpha_l;
+    alpha_v_old = alpha_v;
+
     q_ow_old = q_ow;
 
     Q_ow_old = Q_ow;
@@ -440,8 +569,6 @@ int main() {
 
     Gamma_x_old = Gamma_x;
     Gamma_v_old = Gamma_v;
-
-    phi_x_v_old = phi_x_v;
 
     phi_x_old = phi_x;
     phi_v_old = phi_v;
@@ -514,6 +641,10 @@ int main() {
 
     std::ofstream reynolds_output(case_chosen + "/reynolds_vapor.txt", std::ios::app);
     std::ofstream HTC_output(case_chosen + "/HTC.txt", std::ios::app);
+    std::ofstream DPcap_output(case_chosen + "/DPcap.txt", std::ios::app);
+
+    std::ofstream alpha_l_output(case_chosen + "/alpha_l.txt", std::ios::app);
+    std::ofstream alpha_v_output(case_chosen + "/alpha_v.txt", std::ios::app);
 
     time_output << std::setprecision(output_precision);
     dt_output << std::setprecision(output_precision);
@@ -571,8 +702,10 @@ int main() {
 
     reynolds_output << std::setprecision(output_precision);
     HTC_output << std::setprecision(output_precision);
+    DPcap_output << std::setprecision(output_precision);
 
-    #pragma endregion
+    alpha_l_output << std::setprecision(output_precision);
+    alpha_v_output << std::setprecision(output_precision);
 
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
@@ -685,14 +818,14 @@ int main() {
                     const double D_r = 0.5 * (mu_P + mu_R) / dz;
 
                     aXU[i] =
-                        -std::max(phi_x[i], static_cast<double>(0.0))
+                        -std::max(phi_x[i], 0.0)
                         - D_l;
                     cXU[i] =
-                        -std::max(-phi_x[i + 1], static_cast<double>(0.0))
+                        -std::max(-phi_x[i + 1], 0.0)
                         - D_r;
                     bXU[i] =
-                        +std::max(phi_x[i + 1], static_cast<double>(0.0))
-                        + std::max(-phi_x[i], static_cast<double>(0.0))
+                        +std::max(phi_x[i + 1], 0.0)
+                        + std::max(-phi_x[i], 0.0)
                         + rho_P * dz / dt
                         + D_l + D_r
                         + mu_P / K * dz
@@ -755,15 +888,15 @@ int main() {
 
                     aXT[i] =
                         -D_l
-                        - std::max(C_l, static_cast<double>(0.0));       // [W/(m2 K)]
+                        - std::max(C_l, 0.0);       // [W/(m2 K)]
 
                     cXT[i] =
                         -D_r
-                        - std::max(-C_r, static_cast<double>(0.0));      // [W/(m2 K)]
+                        - std::max(-C_r, 0.0);      // [W/(m2 K)]
 
                     bXT[i] =
-                        +std::max(C_r, static_cast<double>(0.0))
-                        + std::max(-C_l, static_cast<double>(0.0))
+                        +std::max(C_r, 0.0)
+                        + std::max(-C_l, 0.0)
                         + D_l + D_r
                         + rho_P * dz / dt;                                  // [W/(m2 K)]
 
@@ -891,18 +1024,11 @@ int main() {
                     p_x[N - 1] = p_x[N - 2];
                     p_storage_x[N + 1] = p_storage_x[N];
 
-                    // Calculating average on p_x (gauge pressure)
-                    double p_mean = 0.0;
-                    for (int i = 0; i < N; ++i)
-                        p_mean += p_x[i];
-                    p_mean /= static_cast<double>(N);
-
-                    // Removing average on p_x (gauge pressure)
-                    for (int i = 0; i < N; ++i)
-                        p_x[i] -= p_mean;
-
-                    for (int i = 0; i <= N; ++i)
-                        p_storage_x[i] -= p_mean;
+                    double omega = 0.5;
+                    for (int i = 0; i < N; ++i) {
+                        double p_target = p_v[i] - DPcap[i];
+                        p_x[i] = (1.0 - omega) * p_x[i] + omega * p_v[i];
+                    }
 
                     #pragma endregion
 
@@ -1023,14 +1149,14 @@ int main() {
                     const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
 
                     aVU[i] =
-                        -std::max(phi_v[i], static_cast<double>(0.0))
+                        -std::max(phi_v[i], 0.0)
                         - D_l;                              // [kg/(m2 s)]
                     cVU[i] =
-                        -std::max(-phi_v[i + 1], static_cast<double>(0.0))
+                        -std::max(-phi_v[i + 1], 0.0)
                         - D_r;                              // [kg/(m2 s)]
                     bVU[i] =
-                        +std::max(phi_v[i + 1], static_cast<double>(0.0))
-                        + std::max(-phi_v[i], static_cast<double>(0.0))
+                        +std::max(phi_v[i + 1], 0.0)
+                        + std::max(-phi_v[i], 0.0)
                         + rho_P * dz / dt
                         + D_l + D_r
                         + F * dz;                           // [kg/(m2 s)]
@@ -1098,17 +1224,17 @@ int main() {
 
                     aVT[i] =
                         -D_l
-                        - std::max(C_l, static_cast<double>(0.0))
+                        - std::max(C_l, 0.0)
                         ;                                   /// [W/(m2K)]
 
                     cVT[i] =
                         -D_r
-                        - std::max(-C_r, static_cast<double>(0.0))
+                        - std::max(-C_r, 0.0)
                         ;                                   /// [W/(m2K)]
 
                     bVT[i] =
-                        +std::max(C_r, static_cast<double>(0.0))
-                        + std::max(-C_l, static_cast<double>(0.0))
+                        +std::max(C_r, 0.0)
+                        + std::max(-C_l, 0.0)
                         + D_l + D_r
                         + rho_v[i] * dz / dt;               /// [W/(m2 K)]
 
@@ -1195,18 +1321,18 @@ int main() {
 
                         aVP[i] =
                             -E_l
-                            - std::max(C_l, static_cast<double>(0.0))
+                            - std::max(C_l, 0.0)
                             ;                                   /// [s/m]
 
                         cVP[i] =
                             -E_r
-                            - std::max(-C_r, static_cast<double>(0.0))
+                            - std::max(-C_r, 0.0)
                             ;                                   /// [s/m]
 
                         bVP[i] =
                             +E_l + E_r
-                            + std::max(C_r, static_cast<double>(0.0))
-                            + std::max(-C_l, static_cast<double>(0.0))
+                            + std::max(C_r, 0.0)
+                            + std::max(-C_l, 0.0)
                             + psi_i * dz / dt;                  /// [s/m]
 
                         dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
@@ -1368,7 +1494,104 @@ int main() {
             }
 
             // Update density with new p,T
-            eos_update(rho_v, p_v, T_v_bulk);
+            for(int i = 0; i < N; ++i) rho_v[i] = std::max(1e-6, p_v[i] / (Rv * T_v_bulk[i]));
+
+            #pragma endregion
+
+            // =======================================================================
+            //                          [VOF EQUATION]
+            // =======================================================================
+
+            #pragma region vof_equation
+
+            for (int i = 1; i < N - 1; i++) {
+
+                // --- Sound velocities c_k
+                c_l[i] = 2660.7 - 0.37667 * T_x_bulk[i] - 9.0356e-5 * T_x_bulk[i] * T_x_bulk[i];
+                c_v[i] = std::sqrt(Rv * gamma * T_v_bulk[i]);
+
+                // --- Acoustic impedances Z_k
+                const double Z_l = rho_x[i] * c_l[i];           
+                const double Z_v = rho_v[i] * c_v[i];          
+                const double Z_sum = Z_l + Z_v;
+
+                // --- Interface velocity u_int
+                const double dalpha_l_dx = (alpha_l[i + 1] - alpha_l[i - 1]) / (2.0 * dz);
+                const double sgn_dalpha = (dalpha_l_dx > 0.0) ? 1.0 : ((dalpha_l_dx < 0.0) ? -1.0 : 0.0);
+                const double u_int = (Z_l * u_x[i] + Z_v * u_v[i]) / Z_sum
+                    + sgn_dalpha * (p_v[i] - p_x[i]) / Z_sum;
+
+                // --- Interface pressure p_int
+                const double p_int = (Z_l * p_v[i] + Z_v * p_x[i]) / Z_sum;
+
+                // --- Interface thermodynamic state 
+                const double rho_int = liquid_sodium::rho(T_x_v[i]);     
+                const double h_l_int = liquid_sodium::h_l_linear(T_x_v[i]); 
+                const double h_v_int = vapor_sodium::h_g_linear(T_x_v[i]); 
+                const double E_l_int = h_l_int - p_int / rho_int + 0.5 * u_int * u_int;
+                const double E_v_int = h_v_int - p_int / rho_int + 0.5 * u_int * u_int;
+
+                // --- Interfacial area density a_int
+                const double a_int = compute_a_int(alpha_l[i]);
+
+                // --- Pressure relaxation rate Theta
+                const double Theta = a_int / Z_sum;
+
+                // --- Capillary pressure DPcap
+                DPcap[i] = compute_Dpcap(alpha_l[i], T_x_v[i]);
+
+                // Tridiagonal coefficients: a*alpha_{i-1} + b*alpha_i + c*alpha_{i+1} = d
+                aXA[i] = -u_int / dz;                                 // west neighbor
+                cXA[i] = u_int / dz;                               // east neighbor (upwind: no east contribution)
+                bXA[i] = 1 / dt;                       // diagonal
+                dXA[i] = 
+                    + alpha_l_old[i] / dt 
+                    + a_int / Z_sum * (p_x[i] + DPcap[i] - p_v[i])
+                    - Gamma_v[i] * a_int / rho_int;            // RHS
+            }
+
+            aXA[0] = 1.0;
+            bXA[0] = -1.0;
+            cXA[0] = 0.0;
+            dXA[0] = 0.0;
+
+            aXA[N - 1] = 0.0;
+            bXA[N - 1] = -1.0;
+            cXA[N - 1] = 1.0;
+            dXA[N - 1] = 0.0;
+
+            tdma_solver.solve(aXA, bXA, cXA, dXA, alpha_l);
+
+            for (int i = 0; i < N; ++i) alpha_v[i] = 1 - alpha_l[i];
+
+
+            bool alpha_valid = true;
+
+            for (int i = 0; i < N; ++i) {
+
+                if (alpha_l[i] < 0.0 && alpha_l[i] > -1e-3) {
+
+                    alpha_l[i] = 0.0;
+                    alpha_v[i] = 1.0;
+
+                }
+                else if (alpha_v[i] < 0.0 && alpha_v[i] > -1e-3) {
+
+                    alpha_v[i] = 0.0;
+                    alpha_l[i] = 0.0;
+                }
+                else if (alpha_l[i] < -1e-3 || alpha_v[i] < -1e-3) {
+
+                    alpha_valid = false;
+
+                }
+            }
+
+            if (alpha_valid == false) {
+
+                pic = max_picard;
+                break;
+            }
 
             #pragma endregion
 
@@ -1660,6 +1883,9 @@ int main() {
             u_x_old = u_x;
             rho_v_old = rho_v;
 
+            alpha_l_old = alpha_l;
+            alpha_v_old = alpha_v;
+
             p_storage_x_old = p_storage_x;
             p_storage_v_old = p_storage_v;
 
@@ -1680,8 +1906,6 @@ int main() {
 
             Gamma_x_old = Gamma_x;
             Gamma_v_old = Gamma_v;
-
-            phi_x_v_old = phi_x_v;
 
             phi_x_old = phi_x;
             phi_v_old = phi_v;
@@ -1711,6 +1935,9 @@ int main() {
             p_v = p_v_old;
             rho_v = rho_v_old;
 
+            alpha_l = alpha_l_old;
+            alpha_v = alpha_v_old;
+
             p_storage_x = p_storage_x_old;
             p_storage_v = p_storage_v_old;
 
@@ -1731,8 +1958,6 @@ int main() {
 
             Gamma_x = Gamma_x_old;
             Gamma_v = Gamma_v_old;
-
-            phi_x_v = phi_x_v_old;
 
             phi_x = phi_x_old;
             phi_v = phi_v_old;
@@ -1793,6 +2018,10 @@ int main() {
 
                 reynolds_output << Re_v[i] << " ";
                 HTC_output << HTC[i] << " ";
+                DPcap_output << p_v[i] - p_x[i] << " "; 
+
+                alpha_l_output << alpha_l[i] << " ";
+                alpha_v_output << alpha_v[i] << " ";
             }
 
             // Time between timesteps [ms]
@@ -1891,6 +2120,10 @@ int main() {
 
             reynolds_output << "\n";
             HTC_output << "\n";
+            DPcap_output << "\n";
+
+            alpha_l_output << "\n";
+            alpha_v_output << "\n";
 
             v_velocity_output.flush();
             v_pressure_output.flush();
@@ -1950,6 +2183,10 @@ int main() {
 
             reynolds_output.flush();
             HTC_output.flush();
+            DPcap_output.flush();
+
+            alpha_l_output.flush();
+            alpha_v_output.flush();
 
             t_last_print += print_interval;
         }
@@ -2014,6 +2251,10 @@ int main() {
 
     reynolds_output.close();
     HTC_output.close();
+    DPcap_output.close();
+
+    alpha_l_output.close();
+    alpha_v_output.close();
 
     return 0;
 }
