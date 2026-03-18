@@ -92,6 +92,10 @@ const double E2w = 0.5 * (r_o * r_o + r_i * r_i);                       // [m2]
 const double E1x = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));   // [m]
 const double E2x = 0.5 * (r_i * r_i + r_v * r_v);                       // [m2]
 
+// Volume fraction functions
+const double alpha_wick_i_0 = core_section / flow_section;
+const double alpha_wick_i_plus = alpha_wick_i_0 + eps_v * pi * D_i / (A_pore * flow_section) * V_pore_hemi;
+
 // Time-stepping parameters
 double           dt_user = 1e-4;                // Initial time step [s] (then it is updated according to the limits)
 double           dt = dt_user;                  // Current time step [s]
@@ -164,6 +168,8 @@ std::vector<double> alpha_v(N, 0.9);            // Vapor volume fraction [-]
 std::vector<double> c_l(N, 0.0);                // Sound speed in liquid [m/s]
 std::vector<double> c_v(N, 0.0);                // Sound speed in vapor [m/s]
 
+std::vector<double> a_int(N, 0.0);
+
 std::vector<double> mesh(N, 0.0);               // Coordinate of i-th cell left face [m]
 std::vector<double> mesh_center(N, 0.0);        // Coordinate of i'th cell center [m]
 
@@ -187,7 +193,7 @@ std::vector<double> Q_mass_vapor(N, 0.0);               // Heat volumetric sourc
 std::vector<double> Q_mass_liquid(N, 0.0);              // Heat volumetric source [W/m3] due to evaporation condensation. To be summed to the liquid
 
 // Mass sources/fluxes at the interfaces
-std::vector<double> phi_x_v(N, 0.0);            // Mass flux [kg/(m2s)] at the liquid-vapor interface (positive if evaporation)
+std::vector<double> phi_int(N, 0.0);            // Mass flux [kg/(m2s)] at the liquid-vapor interface (positive if evaporation)
 std::vector<double> Gamma_v(N, 0.0);            // Volumetric mass source [kg/(m3s)] (positive if evaporation)
 std::vector<double> Gamma_x(N, 0.0);            // Volumetric mass source [kg/(m3s)] (positive if evaporation)
 
@@ -371,17 +377,6 @@ tdma::Solver tdma_solver(N);
 
 #pragma endregion
 
-// Volume fraction functions
-
-// Pore density
-inline double N_pore(double D) {
-
-    return eps_v * pi * D / (A_pore * flow_section);
-}
-
-const double alpha_wick_i_0 = core_section / flow_section;
-const double alpha_wick_i_plus = alpha_wick_i_0 + N_pore(D_i) * V_pore_hemi;
-
 // Sine of contact angle
 inline double compute_xi(double alpha_v) {
 
@@ -391,7 +386,7 @@ inline double compute_xi(double alpha_v) {
     else if (alpha_v < alpha_wick_i_plus) {
 
         const double C1_arg = 3.0 * (alpha_v - alpha_wick_i_0)
-            / (pi * R_pore * R_pore * R_pore * N_pore(D_v));
+            / (pi * R_pore * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section));
         const double C1 = C1_arg * C1_arg;
 
         const double inner = C1 * (1.0 + C1 * (3.0 + C1 * (3.0 + C1)));
@@ -419,31 +414,10 @@ double compute_Dpcap(double alpha_v, double T_x_v) {
     const double xi = compute_xi(alpha_v);
     const double surf_ten = liquid_sodium::surf_ten(T_x_v);
 
-    if (std::abs(xi - 1.0) < 1e-12) {
-
-        return 0.0;
-    }
+    if (std::abs(xi - 1.0) < 1e-12) return 0.0;
 
     const double R_cap = compute_R_cap(xi);
     return 2.0 * surf_ten / R_cap;
-}
-
-// Interfacial area density
-double compute_a_int(double alpha_v) {
-
-    if (alpha_v <= alpha_wick_i_0) {
-
-        return (2.0 * pi / flow_section) * std::sqrt(alpha_v * flow_section / pi);
-    }
-    else if (alpha_v <= alpha_wick_i_plus) {
-
-        const double xi = compute_xi(alpha_v);
-        return (2.0 * pi * R_pore * R_pore * N_pore(D_v)) / (1.0 + xi);
-    }
-    else {
-
-        return (pi / flow_section) * (D_i * D_i - 4.0 * (1.0 - alpha_v) * flow_section / pi);
-    }
 }
 
 int main() {
@@ -488,8 +462,8 @@ int main() {
         cp_v[i] = vapor_sodium::cp_g_linear();
         k_v_int[i] = vapor_sodium::k(T_x_v[i], p_v[i]);
 
-        bXU[i] = 2 * mu_x[i] / dz + rho_x[i] * dz / dt;
-        bVU[i] = 2 * (4.0 / 3.0 * mu_v[i] / dz) + rho_v[i] * dz / dt;
+        bXU[i] = 2 * alpha_l[i] * mu_x[i] / dz + alpha_l[i] * rho_x[i] * dz / dt;
+        bVU[i] = 2 * (4.0 / 3.0 * alpha_v[i] * mu_v[i] / dz) + alpha_v[i] * rho_v[i] * dz / dt;
 
         mesh[i] = (i - 1) * dz;
         mesh_center[i] = (i - 0.5) * dz;
@@ -795,50 +769,42 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_x[i];
-                    const double rho_L = rho_x[i - 1];
-                    const double rho_R = rho_x[i + 1];
+                    const double rho_x_old = liquid_sodium::rho(T_x_bulk_old[i]);
 
-                    const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
-                    const double mu_P = mu_x[i];
-                    const double mu_L = mu_x[i - 1];
-                    const double mu_R = mu_x[i + 1];
-
-                    const double D_l = 0.5 * (mu_P + mu_L) / dz;
-                    const double D_r = 0.5 * (mu_P + mu_R) / dz;
+                    const double D_l = 0.5 * (alpha_l[i] * mu_x[i] + alpha_l[i - 1] * mu_x[i - 1]) / dz;
+                    const double D_r = 0.5 * (alpha_l[i] * mu_x[i] + alpha_l[i + 1] * mu_x[i + 1]) / dz;
 
                     aXU[i] =
-                        -std::max(phi_x[i], 0.0)
+                        - std::max(phi_x[i], 0.0)
                         - D_l;
                     cXU[i] =
-                        -std::max(-phi_x[i + 1], 0.0)
+                        - std::max(-phi_x[i + 1], 0.0)
                         - D_r;
                     bXU[i] =
-                        +std::max(phi_x[i + 1], 0.0)
+                        + std::max(phi_x[i + 1], 0.0)
                         + std::max(-phi_x[i], 0.0)
-                        + rho_P * dz / dt
+                        + alpha_l[i] * rho_x[i] * dz / dt
                         + D_l + D_r
-                        + mu_P / K * dz
-                        + CF * mu_P * dz / sqrt(K) * abs(u_x[i]);
+                        + alpha_l[i] * mu_x[i] / K * dz
+                        + alpha_l[i] * CF * mu_x[i] * dz / sqrt(K) * abs(u_x[i]);
                     dXU[i] =
-                        -0.5 * (p_x[i + 1] - p_x[i - 1])
-                        + rho_P_old * u_x_old[i] * dz / dt;
+                        - 0.5 * alpha_l[i] * (p_x[i + 1] - p_x[i - 1])
+                        + alpha_l_old[i] * rho_x_old * u_x_old[i] * dz / dt;
                 }
 
                 // Diffusion coefficients for the first and last node to define BCs
-                const double D_first = mu_x[0] / dz;
-                const double D_last = mu_x[N - 1] / dz;
+                const double D_first = alpha_l[0] * mu_x[0] / dz;
+                const double D_last = alpha_l[N - 1] * mu_x[N - 1] / dz;
 
                 // Velocity BCs: fixed (zero) velocity on the first face
                 aXU[0] = 0.0;
-                bXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
-                cXU[0] = (rho_x[0] * dz / dt + 2 * D_first);
+                bXU[0] = (alpha_l[0] * rho_x[0] * dz / dt + 2 * D_first);
+                cXU[0] = (alpha_l[0] * rho_x[0] * dz / dt + 2 * D_first);
                 dXU[0] = 0.0;
 
                 // Velocity BCs: fixed (zero) velocity on the last face
-                aXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
-                bXU[N - 1] = (rho_x[N - 1] * dz / dt + 2 * D_last);
+                aXU[N - 1] = (alpha_l[N - 1] * rho_x[N - 1] * dz / dt + 2 * D_last);
+                bXU[N - 1] = (alpha_l[N - 1] * rho_x[N - 1] * dz / dt + 2 * D_last);
                 cXU[N - 1] = 0.0;
                 dXU[N - 1] = 0.0;
 
@@ -851,48 +817,29 @@ int main() {
 
                 for (int i = 1; i < N - 1; i++) {
 
-                    // Physical properties
-                    const double rho_P = rho_x[i];
-                    const double rho_L = rho_x[i - 1];
-                    const double rho_R = rho_x[i + 1];
+                    const double rho_x_old = liquid_sodium::rho(T_x_bulk_old[i]);
 
-                    const double rho_P_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
-                    const double C_l = phi_x[i];   // [W/m2]
-                    const double C_r = phi_x[i + 1];
-
-                    const double k_cond_P = k_x[i];
-                    const double k_cond_L = k_x[i - 1];
-                    const double k_cond_R = k_x[i + 1];
-
-                    const double cp_P = cp_x[i];
-                    const double cp_L = cp_x[i - 1];
-                    const double cp_R = cp_x[i + 1];
-
-                    const double cp_l = 0.5 * (cp_P + cp_L);
-                    const double cp_r = 0.5 * (cp_P + cp_R);
-
-                    const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
-                    const double D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
+                    const double D_l = 0.5 * (alpha_l[i] * k_x[i] + alpha_l[i - 1] * k_x[i - 1]) / dz;
+                    const double D_r = 0.5 * (alpha_l[i] * k_x[i] + alpha_l[i + 1] * k_x[i + 1]) / dz;
 
                     Q_tot_x[i] = Q_wx[i] + Q_mx[i] + Q_mass_liquid[i];
 
                     aXT[i] =
-                        -D_l
-                        - std::max(C_l, 0.0);       // [W/(m2 K)]
+                        - D_l
+                        - std::max(phi_x[i], 0.0);       // [W/(m2 K)]
 
                     cXT[i] =
-                        -D_r
-                        - std::max(-C_r, 0.0);      // [W/(m2 K)]
+                        - D_r
+                        - std::max(-phi_x[i + 1], 0.0);      // [W/(m2 K)]
 
                     bXT[i] =
-                        +std::max(C_r, 0.0)
-                        + std::max(-C_l, 0.0)
+                        + std::max(phi_x[i + 1], 0.0)
+                        + std::max(-phi_x[i], 0.0)
                         + D_l + D_r
-                        + rho_P * dz / dt;                                  // [W/(m2 K)]
+                        + alpha_l[i] * rho_x[i] * dz / dt;                                  // [W/(m2 K)]
 
                     dXT[i] =
-                        +rho_P_old * dz / dt * h_x_old[i]
+                        + alpha_l_old[i] * rho_x_old * dz / dt * h_x_old[i]
                         + Q_wx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mass_liquid[i] * dz;        // [W/m2]       
@@ -915,10 +862,7 @@ int main() {
                 tdma_solver.solve(aXT, bXT, cXT, dXT, h_x);
 
                 // Recovering temperature from enthalpy
-                for (int i = 0; i < N; i++) {
-
-                    T_x_bulk[i] = liquid_sodium::T_from_h_l_linear(h_x[i]);
-                }
+                for (int i = 0; i < N; i++) T_x_bulk[i] = liquid_sodium::T_from_h_l_linear(h_x[i]);
 
                 #pragma endregion
 
@@ -951,30 +895,27 @@ int main() {
                     // Loop to assemble the linear system for the pressure correction
                     for (int i = 1; i < N - 1; i++) {
 
-                        // Physical properties
-                        const double rho_P = rho_x[i];
-                        const double rho_L = rho_x[i - 1];
-                        const double rho_R = rho_x[i + 1];
-
                         const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
                         const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
 
-                        const double mass_flux = Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double mass_flux = phi_int[i] * a_int[i] * dz;   // [kg/(m2s)]
 
-                        const double rho_l_cd = 0.5 * (rho_L + rho_P);      // [kg/m3]
-                        const double rho_r_cd = 0.5 * (rho_P + rho_R);      // [kg/m3]
+                        const double alpha_rho_l_cd = 0.5 * (alpha_l[i - 1] * rho_x[i - 1] + alpha_l[i] * rho_x[i]);      // [kg/m3]
+                        const double alpha_rho_r_cd = 0.5 * (alpha_l[i] * rho_x[i] + alpha_l[i + 1] * rho_x[i + 1]);      // [kg/m3]
 
-                        const double E_l = rho_l_cd * avgInvbLU_L / dz;     // [s/m]
-                        const double E_r = rho_r_cd * avgInvbLU_R / dz;     // [s/m]
+                        const double E_l = alpha_rho_l_cd * avgInvbLU_L / dz;     // [s/m]
+                        const double E_r = alpha_rho_r_cd * avgInvbLU_R / dz;     // [s/m]
+
+                        double lambda = 1.0;
 
                         aXP[i] = -E_l;              // [s/m]
                         cXP[i] = -E_r;              // [s/m]
-                        bXP[i] = E_l + E_r;         // [s/m]
+                        bXP[i] = E_l + E_r + lambda;         // [s/m]
                         dXP[i] =
-                            +mass_flux
-                            - mass_imbalance;       // [kg/(m2s)]
+                            + mass_flux
+                            - mass_imbalance + lambda * ((p_v[i] - DPcap[i]) - p_x[i]);       // [kg/(m2s)]
                     }
 
                     // BCs for the correction of pressure: zero gradient at first face
@@ -1015,7 +956,7 @@ int main() {
                     p_x[N - 1] = p_x[N - 2];
                     p_storage_x[N + 1] = p_storage_x[N];
 
-                    double omega = 0.5;
+                    double omega = 0;
                     for (int i = 0; i < N; ++i) {
                         double p_target = p_v[i] - DPcap[i];
                         p_x[i] = (1.0 - omega) * p_x[i] + omega * p_v[i];
@@ -1046,10 +987,18 @@ int main() {
                         const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
 
                         // Correzione incrementale coerente con la matrice p'
-                        const double rho_face = (phi_x[i] >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                        const double rho_face = (phi_x[i] >= 0.0) ? alpha_l[i - 1] * rho_x[i - 1] : alpha_l[i] * rho_x[i];
                         phi_x[i] -= rho_face * avgInvbXU * (p_prime_x[i] - p_prime_x[i - 1]) / dz;
 
                     }
+
+                    /*
+                    phi_x[0] = u_inlet_x * alpha_l[0] * rho_x[0];
+                    phi_x[1] = u_inlet_x * alpha_l[0] * rho_x[0];
+
+                    phi_x[N - 1] = u_outlet_x * alpha_l[N - 1] * rho_x[N - 1];
+                    phi_x[N] = u_outlet_x * alpha_l[N - 1] * rho_x[N - 1];
+                    */
 
                     #pragma endregion
 
@@ -1061,7 +1010,7 @@ int main() {
                     for (int i = 1; i < N - 1; ++i) {
 
                         const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
-                        const double mass_flux = Gamma_x[i] * dz;   // [kg/(m2s)]
+                        const double mass_flux = phi_int[i] * a_int[i] * dz;   // [kg/(m2s)]
                         dXP[i] = +mass_flux - mass_imbalance;       // [kg/(m2s)]
 
                         continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
@@ -1095,7 +1044,8 @@ int main() {
                     + 3 * p_padded_x[i] - p_padded_x[i + 1]);
                 const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rc;
                 const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
-                phi_x[i] = rho_face * u_face;
+                const double alpha_face = (u_face >= 0.0) ? alpha_l[i - 1] : alpha_l[i];
+                phi_x[i] = alpha_face * rho_face * u_face;
             }
 
             #pragma endregion
@@ -1122,53 +1072,43 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_v[i];
-                    const double rho_L = rho_v[i - 1];
-                    const double rho_R = rho_v[i + 1];
+                    const double D_l = 4.0 / 3.0 * 0.5 * (alpha_v[i] * mu_v[i] + alpha_v[i - 1] * mu_v[i - 1]) / dz;
+                    const double D_r = 4.0 / 3.0 * 0.5 * (alpha_v[i] * mu_v[i] + alpha_v[i + 1] * mu_v[i + 1]) / dz;
 
-                    const double rho_P_old = rho_v_old[i];
-
-                    const double mu_P = mu_v[i];
-                    const double mu_L = mu_v[i - 1];
-                    const double mu_R = mu_v[i + 1];
-
-                    const double D_l = 4.0 / 3.0 * 0.5 * (mu_P + mu_L) / dz;
-                    const double D_r = 4.0 / 3.0 * 0.5 * (mu_P + mu_R) / dz;
-
-                    const double Re = u_v[i] * (2 * r_v) * rho_P / mu_P;
+                    const double Re = u_v[i] * (2 * r_v) * alpha_v[i] * rho_v[i] / mu_v[i];
                     const double f = (Re < 1187.4) ? 64 / Re : 0.3164 * std::pow(Re, -0.25);
-                    const double F = 0.25 * f * rho_P * std::abs(u_v[i]) / r_v;
+                    const double F = 0.25 * f * alpha_v[i] * rho_v[i] * std::abs(u_v[i]) / r_v;
 
                     aVU[i] =
-                        -std::max(phi_v[i], 0.0)
+                        - std::max(phi_v[i], 0.0)
                         - D_l;                              // [kg/(m2 s)]
                     cVU[i] =
-                        -std::max(-phi_v[i + 1], 0.0)
+                        - std::max(-phi_v[i + 1], 0.0)
                         - D_r;                              // [kg/(m2 s)]
                     bVU[i] =
-                        +std::max(phi_v[i + 1], 0.0)
+                        + std::max(phi_v[i + 1], 0.0)
                         + std::max(-phi_v[i], 0.0)
-                        + rho_P * dz / dt
+                        + alpha_v[i] * rho_v[i] * dz / dt
                         + D_l + D_r
                         + F * dz;                           // [kg/(m2 s)]
                     dVU[i] =
-                        -0.5 * (p_v[i + 1] - p_v[i - 1])
-                        + rho_P_old * u_v_old[i] * dz / dt; // [kg/(m s2)]
+                        - 0.5 * alpha_v[i] *(p_v[i + 1] - p_v[i - 1])
+                        + alpha_v_old[i] * rho_v_old[i] * u_v_old[i] * dz / dt; // [kg/(m s2)]
                 }
 
                 /// Diffusion coefficients for the first and last node to define BCs
-                const double D_first = (4.0 / 3.0) * mu_v[0] / dz;
-                const double D_last = (4.0 / 3.0) * mu_v[N - 1] / dz;
+                const double D_first = (4.0 / 3.0) * alpha_v[0] * mu_v[0] / dz;
+                const double D_last = (4.0 / 3.0) * alpha_v[N - 1] * mu_v[N - 1] / dz;
 
                 // Velocity BCs: zero velocity on the first node
                 aVU[0] = 0.0;
-                bVU[0] = +(rho_v[0] * dz / dt + 2 * D_first);
-                cVU[0] = +(rho_v[0] * dz / dt + 2 * D_first);
+                bVU[0] = +(alpha_v[0] * rho_v[0] * dz / dt + 2 * D_first);
+                cVU[0] = +(alpha_v[0] * rho_v[0] * dz / dt + 2 * D_first);
                 dVU[0] = 0.0;
 
                 // Velocity BCs: zero velocity on the last node
-                aVU[N - 1] = +(rho_v[N - 1] * dz / dt + 2 * D_last);
-                bVU[N - 1] = +(rho_v[N - 1] * dz / dt + 2 * D_last);
+                aVU[N - 1] = +(alpha_v[N - 1] * rho_v[N - 1] * dz / dt + 2 * D_last);
+                bVU[N - 1] = +(alpha_v[N - 1] * rho_v[N - 1] * dz / dt + 2 * D_last);
                 cVU[N - 1] = 0.0;
                 dVU[N - 1] = 0.0;
 
@@ -1182,31 +1122,11 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_P = rho_v[i];
-                    const double rho_L = rho_v[i - 1];
-                    const double rho_R = rho_v[i + 1];
-
-                    const double cp_P = cp_v[i];
-                    const double cp_L = cp_v[i - 1];
-                    const double cp_R = cp_v[i + 1];
-
-                    const double cp_l = (phi_v[i] >= 0) ? cp_L : cp_P;
-                    const double cp_r = (phi_v[i + 1] >= 0) ? cp_P : cp_R;
-
-                    const double k_cond_P = k_v[i];
-                    const double k_cond_L = k_v[i - 1];
-                    const double k_cond_R = k_v[i + 1];
-
-                    const double D_l = 0.5 * (k_cond_P + k_cond_L) / dz;
-                    const double D_r = 0.5 * (k_cond_P + k_cond_R) / dz;
-
-                    const double C_l = phi_v[i];
-                    const double C_r = phi_v[i + 1];
+                    const double D_l = 0.5 * (alpha_v[i] * k_v[i] + alpha_v[i - 1] * k_v[i - 1]) / dz;
+                    const double D_r = 0.5 * (alpha_v[i] * k_v[i] + alpha_v[i + 1] * k_v[i + 1]) / dz;
 
                     const double dpdz_up = u_v[i] * (p_v[i + 1] - p_v[i - 1]) / 2.0;
-
                     const double dp_dt = (p_v[i] - p_v_old[i]) / dt * dz;
-
                     const double viscous_dissipation =
                         4.0 / 3.0 * 0.25 * mu_v[i] * ((u_v[i + 1] - u_v[i]) * (u_v[i + 1] - u_v[i])
                             + (u_v[i] + u_v[i - 1]) * (u_v[i] + u_v[i - 1])) / dz;
@@ -1214,27 +1134,27 @@ int main() {
                     Q_tot_v[i] = /*dp_dt / dz + dpdz_up / dz + viscous_dissipation +*/ Q_xm[i] + Q_mass_vapor[i];
 
                     aVT[i] =
-                        -D_l
-                        - std::max(C_l, 0.0)
+                        - D_l
+                        - std::max(phi_v[i], 0.0)
                         ;                                   /// [W/(m2K)]
 
                     cVT[i] =
-                        -D_r
-                        - std::max(-C_r, 0.0)
+                        - D_r
+                        - std::max(-phi_v[i + 1], 0.0)
                         ;                                   /// [W/(m2K)]
 
                     bVT[i] =
-                        +std::max(C_r, 0.0)
-                        + std::max(-C_l, 0.0)
+                        + std::max(phi_v[i + 1], 0.0)
+                        + std::max(-phi_v[i], 0.0)
                         + D_l + D_r
-                        + rho_v[i] * dz / dt;               /// [W/(m2 K)]
+                        + alpha_v[i] * rho_v[i] * dz / dt;               /// [W/(m2 K)]
 
                     dVT[i] =
-                        +rho_v_old[i] * dz / dt * h_v_old[i]
+                        + alpha_v_old[i] * rho_v_old[i] * dz / dt * h_v_old[i]
                         // + dp_dt
                         // + dpdz_up
                         // + viscous_dissipation * dz
-                        +Q_xm[i] * dz                      // Positive if heat from liquid to vapor
+                        + Q_xm[i] * dz                      // Positive if heat from liquid to vapor
                         + Q_mass_vapor[i] * dz;             // [W/m2]
                 }
 
@@ -1255,11 +1175,7 @@ int main() {
                 tdma_solver.solve(aVT, bVT, cVT, dVT, h_v);
 
                 // Recovering temperture from enthalpy
-                for (int i = 0; i < N; i++) {
-
-                    T_v_bulk[i] = vapor_sodium::T_from_h_g_linear(h_v[i]);
-
-                }
+                for (int i = 0; i < N; i++) T_v_bulk[i] = vapor_sodium::T_from_h_g_linear(h_v[i]);
 
                 #pragma endregion
 
@@ -1292,23 +1208,20 @@ int main() {
 
                     for (int i = 1; i < N - 1; ++i) {
 
-                        const double psi_i = 1.0 / (Rv * T_v_bulk[i]); // [kg/J]
+                        const double psi_i = alpha_v[i] / (Rv * T_v_bulk[i]); // [kg/J]
 
-                        const double Crho_l = phi_v[i] >= 0 ? (1.0 / (Rv * T_v_bulk[i - 1])) : (1.0 / (Rv * T_v_bulk[i]));  // [s2/m2]
-                        const double Crho_r = phi_v[i + 1] >= 0 ? (1.0 / (Rv * T_v_bulk[i])) : (1.0 / (Rv * T_v_bulk[i + 1]));  // [s2/m2]
+                        const double Crho_l = phi_v[i] >= 0 ? (alpha_v[i - 1] / (Rv * T_v_bulk[i - 1])) : (alpha_v[i] / (Rv * T_v_bulk[i]));  // [s2/m2]
+                        const double Crho_r = phi_v[i + 1] >= 0 ? (alpha_v[i] / (Rv * T_v_bulk[i])) : (alpha_v[i + 1] / (Rv * T_v_bulk[i + 1]));  // [s2/m2]
 
-                        const double C_l = Crho_l * phi_v[i] / rho_v[i];       // [s/m]
-                        const double C_r = Crho_r * phi_v[i + 1] / rho_v[i + 1];       // [s/m]
+                        const double C_l = Crho_l * phi_v[i] / (alpha_v[i] * rho_v[i]);       // [s/m]
+                        const double C_r = Crho_r * phi_v[i + 1] / (alpha_v[i + 1] * rho_v[i + 1]);       // [s/m]
 
-                        const double rho_l_upwind = (phi_v[i] >= 0.0) ? rho_v[i - 1] : rho_v[i];    // [kg/m3]
-                        const double rho_r_upwind = (phi_v[i + 1] >= 0.0) ? rho_v[i] : rho_v[i + 1];    // [kg/m3]
+                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (alpha_v[i] * rho_v[i] - alpha_v_old[i] * rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
 
-                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const double mass_flux = -phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
 
-                        const double mass_flux = Gamma_v[i] * dz;         // [kg/(m2s)]
-
-                        const double E_l = 0.5 * (rho_v[i - 1] * (1.0 / bVU[i - 1]) + rho_v[i] * (1.0 / bVU[i])) / dz; // [s/m]
-                        const double E_r = 0.5 * (rho_v[i] * (1.0 / bVU[i]) + rho_v[i + 1] * (1.0 / bVU[i + 1])) / dz; // [s/m]
+                        const double E_l = 0.5 * (alpha_v[i - 1] * rho_v[i - 1] * (1.0 / bVU[i - 1]) + alpha_v[i] * rho_v[i] * (1.0 / bVU[i])) / dz; // [s/m]
+                        const double E_r = 0.5 * (alpha_v[i] * rho_v[i] * (1.0 / bVU[i]) + alpha_v[i + 1] * rho_v[i + 1] * (1.0 / bVU[i + 1])) / dz; // [s/m]
 
                         aVP[i] =
                             -E_l
@@ -1400,16 +1313,20 @@ int main() {
                         const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]); // [m2s/kg]
 
                         // Correzione incrementale coerente con la matrice p'
-                        const double rho_face = (phi_v[i] >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                        const double rho_face = (phi_v[i] >= 0.0) ? alpha_v[i - 1] * rho_v[i - 1] : alpha_v[i] * rho_v[i];
                         phi_v[i] -= rho_face * avgInvbVU * (p_prime_v[i] - p_prime_v[i - 1]) / dz;
 
                     }
 
-                    phi_v[0] = u_inlet_v * rho_v[0];
-                    phi_v[1] = u_inlet_v * rho_v[0];
+                    /*
 
-                    phi_v[N - 1] = u_outlet_v * rho_v[N - 1];
-                    phi_v[N] = u_outlet_v * rho_v[N - 1];
+                    phi_v[0] = u_inlet_v * alpha_v[0] * rho_v[0];
+                    phi_v[1] = u_inlet_v * alpha_v[0] * rho_v[0];
+
+                    phi_v[N - 1] = u_outlet_v * alpha_v[N - 1] * rho_v[N - 1];
+                    phi_v[N] = u_outlet_v * alpha_v[N - 1] * rho_v[N - 1];
+
+                    */
 
                     #pragma endregion
 
@@ -1437,8 +1354,8 @@ int main() {
 
                     for (int i = 1; i < N - 1; ++i) {
 
-                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (rho_v[i] - rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
-                        const double mass_flux = Gamma_v[i] * dz;         // [kg/(m2s)]
+                        const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (alpha_v[i] * rho_v[i] - alpha_v_old[i] * rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
+                        const double mass_flux = -phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
                         dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
 
                         continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
@@ -1481,7 +1398,8 @@ int main() {
                     + 3 * p_padded_v[i] - p_padded_v[i + 1]);
                 const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rc;
                 const double rho_face = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];
-                phi_v[i] = rho_face * u_face;
+                const double alpha_face = (u_face >= 0.0) ? alpha_v[i - 1] : alpha_v[i];
+                phi_v[i] = alpha_face * rho_face * u_face;
             }
 
             // Update density with new p,T
@@ -1490,7 +1408,7 @@ int main() {
             #pragma endregion
 
             // =======================================================================
-            //                          [VOF EQUATION]
+            //                            [VOF EQUATION]
             // =======================================================================
 
             #pragma region vof_equation
@@ -1523,22 +1441,34 @@ int main() {
                 const double E_v_int = h_v_int - p_int / rho_int + 0.5 * u_int * u_int;
 
                 // --- Interfacial area density a_int
-                const double a_int = compute_a_int(alpha_l[i]);
+                if (alpha_v[i] <= alpha_wick_i_0) {
+
+                    a_int[i] = (2.0 * pi / flow_section) * std::sqrt(alpha_v[i] * flow_section / pi);
+                }
+                else if (alpha_v[i] <= alpha_wick_i_plus) {
+
+                    const double xi = compute_xi(alpha_v[i]);
+                    a_int[i] = (2.0 * pi * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section)) / (1.0 + xi);
+                }
+                else {
+
+                    a_int[i] = (pi / flow_section) * (D_i * D_i - 4.0 * (1.0 - alpha_v[i]) * flow_section / pi);
+                }
 
                 // --- Pressure relaxation rate Theta
-                const double Theta = a_int / Z_sum;
+                const double Theta = a_int[i] / Z_sum;
 
                 // --- Capillary pressure DPcap
                 DPcap[i] = compute_Dpcap(alpha_l[i], T_x_v[i]);
 
                 // Tridiagonal coefficients: a*alpha_{i-1} + b*alpha_i + c*alpha_{i+1} = d
-                aXA[i] = -u_int / dz;                                 // west neighbor
-                cXA[i] = u_int / dz;                               // east neighbor (upwind: no east contribution)
-                bXA[i] = 1 / dt;                       // diagonal
+                aXA[i] = -u_int / dz;                                   // [1/s]
+                cXA[i] = u_int / dz;                                    // [1/s]
+                bXA[i] = 1 / dt;                                        // [1/s]
                 dXA[i] = 
-                    + alpha_l_old[i] / dt 
-                    + a_int / Z_sum * (p_x[i] + DPcap[i] - p_v[i])
-                    - Gamma_v[i] * a_int / rho_int;            // RHS
+                    + alpha_l_old[i] / dt                               // [1/s]
+                    + a_int[i] / Z_sum * (p_x[i] + DPcap[i] - p_v[i])
+                    - phi_int[i] * a_int[i] / rho_int;           
             }
 
             aXA[0] = 1.0;
@@ -1553,9 +1483,10 @@ int main() {
 
             tdma_solver.solve(aXA, bXA, cXA, dXA, alpha_l);
 
+            // Obtain alpha_v as the complementary
             for (int i = 0; i < N; ++i) alpha_v[i] = 1 - alpha_l[i];
 
-
+            // Check if less than zero or over than one and correct/half the timestep
             bool alpha_valid = true;
 
             for (int i = 0; i < N; ++i) {
@@ -1584,6 +1515,13 @@ int main() {
                 break;
             }
 
+            // Enforcing boundary conditions
+            alpha_l[0] = alpha_l[1];
+            alpha_v[0] = alpha_v[1];
+
+            alpha_l[N - 1] = alpha_l[N - 2];
+            alpha_v[N - 1] = alpha_v[N - 2];
+
             #pragma endregion
 
             // =======================================================================
@@ -1596,7 +1534,7 @@ int main() {
 
                 // Physical properties
                 Re_v[i] = rho_v[i] * std::abs(u_v[i]) * Dh_v / mu_v[i];         // Reynolds number [-]
-                const double Pr_v = cp_v[i] * mu_v[i] / k_v[i];              // Prandtl number [-]
+                const double Pr_v = cp_v[i] * mu_v[i] / k_v[i];                 // Prandtl number [-]
                 HTC[i] = vapor_sodium::h_conv(Re_v[i], Pr_v, k_v[i], Dh_v);     // Convective HTC at the vapor-liquid interface [W/(m2K)]
 
                 // Enthalpies
@@ -1619,7 +1557,7 @@ int main() {
                 const double E3 = HTC[i];
                 const double E4 = -k_x[i] + HTC[i] * r_v;
                 const double E5 = -2.0 * r_v * k_x[i] + HTC[i] * r_v * r_v;
-                const double E6 = HTC[i] * T_v_bulk[i] - enthalpy_difference * phi_x_v[i];
+                const double E6 = HTC[i] * T_v_bulk[i] - enthalpy_difference * phi_int[i];
 
                 const double alpha = 1.0 / (2 * r_o * (E1w - r_i) + r_i * r_i - E2w);
                 const double delta = T_x_bulk[i] - T_w_bulk[i] + q_ow[i] / k_w[i] * (E1w - r_i) -
@@ -1649,7 +1587,7 @@ int main() {
                 heat_balance_surface[i] =
                     -k_x[i] * (ABC[6 * i + 4] + 2 * ABC[6 * i + 5] * r_v)
                     + HTC[i] * (ABC[6 * i + 3] + ABC[6 * i + 4] * r_v + ABC[6 * i + 5] * r_v * r_v - T_v_bulk[i])
-                    + enthalpy_difference * phi_x_v[i];
+                    + enthalpy_difference * phi_int[i];
 
                 // Update temperatures at the interfaces
                 T_o_w[i] = ABC[6 * i + 0] + ABC[6 * i + 1] * r_o + ABC[6 * i + 2] * r_o * r_o; // Temperature at the outer wall [K]
@@ -1745,15 +1683,15 @@ int main() {
                 Q_mass_liquid[i] = Gamma_x[i] * h_x_phase;
 
                 // Real evaporation mass flux [kg/(m2s)]
-                phi_x_v[i] = eps_s * (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
+                phi_int[i] = eps_s * (sigma_e * vapor_sodium::P_sat(T_x_v[i]) / std::sqrt(T_x_v[i]) -
                     sigma_c * Omega * p_v[i] / std::sqrt(T_v_bulk[i])) /
                     std::sqrt(2 * pi * Rv);   
 
                 // Volumetric mass source [kg/m3s] to vapor
-                Gamma_v[i] = phi_x_v[i] * interface_wick_inner_cell / vol_inner_cell;
+                Gamma_v[i] = phi_int[i] * interface_wick_inner_cell / vol_inner_cell;
 
                 // Volumetric mass source [kg/m3s] to liquid
-                Gamma_x[i] = -phi_x_v[i] * interface_wick_inner_cell / vol_inner_cell;
+                Gamma_x[i] = -phi_int[i] * interface_wick_inner_cell / vol_inner_cell;
             }
 
             #pragma endregion
@@ -1986,7 +1924,7 @@ int main() {
                 o_w_temperature_output << T_o_w[i] << " ";
                 w_bulk_temperature_output << T_w_bulk[i] << " ";
 
-                x_v_mass_flux_output << phi_x_v[i] * interface_wall_inner_cell << " ";
+                x_v_mass_flux_output << phi_int[i] * interface_wall_inner_cell << " ";
 
                 Q_ow_output << Q_ow[i] * vol_wall_cell << " ";
                 Q_wx_output << Q_wx[i] * vol_inner_cell << " ";
