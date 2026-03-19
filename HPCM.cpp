@@ -40,8 +40,8 @@ const double T_env = 280.0;                 // External environmental temperatur
 
 // Evaporation and condensation parameters
 const double eps_s = 1.0;                   // Surface fraction of the liquid available for phasic interface [-]
-const double sigma_e = 0.05;                // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-const double sigma_c = 0.05;                // Condensation accomodation coefficient [-]. 1 means optimal condensation
+const double sigma_e = 0.5;                // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+const double sigma_c = 0.5;                // Condensation accomodation coefficient [-]. 1 means optimal condensation
 double Omega = 1.0;                         // Initialization of Omega parameter for evaporation/condensation model [-]
 
 // Wick permeability parameters
@@ -68,15 +68,15 @@ const double core_section = pi * r_v * r_v;                         // Area of t
 const double wick_section = eps_v * pi * (r_i * r_i - r_v * r_v);   // Flow area of the wick [m2]
 
 // Pore geometry (assumed known constants)
-const double R_pore = 1e-6;                                                 // Pore radius [m]
+const double R_pore = 1e-4;                                                 // Pore radius [m]
 const double V_pore_hemi = (2.0 / 3.0) * pi * R_pore * R_pore * R_pore;     // Volume of a pore [m3]
 const double A_pore = pi * R_pore * R_pore;                                 // Surface of a pore [m2]
 const double flow_section = core_section + wick_section;                    // Flow section [m2]
 
 // Evaporator region parameters
-const double evaporator_start = 0.020;                              // Evaporator begin [m]
-const double evaporator_end = 0.073;                                // Evaporator end [m]
-const double condenser_length = 0.292;                              // Condenser length [m]
+const double evaporator_start = 0.0;                              // Evaporator begin [m]
+const double evaporator_end = 0.3;                                // Evaporator end [m]
+const double condenser_length = 0.3;                              // Condenser length [m]
 const double evaporator_length = evaporator_end - evaporator_start; // Evaporator length [m]
 const double delta_h = 0.01;                                        // Evaporator ramp [m]
 const double evaporator_length_eff = evaporator_length + delta_h;   // Evaporator effective length [m]
@@ -108,8 +108,8 @@ const double     accelerator = 1;               // Adaptive timestep multiplier 
 // Picard iteration parameters
 int pic = 0;                                    // Outside to check if convergence is reached [-]
 const double max_picard = 100;                  // Maximum number of Picard iterations per time step [-]
-std::vector<double> pic_error(3, 0.0);          // L1 error for picard convergence [K, K, K]
-std::vector<double> pic_tolerance(3, 1e-2);     // Picard convergence tolerance [K, K, K]
+std::vector<double> pic_error(4, 0.0);          // L1 error for picard convergence [K, K, K]
+std::vector<double> pic_tolerance(4, 1e-2);     // Picard convergence tolerance [K, K, K]
 
 // PISO Liquid parameters
 const int tot_simple_iter_x = 10;               // Outer iterations per time-step [-]
@@ -127,7 +127,7 @@ const double temperature_tol_v = 1e-3;          // Tolerance for the energy equa
 
 const double T_init = 1000;                     // Initial uniform temperature [K]
 
-const double dT_init = 10.0;                    // Ampiezza variazione iniziale [K]
+const double dT_init = 1.0;                    // Ampiezza variazione iniziale [K]
 
 const double T_left = T_init + dT_init;
 const double T_right = T_init - dT_init;
@@ -162,8 +162,8 @@ double* p_padded_v = &p_storage_v[1];           // Pointer to work on the storag
 
 std::vector<double> DPcap(N, 0.0);              // Capillary pressure differential [Pa]
 
-std::vector<double> alpha_l(N, 0.1);            // Liquid volume fraction [-]
-std::vector<double> alpha_v(N, 0.9);            // Vapor volume fraction [-]
+std::vector<double> alpha_l(N, 0.0);            // Liquid volume fraction [-]
+std::vector<double> alpha_v(N, 0.0);            // Vapor volume fraction [-]
 
 std::vector<double> c_l(N, 0.0);                // Sound speed in liquid [m/s]
 std::vector<double> c_v(N, 0.0);                // Sound speed in vapor [m/s]
@@ -370,55 +370,23 @@ std::vector<double> T_prev_v(N);
 
 // Printing parameters
 double t_last_print = 0.0;              // Time from last print [s]
-const double print_interval = 1e-3;     // Time interval for printing [s]
+const double print_interval = 1e-2;     // Time interval for printing [s]
 
 // TDMA solver
 tdma::Solver tdma_solver(N);
 
 #pragma endregion
 
-// Sine of contact angle
-inline double compute_xi(double alpha_v) {
+std::vector<double> xi(N, 0.0);
+std::vector<double> Rcap(N, 0.0);
+std::vector<double> surf_ten(N, 0.0);
 
-    if (alpha_v <= alpha_wick_i_0 || alpha_v >= alpha_wick_i_plus) {  // Overflow or dryout → flat surface
-        return 1.0;
-    }
-    else if (alpha_v < alpha_wick_i_plus) {
+std::vector<double> phi_int_iter(N, 0.0);
+std::vector<double> phi_int_old(N, 0.0);
 
-        const double C1_arg = 3.0 * (alpha_v - alpha_wick_i_0)
-            / (pi * R_pore * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section));
-        const double C1 = C1_arg * C1_arg;
-
-        const double inner = C1 * (1.0 + C1 * (3.0 + C1 * (3.0 + C1)));
-        const double C2 = std::cbrt((C1 + 1.0) * (C1 + 1.0) + std::sqrt(inner));
-
-        return 1.0 / C2 + C2 / (C1 + 1.0) - 1.0;
-    }
-    else {
-        return 0.0;
-    }
-}
-
-// Capillary radius
-inline double compute_R_cap(double xi) {
-
-    const double cos_theta = std::sqrt(1.0 - xi * xi);
-
-    if (cos_theta < 1e-12) return 1e12;
-    return R_pore / cos_theta;
-}
-
-// Capillary pressure
-double compute_Dpcap(double alpha_v, double T_x_v) {
-
-    const double xi = compute_xi(alpha_v);
-    const double surf_ten = liquid_sodium::surf_ten(T_x_v);
-
-    if (std::abs(xi - 1.0) < 1e-12) return 0.0;
-
-    const double R_cap = compute_R_cap(xi);
-    return 2.0 * surf_ten / R_cap;
-}
+std::vector<double> DPcap_old(N, 0.0);
+std::vector<double> rho_x_old(N, 0.0);
+std::vector<double> a_int_old(N, 0.0);
 
 int main() {
 
@@ -442,6 +410,9 @@ int main() {
 
         p_x[i] = vapor_sodium::P_sat(T_x_v[i]);
         p_v[i] = vapor_sodium::P_sat(T_x_v[i]);
+
+        alpha_v[i] = 0.93 + (0.92 - 0.93) * xi;
+        alpha_l[i] = 1 - alpha_v[i];
 
         rho_x[i] = liquid_sodium::rho(T_x_bulk[i]);
         rho_v[i] = std::max(1e-6, p_v[i] / (Rv * T_v_bulk[i]));
@@ -541,6 +512,7 @@ int main() {
     u_x_old = u_x;
     p_x_old = p_x;
     p_storage_x_old = p_storage_x;
+    rho_x_old = rho_x;
     bXU = bXU_old;
 
     u_v_old = u_v;
@@ -548,6 +520,10 @@ int main() {
     p_storage_v_old = p_storage_v;
     rho_v_old = rho_v;
     bVU_old = bVU;
+
+    phi_int_old = phi_int;
+    DPcap_old = DPcap;
+    a_int_old = a_int;
 
     // Steam outputs
     std::ofstream time_output(case_chosen + "/time.txt", std::ios::app);
@@ -689,8 +665,9 @@ int main() {
         dt_code = std::min(std::min(dt_cand_w, dt_cand_x), 
             std::min(dt_cand_x, dt_cand_v));                    // Choosing the minimum amongst all the candidates
 
-		dt = std::min(dt_user, dt_code);                        // Choosing the minimum between user and calculated timestep
-		dt *= std::pow(0.5, halves);                            // Halving the timestep if Picard failed
+		// dt = std::min(dt_user, dt_code);                        // Choosing the minimum between user and calculated timestep
+        dt = dt_user;
+        dt *= std::pow(0.5, halves);                            // Halving the timestep if Picard failed
         dt *= accelerator;                                      // Accelerator multiplier
         if (dt < 1e-12) {
 
@@ -710,6 +687,7 @@ int main() {
         T_o_w_iter = T_o_w_old;
         T_w_x_iter = T_w_x_old;
         T_x_v_iter = T_x_v_old;
+        phi_int_iter = phi_int;
 
         // Ramping for power to heat pipe
 
@@ -747,9 +725,9 @@ int main() {
 
         for (pic = 0; pic < max_picard; pic++) {
 
-           // =======================================================================
-           //                                [WICK]
-           // =======================================================================
+            // =======================================================================
+            //                                [WICK]
+            // =======================================================================
 
             #pragma region liquid
 
@@ -769,8 +747,6 @@ int main() {
                 for (int i = 1; i < N - 1; i++) {
 
                     // Physical properties
-                    const double rho_x_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
                     const double D_l = 0.5 * (alpha_l[i] * mu_x[i] + alpha_l[i - 1] * mu_x[i - 1]) / dz;
                     const double D_r = 0.5 * (alpha_l[i] * mu_x[i] + alpha_l[i + 1] * mu_x[i + 1]) / dz;
 
@@ -789,7 +765,7 @@ int main() {
                         + alpha_l[i] * CF * mu_x[i] * dz / sqrt(K) * abs(u_x[i]);
                     dXU[i] =
                         - 0.5 * alpha_l[i] * (p_x[i + 1] - p_x[i - 1])
-                        + alpha_l_old[i] * rho_x_old * u_x_old[i] * dz / dt;
+                        + alpha_l_old[i] * rho_x_old[i] * u_x_old[i] * dz / dt;
                 }
 
                 // Diffusion coefficients for the first and last node to define BCs
@@ -817,8 +793,6 @@ int main() {
 
                 for (int i = 1; i < N - 1; i++) {
 
-                    const double rho_x_old = liquid_sodium::rho(T_x_bulk_old[i]);
-
                     const double D_l = 0.5 * (alpha_l[i] * k_x[i] + alpha_l[i - 1] * k_x[i - 1]) / dz;
                     const double D_r = 0.5 * (alpha_l[i] * k_x[i] + alpha_l[i + 1] * k_x[i + 1]) / dz;
 
@@ -839,7 +813,7 @@ int main() {
                         + alpha_l[i] * rho_x[i] * dz / dt;                                  // [W/(m2 K)]
 
                     dXT[i] =
-                        + alpha_l_old[i] * rho_x_old * dz / dt * h_x_old[i]
+                        + alpha_l_old[i] * rho_x_old[i] * dz / dt * h_x_old[i]
                         + Q_wx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mx[i] * dz                  // Positive if heat is added to the liquid
                         + Q_mass_liquid[i] * dz;        // [W/m2]       
@@ -880,147 +854,6 @@ int main() {
 
                 #pragma endregion
 
-                // Continuity residual initialization to access inner loop
-                continuity_res_x = 1.0;
-
-                // Inner iterations reset
-                piso_iter_x = 0;
-
-                // Inner "SIMPLE" iterations
-                while ((piso_iter_x < tot_piso_iter_x) && (continuity_res_x > continuity_tol_x)) {
-
-                    // =========== CONTINUITY SATIFACTOR
-                    #pragma region continuity_satisfactor
-
-                    // Loop to assemble the linear system for the pressure correction
-                    for (int i = 1; i < N - 1; i++) {
-
-                        const double avgInvbLU_L = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);     // [m2s/kg]
-                        const double avgInvbLU_R = 0.5 * (1.0 / bXU[i + 1] + 1.0 / bXU[i]);     // [m2s/kg]
-
-                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
-
-                        const double mass_flux = phi_int[i] * a_int[i] * dz;   // [kg/(m2s)]
-
-                        const double alpha_rho_l_cd = 0.5 * (alpha_l[i - 1] * rho_x[i - 1] + alpha_l[i] * rho_x[i]);      // [kg/m3]
-                        const double alpha_rho_r_cd = 0.5 * (alpha_l[i] * rho_x[i] + alpha_l[i + 1] * rho_x[i + 1]);      // [kg/m3]
-
-                        const double E_l = alpha_rho_l_cd * avgInvbLU_L / dz;     // [s/m]
-                        const double E_r = alpha_rho_r_cd * avgInvbLU_R / dz;     // [s/m]
-
-                        double lambda = 1.0;
-
-                        aXP[i] = -E_l;              // [s/m]
-                        cXP[i] = -E_r;              // [s/m]
-                        bXP[i] = E_l + E_r + lambda;         // [s/m]
-                        dXP[i] =
-                            + mass_flux
-                            - mass_imbalance + lambda * ((p_v[i] - DPcap[i]) - p_x[i]);       // [kg/(m2s)]
-                    }
-
-                    // BCs for the correction of pressure: zero gradient at first face
-                    aXP[0] = 0.0;
-                    bXP[0] = 1.0;
-                    cXP[0] = -1.0;
-                    dXP[0] = 0.0;
-
-                    // BCs for the correction of pressure: zero at first face
-                    aXP[N - 1] = 1.0;
-                    bXP[N - 1] = 1.0;
-                    cXP[N - 1] = 0.0;
-                    dXP[N - 1] = 0.0;
-
-                    tdma_solver.solve(aXP, bXP, cXP, dXP, p_prime_x);
-
-                    #pragma endregion
-
-                    // =========== PRESSURE CORRECTOR
-                    #pragma region pressure_corrector
-
-                    // Initialization maximum pressure variation
-                    p_error_x = 0.0;
-
-                    for (int i = 0; i < N; i++) {
-
-                        double p_prev_x = p_x[i];
-                        p_x[i] += p_prime_x[i];         // PIMPLE does not require an under-relaxation factor
-                        p_storage_x[i + 1] = p_x[i];
-
-                        p_error_x = std::max(p_error_x, std::abs(p_x[i] - p_prev_x));
-                    }
-
-                    // Enforcing boundary conditions
-                    p_x[0] = p_x[1];
-                    p_storage_x[0] = p_storage_x[1];
-
-                    p_x[N - 1] = p_x[N - 2];
-                    p_storage_x[N + 1] = p_storage_x[N];
-
-                    double omega = 0;
-                    for (int i = 0; i < N; ++i) {
-                        double p_target = p_v[i] - DPcap[i];
-                        p_x[i] = (1.0 - omega) * p_x[i] + omega * p_v[i];
-                    }
-
-                    #pragma endregion
-
-                    // =========== VELOCITY CORRECTOR
-                    #pragma region velocity_corrector
-
-                    u_error_x = 0.0;
-
-                    for (int i = 1; i < N - 1; i++) {
-
-                        double u_prev = u_x[i];
-                        u_x[i] = u_x[i] - (p_prime_x[i + 1] - p_prime_x[i - 1]) / (2.0 * bXU[i]);
-
-                        u_error_x = std::max(u_error_x, std::abs(u_x[i] - u_prev));
-                    }
-
-                    #pragma endregion
-
-                    // =========== FLUX CORRECTOR
-                    #pragma region flux_corrector
-
-                    for (int i = 1; i < N; ++i) {
-
-                        const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]); // [m2s/kg]
-
-                        // Correzione incrementale coerente con la matrice p'
-                        const double rho_face = (phi_x[i] >= 0.0) ? alpha_l[i - 1] * rho_x[i - 1] : alpha_l[i] * rho_x[i];
-                        phi_x[i] -= rho_face * avgInvbXU * (p_prime_x[i] - p_prime_x[i - 1]) / dz;
-
-                    }
-
-                    /*
-                    phi_x[0] = u_inlet_x * alpha_l[0] * rho_x[0];
-                    phi_x[1] = u_inlet_x * alpha_l[0] * rho_x[0];
-
-                    phi_x[N - 1] = u_outlet_x * alpha_l[N - 1] * rho_x[N - 1];
-                    phi_x[N] = u_outlet_x * alpha_l[N - 1] * rho_x[N - 1];
-                    */
-
-                    #pragma endregion
-
-                    // =========== CONTINUITY RESIDUAL CALCULATOR
-                    #pragma region continuity_residual_calculator
-
-                    continuity_res_x = 0.0;
-
-                    for (int i = 1; i < N - 1; ++i) {
-
-                        const double mass_imbalance = (phi_x[i + 1] - phi_x[i]);          // [kg/(m2s)]
-                        const double mass_flux = phi_int[i] * a_int[i] * dz;   // [kg/(m2s)]
-                        dXP[i] = +mass_flux - mass_imbalance;       // [kg/(m2s)]
-
-                        continuity_res_x = std::max(continuity_res_x, std::abs(dXP[i]));
-                    }
-
-                    #pragma endregion
-
-                    piso_iter_x++;
-                }
-
                 // =========== MOMENTUM RESIDUAL CALCULATOR
                 #pragma region momentum_residual_calculator
 
@@ -1034,18 +867,18 @@ int main() {
 
                 #pragma endregion
 
-                simple_iter_x++;
-            }
+                // Apply Rhie and Chow correction OUTSIDE loops
+                for (int i = 1; i < N; ++i) {
+                    const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);
+                    double rc = -avgInvbXU / 4.0 * (p_padded_x[i - 2] - 3 * p_padded_x[i - 1]
+                        + 3 * p_padded_x[i] - p_padded_x[i + 1]);
+                    const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rc;
+                    const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
+                    const double alpha_face = (u_face >= 0.0) ? alpha_l[i - 1] : alpha_l[i];
+                    phi_x[i] = alpha_face * rho_face * u_face;
+                }
 
-            // Apply Rhie and Chow correction OUTSIDE loops
-            for (int i = 1; i < N; ++i) {
-                const double avgInvbXU = 0.5 * (1.0 / bXU[i - 1] + 1.0 / bXU[i]);
-                double rc = -avgInvbXU / 4.0 * (p_padded_x[i - 2] - 3 * p_padded_x[i - 1]
-                    + 3 * p_padded_x[i] - p_padded_x[i + 1]);
-                const double u_face = 0.5 * (u_x[i - 1] + u_x[i]) + rc;
-                const double rho_face = (u_face >= 0.0) ? rho_x[i - 1] : rho_x[i];
-                const double alpha_face = (u_face >= 0.0) ? alpha_l[i - 1] : alpha_l[i];
-                phi_x[i] = alpha_face * rho_face * u_face;
+                simple_iter_x++;
             }
 
             #pragma endregion
@@ -1218,7 +1051,7 @@ int main() {
 
                         const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (alpha_v[i] * rho_v[i] - alpha_v_old[i] * rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
 
-                        const double mass_flux = -phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
+                        const double mass_flux = phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
 
                         const double E_l = 0.5 * (alpha_v[i - 1] * rho_v[i - 1] * (1.0 / bVU[i - 1]) + alpha_v[i] * rho_v[i] * (1.0 / bVU[i])) / dz; // [s/m]
                         const double E_r = 0.5 * (alpha_v[i] * rho_v[i] * (1.0 / bVU[i]) + alpha_v[i + 1] * rho_v[i + 1] * (1.0 / bVU[i + 1])) / dz; // [s/m]
@@ -1355,7 +1188,7 @@ int main() {
                     for (int i = 1; i < N - 1; ++i) {
 
                         const double mass_imbalance = (phi_v[i + 1] - phi_v[i]) + (alpha_v[i] * rho_v[i] - alpha_v_old[i] * rho_v_old[i]) * dz / dt;  // [kg/(m2s)]
-                        const double mass_flux = -phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
+                        const double mass_flux = phi_int[i] * a_int[i] * dz;         // [kg/(m2s)]
                         dVP[i] = +mass_flux - mass_imbalance;  /// [kg/(m2s)]
 
                         continuity_res_v = std::max(continuity_res_v, std::abs(dVP[i]));
@@ -1389,21 +1222,36 @@ int main() {
                 #pragma endregion
 
                 simple_iter_v++;
+
+                // Apply Rhie and Chow correction OUTSIDE loops
+                for (int i = 1; i < N; ++i) {
+                    const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);
+                    double rc = -avgInvbVU / 4.0 * (p_padded_v[i - 2] - 3 * p_padded_v[i - 1]
+                        + 3 * p_padded_v[i] - p_padded_v[i + 1]);
+                    const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rc;
+                    const double rho_face = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];
+                    const double alpha_face = (u_face >= 0.0) ? alpha_v[i - 1] : alpha_v[i];
+                    phi_v[i] = alpha_face * rho_face * u_face;
+                }
             }
 
-            // Apply Rhie and Chow correction OUTSIDE loops
-            for (int i = 1; i < N; ++i) {
-                const double avgInvbVU = 0.5 * (1.0 / bVU[i - 1] + 1.0 / bVU[i]);
-                double rc = -avgInvbVU / 4.0 * (p_padded_v[i - 2] - 3 * p_padded_v[i - 1]
-                    + 3 * p_padded_v[i] - p_padded_v[i + 1]);
-                const double u_face = 0.5 * (u_v[i - 1] + u_v[i]) + rc;
-                const double rho_face = (u_face >= 0.0) ? rho_v[i - 1] : rho_v[i];
-                const double alpha_face = (u_face >= 0.0) ? alpha_v[i - 1] : alpha_v[i];
-                phi_v[i] = alpha_face * rho_face * u_face;
-            }
+
 
             // Update density with new p,T
             for(int i = 0; i < N; ++i) rho_v[i] = std::max(1e-6, p_v[i] / (Rv * T_v_bulk[i]));
+
+            // Pressure field of the liquid from the vapor
+            for (int i = 0; i < N; i++) {
+
+                p_x[i] = p_v[i] - DPcap[i];
+                p_storage_x[i + 1] = p_x[i];
+            }
+
+            p_x[0] = p_x[1];
+            p_x[N - 1] = p_x[N - 2];
+
+            p_storage_x[0] = p_storage_x[1];
+            p_storage_x[N + 1] = p_storage_x[N];
 
             #pragma endregion
 
@@ -1440,6 +1288,25 @@ int main() {
                 const double E_l_int = h_l_int - p_int / rho_int + 0.5 * u_int * u_int;
                 const double E_v_int = h_v_int - p_int / rho_int + 0.5 * u_int * u_int;
 
+                // --- Sine of contact angle xi
+                if (alpha_v[i] <= alpha_wick_i_0 || alpha_v[i] >= alpha_wick_i_plus) {  // Overflow or dryout → flat surface
+                    xi[i] = 1.0;
+                }
+                else if (alpha_v[i] < alpha_wick_i_plus) {
+
+                    const double C1_arg = 3.0 * (alpha_v[i] - alpha_wick_i_0)
+                        / (pi * R_pore * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section));
+                    const double C1 = C1_arg * C1_arg;
+
+                    const double inner = C1 * (1.0 + C1 * (3.0 + C1 * (3.0 + C1)));
+                    const double C2 = std::cbrt((C1 + 1.0) * (C1 + 1.0) + std::sqrt(inner));
+
+                    xi[i] =  1.0 / C2 + C2 / (C1 + 1.0) - 1.0;
+                }
+                else {
+                    xi[i] =  0.0;
+                }
+
                 // --- Interfacial area density a_int
                 if (alpha_v[i] <= alpha_wick_i_0) {
 
@@ -1447,8 +1314,7 @@ int main() {
                 }
                 else if (alpha_v[i] <= alpha_wick_i_plus) {
 
-                    const double xi = compute_xi(alpha_v[i]);
-                    a_int[i] = (2.0 * pi * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section)) / (1.0 + xi);
+                    a_int[i] = (2.0 * pi * R_pore * R_pore * eps_v * pi * D_v / (A_pore * flow_section)) / (1.0 + xi[i]);
                 }
                 else {
 
@@ -1458,8 +1324,14 @@ int main() {
                 // --- Pressure relaxation rate Theta
                 const double Theta = a_int[i] / Z_sum;
 
+                // --- Cosine of contact angle 
+                Rcap[i] = std::sqrt(1.0 - xi[i] * xi[i]) < 1e-12 ? 0.0 : R_pore / std::sqrt(1.0 - xi[i] * xi[i]);
+
+                // --- Surface tension surf_ten
+                surf_ten[i] = liquid_sodium::surf_ten(T_x_v[i]);
+
                 // --- Capillary pressure DPcap
-                DPcap[i] = compute_Dpcap(alpha_l[i], T_x_v[i]);
+                DPcap[i] = std::abs(xi[i] - 1.0) < 1e-12 ? 0.0 :  2.0 * surf_ten[i] / Rcap[i];
 
                 // Tridiagonal coefficients: a*alpha_{i-1} + b*alpha_i + c*alpha_{i+1} = d
                 aXA[i] = -u_int / dz;                                   // [1/s]
@@ -1709,6 +1581,7 @@ int main() {
             pic_error[0] = 0.0;
             pic_error[1] = 0.0;
             pic_error[2] = 0.0;
+            pic_error[3] = 0.0;
 
             for (int i = 0; i < N; ++i) {
 
@@ -1730,16 +1603,24 @@ int main() {
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 pic_error[2] += eps;
 
+                Aold = phi_int_iter[i];
+                Anew = phi_int[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                pic_error[3] += eps;
             }
 
             // Picard error normalization
             pic_error[0] /= N;
             pic_error[1] /= N;
             pic_error[2] /= N;
+            pic_error[3] /= N;
 
             if (pic_error[0] < pic_tolerance[0] &&
                 pic_error[1] < pic_tolerance[1] &&
-                pic_error[2] < pic_tolerance[2]) {
+                pic_error[2] < pic_tolerance[2] &&
+                pic_error[3] < pic_tolerance[3]) {
+
 
                 halves = std::max(0, --halves);     // Double timestep if converged
                 break;                              // Picard converged
@@ -1749,6 +1630,7 @@ int main() {
             T_o_w_iter = T_o_w;
             T_w_x_iter = T_w_x;
             T_x_v_iter = T_x_v;
+            phi_int_iter = phi_int;
 
             #pragma endregion
         }
@@ -1811,6 +1693,7 @@ int main() {
             u_v_old = u_v;
             u_x_old = u_x;
             rho_v_old = rho_v;
+            rho_x_old = rho_x;
 
             alpha_l_old = alpha_l;
             alpha_v_old = alpha_v;
@@ -1845,6 +1728,10 @@ int main() {
             h_x_old = h_x;
             h_v_old = h_v;
 
+            phi_int_old = phi_int;
+            DPcap_old = DPcap;
+            a_int_old = a_int;
+
             // Update total time elapsed
             time_total += dt;
 
@@ -1863,6 +1750,7 @@ int main() {
             u_v = u_v_old;
             p_v = p_v_old;
             rho_v = rho_v_old;
+            rho_x = rho_x_old;
 
             alpha_l = alpha_l_old;
             alpha_v = alpha_v_old;
@@ -1896,6 +1784,10 @@ int main() {
 
             h_x = h_x_old;
             h_v = h_v_old;
+
+            phi_int = phi_int_old;
+            DPcap = DPcap_old;
+            a_int = a_int_old;
 
             halves += 1;                        // Reduce time step if max Picard iterations reached
         }
